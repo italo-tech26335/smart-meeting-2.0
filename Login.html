@@ -1,0 +1,272 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Meeting - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <?!= include('Login-CSS') ?>
+</head>
+<body>
+<div class="login-bg"></div>
+
+<div class="login-card" id="painelLogin">
+  <div class="login-logo">
+    <div class="icon">&#9889;</div>
+    <h1>Smart Meeting</h1>
+    <p>Faca login para continuar</p>
+  </div>
+
+  <? if (mensagemErroUrl) { ?>
+  <div class="msg-erro" style="display:block;"><?= mensagemErroUrl ?></div>
+  <? } ?>
+
+  <div class="msg-erro" id="erroLogin"></div>
+  <div class="msg-sucesso" id="sucessoLogin"></div>
+
+  <div class="form-group">
+    <label>Email</label>
+    <div class="input-wrap">
+      <input type="email" id="inputEmail" placeholder="seu@email.com" autocomplete="username">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Senha</label>
+    <div class="input-wrap">
+      <input type="password" id="inputSenha" placeholder="********" autocomplete="current-password">
+      <button type="button" class="toggle-senha" onclick="toggleSenha('inputSenha', this)">
+        <i class="fas fa-eye"></i>
+      </button>
+    </div>
+  </div>
+
+  <button class="btn-entrar" id="btnEntrar" onclick="fazerLogin()">Entrar</button>
+
+  <div class="link-reset">
+    <a onclick="mostrarReset()">Esqueci minha senha</a>
+  </div>
+</div>
+
+<div class="login-card painel-reset" id="painelReset">
+  <button class="btn-voltar" onclick="voltarLogin()">
+    <i class="fas fa-arrow-left"></i> Voltar ao login
+  </button>
+
+  <div class="login-logo">
+    <div class="icon">&#128233;</div>
+    <h1>Redefinir Senha</h1>
+    <p>Enviaremos um link para seu email</p>
+  </div>
+
+  <div class="msg-erro" id="erroReset"></div>
+  <div class="msg-sucesso" id="sucessoReset"></div>
+
+  <div class="form-group">
+    <label>Email cadastrado</label>
+    <div class="input-wrap">
+      <input type="email" id="inputEmailReset" placeholder="seu@email.com" autocomplete="email">
+    </div>
+  </div>
+
+  <button class="btn-entrar" id="btnReset" onclick="enviarReset()">Enviar link</button>
+</div>
+
+<div class="login-card painel-nova-senha" id="painelNovaSenha">
+  <div class="login-logo">
+    <div class="icon">&#128273;</div>
+    <h1>Nova Senha</h1>
+    <p>Crie sua nova senha de acesso</p>
+  </div>
+
+  <div class="msg-erro" id="erroNovaSenha"></div>
+  <div class="msg-sucesso" id="sucessoNovaSenha"></div>
+
+  <div class="form-group">
+    <label>Nova Senha</label>
+    <div class="input-wrap">
+      <input type="password" id="inputNovaSenha" placeholder="Minimo 8 caracteres" autocomplete="new-password">
+      <button type="button" class="toggle-senha" onclick="toggleSenha('inputNovaSenha', this)">
+        <i class="fas fa-eye"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Confirmar Senha</label>
+    <div class="input-wrap">
+      <input type="password" id="inputConfirmaSenha" placeholder="Repita a senha" autocomplete="new-password">
+      <button type="button" class="toggle-senha" onclick="toggleSenha('inputConfirmaSenha', this)">
+        <i class="fas fa-eye"></i>
+      </button>
+    </div>
+  </div>
+
+  <small style="color:#64748b;font-size:.8rem;display:block;margin-bottom:16px;">
+    Minimo 8 caracteres, 1 letra maiuscula, 1 numero e 1 caractere especial.
+  </small>
+
+  <button class="btn-entrar" id="btnNovaSenha" onclick="salvarNovaSenha()">Salvar nova senha</button>
+</div>
+
+<script>
+  var TOKEN_RESET = '<?= tokenReset ?>';
+
+  document.addEventListener('DOMContentLoaded', function() {
+    if (TOKEN_RESET) {
+      mostrarPainel('painelNovaSenha');
+    } else {
+      mostrarPainel('painelLogin');
+    }
+
+    document.getElementById('inputEmail').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') document.getElementById('inputSenha').focus();
+    });
+    document.getElementById('inputSenha').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') fazerLogin();
+    });
+    document.getElementById('inputEmailReset').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') enviarReset();
+    });
+    document.getElementById('inputNovaSenha').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') document.getElementById('inputConfirmaSenha').focus();
+    });
+    document.getElementById('inputConfirmaSenha').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') salvarNovaSenha();
+    });
+  });
+
+  function mostrarPainel(id) {
+    ['painelLogin', 'painelReset', 'painelNovaSenha'].forEach(function(p) {
+      var el = document.getElementById(p);
+      if (el) el.style.display = (p === id) ? 'block' : 'none';
+    });
+  }
+
+  function mostrarReset() { mostrarPainel('painelReset'); }
+  function voltarLogin() { mostrarPainel('painelLogin'); limparMensagens(); }
+
+  function toggleSenha(inputId, btn) {
+    var input = document.getElementById(inputId);
+    var icon = btn.querySelector('i');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.className = 'fas fa-eye-slash';
+    } else {
+      input.type = 'password';
+      icon.className = 'fas fa-eye';
+    }
+  }
+
+  function limparMensagens() {
+    ['erroLogin', 'sucessoLogin', 'erroReset', 'sucessoReset', 'erroNovaSenha', 'sucessoNovaSenha'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) { el.style.display = 'none'; el.textContent = ''; }
+    });
+  }
+
+  function mostrarErro(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; }
+  function mostrarSucesso(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; }
+
+  function setCarregando(btnId, carregando) {
+    var btn = document.getElementById(btnId);
+    if (carregando) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Aguarde...';
+    } else {
+      btn.disabled = false;
+    }
+  }
+
+  function fazerLogin() {
+    limparMensagens();
+    var email = document.getElementById('inputEmail').value.trim();
+    var senha = document.getElementById('inputSenha').value;
+
+    if (!email || !senha) {
+      mostrarErro('erroLogin', 'Preencha email e senha.');
+      return;
+    }
+
+    setCarregando('btnEntrar', true);
+    document.getElementById('btnEntrar').innerHTML = '<span class="spinner"></span> Entrando...';
+
+    google.script.run
+      .withSuccessHandler(function(r) {
+        setCarregando('btnEntrar', false);
+        document.getElementById('btnEntrar').textContent = 'Entrar';
+        if (r.sucesso) {
+          sessionStorage.setItem('sm_token', r.token);
+          sessionStorage.setItem('sm_usuario', JSON.stringify(r.usuario));
+          google.script.run.withSuccessHandler(function(url) {
+            window.location.href = url + '?pagina=reunioes&token=' + r.token;
+          }).obterUrlWebApp();
+        } else {
+          mostrarErro('erroLogin', r.mensagem || 'Erro ao fazer login.');
+        }
+      })
+      .withFailureHandler(function() {
+        setCarregando('btnEntrar', false);
+        document.getElementById('btnEntrar').textContent = 'Entrar';
+        mostrarErro('erroLogin', 'Erro de conexao. Tente novamente.');
+      })
+      .fazerLogin(email, senha);
+  }
+
+  function enviarReset() {
+    limparMensagens();
+    var email = document.getElementById('inputEmailReset').value.trim();
+    if (!email) { mostrarErro('erroReset', 'Informe seu email.'); return; }
+
+    setCarregando('btnReset', true);
+    document.getElementById('btnReset').innerHTML = '<span class="spinner"></span> Enviando...';
+
+    google.script.run
+      .withSuccessHandler(function(r) {
+        setCarregando('btnReset', false);
+        document.getElementById('btnReset').textContent = 'Enviar link';
+        mostrarSucesso('sucessoReset', r.mensagem || 'Email enviado!');
+        document.getElementById('inputEmailReset').value = '';
+      })
+      .withFailureHandler(function() {
+        setCarregando('btnReset', false);
+        document.getElementById('btnReset').textContent = 'Enviar link';
+        mostrarErro('erroReset', 'Erro ao enviar. Tente novamente.');
+      })
+      .solicitarResetSenha(email);
+  }
+
+  function salvarNovaSenha() {
+    limparMensagens();
+    var nova = document.getElementById('inputNovaSenha').value;
+    var confirma = document.getElementById('inputConfirmaSenha').value;
+
+    if (!nova || !confirma) { mostrarErro('erroNovaSenha', 'Preencha os dois campos.'); return; }
+    if (nova !== confirma) { mostrarErro('erroNovaSenha', 'As senhas nao coincidem.'); return; }
+
+    setCarregando('btnNovaSenha', true);
+    document.getElementById('btnNovaSenha').innerHTML = '<span class="spinner"></span> Salvando...';
+
+    google.script.run
+      .withSuccessHandler(function(r) {
+        setCarregando('btnNovaSenha', false);
+        document.getElementById('btnNovaSenha').textContent = 'Salvar nova senha';
+        if (r.sucesso) {
+          mostrarSucesso('sucessoNovaSenha', r.mensagem);
+          setTimeout(function() { mostrarPainel('painelLogin'); }, 2000);
+        } else {
+          mostrarErro('erroNovaSenha', r.mensagem);
+        }
+      })
+      .withFailureHandler(function() {
+        setCarregando('btnNovaSenha', false);
+        document.getElementById('btnNovaSenha').textContent = 'Salvar nova senha';
+        mostrarErro('erroNovaSenha', 'Erro de conexao.');
+      })
+      .redefinirSenha(TOKEN_RESET, nova);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Meeting — Admin</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    var SESSAO_TOKEN   = '<?= sessaoToken ?>';
+    var USUARIO_NOME   = '<?= usuarioNome ?>';
+    var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .adm-header {
+      position: sticky; top: 0; z-index: 100;
+      background: #1a1d27;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      padding: 0 24px;
+      height: 56px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .adm-logo { font-size: 1rem; font-weight: 700; color: #fff; letter-spacing: -.01em; }
+    .adm-logo span { color: #6366f1; }
+    .adm-nav { display: flex; gap: 4px; flex: 1; }
+    .adm-nav a {
+      padding: 6px 14px; border-radius: 8px;
+      color: #94a3b8; text-decoration: none; font-size: .85rem; font-weight: 500;
+      cursor: pointer; transition: background .15s, color .15s;
+    }
+    .adm-nav a:hover, .adm-nav a.ativo { background: rgba(99,102,241,.15); color: #818cf8; }
+    .adm-user { display: flex; align-items: center; gap: 10px; color: #64748b; font-size: .82rem; }
+    .btn-logout {
+      padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1);
+      background: none; color: #94a3b8; cursor: pointer; font-size: .82rem;
+      transition: background .15s, color .15s;
+    }
+    .btn-logout:hover { background: rgba(239,68,68,.1); color: #fca5a5; border-color: rgba(239,68,68,.3); }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .adm-main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+    /* ── Seções ──────────────────────────────────────────────────── */
+    .adm-secao { display: none; }
+    .adm-secao.ativa { display: block; }
+
+    /* ── Cards métricas ──────────────────────────────────────────── */
+    .cards-metricas { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 16px; margin-bottom: 28px; }
+    .card-metrica {
+      background: #1a1d27; border: 1px solid rgba(255,255,255,.07);
+      border-radius: 12px; padding: 20px 16px;
+    }
+    .card-metrica .valor { font-size: 2rem; font-weight: 700; color: #6366f1; }
+    .card-metrica .label { font-size: .78rem; color: #64748b; margin-top: 4px; }
+
+    /* ── Tabela ──────────────────────────────────────────────────── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: rgba(255,255,255,.04);
+      padding: 10px 14px; text-align: left;
+      font-size: .75rem; font-weight: 600; color: #64748b;
+      text-transform: uppercase; letter-spacing: .05em;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    tbody tr:hover { background: rgba(255,255,255,.025); }
+    tbody td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.04); font-size: .85rem; }
+
+    /* ── Badges ─────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 20px;
+      font-size: .72rem; font-weight: 600;
+    }
+    .badge-admin   { background: rgba(99,102,241,.2);  color: #818cf8; }
+    .badge-usuario { background: rgba(34,197,94,.15);  color: #86efac; }
+    .badge-viz     { background: rgba(100,116,139,.2); color: #94a3b8; }
+    .badge-ativo   { background: rgba(34,197,94,.15);  color: #86efac; }
+    .badge-inativo { background: rgba(239,68,68,.12);  color: #fca5a5; }
+    .badge-bloq    { background: rgba(245,158,11,.15); color: #fcd34d; }
+
+    /* ── Botões ─────────────────────────────────────────────────── */
+    .btn {
+      padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: .82rem; font-weight: 500; transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; }
+    .btn-ghost { background: rgba(255,255,255,.06); color: #94a3b8; border: 1px solid rgba(255,255,255,.1); }
+    .btn-danger { background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.2); }
+    .btn-sm { padding: 4px 10px; font-size: .78rem; }
+
+    /* ── Toolbar ─────────────────────────────────────────────────── */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+    .toolbar h2 { font-size: 1rem; font-weight: 600; color: #fff; }
+    .toolbar-acoes { display: flex; gap: 8px; align-items: center; }
+
+    /* ── Modal ──────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,.6); align-items: center; justify-content: center;
+    }
+    .modal-overlay.aberto { display: flex; }
+    .modal-caixa {
+      background: #1a1d27; border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px; padding: 28px; width: 100%; max-width: 480px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+    .modal-titulo { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px; }
+    .campo-grupo { margin-bottom: 14px; }
+    .campo-grupo label { display: block; font-size: .78rem; color: #94a3b8; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+    .campo-grupo input, .campo-grupo select {
+      width: 100%; background: #0f1117; border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px; padding: 10px 12px; color: #e2e8f0; font-size: .9rem; outline: none;
+    }
+    .campo-grupo input:focus, .campo-grupo select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* ── Senha gerada ────────────────────────────────────────────── */
+    .senha-gerada {
+      background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2);
+      border-radius: 8px; padding: 12px 14px; font-size: .85rem;
+      color: #86efac; display: none; margin-top: 12px; word-break: break-all;
+    }
+
+    /* ── Filtro logs ──────────────────────────────────────────────── */
+    .filtros-logs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .filtros-logs select, .filtros-logs input {
+      background: #1a1d27; border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px; padding: 7px 10px; color: #e2e8f0; font-size: .83rem; outline: none;
+    }
+
+    /* ── Toast ─────────────────────────────────────────────────── */
+    #toastAdmin { position: fixed; bottom: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+    .toast-adm {
+      padding: 12px 18px; border-radius: 10px; font-size: .85rem; font-weight: 500;
+      animation: toastIn .25s ease;
+    }
+    @keyframes toastIn { from{opacity:0;transform:translateX(60px);} to{opacity:1;transform:translateX(0);} }
+    .toast-ok  { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); color: #86efac; }
+    .toast-err { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+
+    /* ── Spinner ──────────────────────────────────────────────────── */
+    .spinner-inline {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.2); border-top-color: #6366f1;
+      border-radius: 50%; animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty state ─────────────────────────────────────────────── */
+    .empty-state { text-align: center; padding: 48px 24px; color: #475569; }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header class="adm-header">
+  <div class="adm-logo">Smart <span>Meeting</span> <span style="font-size:.7rem;color:#64748b;font-weight:400;">Admin</span></div>
+  <nav class="adm-nav">
+    <a onclick="mostrarSecao('secUsuarios')" class="ativo" id="tabUsuarios">
+      <i class="fas fa-users"></i> Usuários
+    </a>
+    <a onclick="mostrarSecao('secLogs')" id="tabLogs">
+      <i class="fas fa-scroll"></i> Logs
+    </a>
+  </nav>
+  <div class="adm-user">
+    <span id="admNomeUsuario"></span>
+    <button class="btn-logout" onclick="fazerLogoutCliente()">
+      <i class="fas fa-sign-out-alt"></i> Sair
+    </button>
+  </div>
+</header>
+
+<!-- ══ CONTEÚDO ══ -->
+<main class="adm-main">
+
+  <!-- ── Seção Usuários ── -->
+  <section class="adm-secao ativa" id="secUsuarios">
+    <div class="cards-metricas" id="cardsMetricas">
+      <div class="card-metrica"><div class="valor" id="metTotal">—</div><div class="label">Total de usuários</div></div>
+      <div class="card-metrica"><div class="valor" id="metAtivos">—</div><div class="label">Ativos</div></div>
+      <div class="card-metrica"><div class="valor" id="metBloq">—</div><div class="label">Bloqueados</div></div>
+      <div class="card-metrica"><div class="valor" id="metAdmin">—</div><div class="label">Admins</div></div>
+    </div>
+
+    <div class="toolbar">
+      <h2><i class="fas fa-users"></i> Gerenciar Usuários</h2>
+      <div class="toolbar-acoes">
+        <button class="btn btn-primary" onclick="abrirModalNovoUsuario()">
+          <i class="fas fa-user-plus"></i> Novo Usuário
+        </button>
+        <button class="btn btn-ghost" onclick="carregarUsuarios()">
+          <i class="fas fa-sync"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome / Email</th>
+            <th>Perfil</th>
+            <th>Status</th>
+            <th>Último Login</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyUsuarios">
+          <tr><td colspan="5" style="text-align:center;padding:32px;color:#475569;">
+            <span class="spinner-inline"></span> Carregando...
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Seção Logs ── -->
+  <section class="adm-secao" id="secLogs">
+    <div class="toolbar">
+      <h2><i class="fas fa-scroll"></i> Logs de Auditoria</h2>
+      <div class="toolbar-acoes">
+        <button class="btn btn-ghost" onclick="carregarLogs()">
+          <i class="fas fa-sync"></i> Atualizar
+        </button>
+      </div>
+    </div>
+
+    <div class="filtros-logs">
+      <select id="filtroEvento" onchange="carregarLogs()">
+        <option value="">Todos os eventos</option>
+        <option value="login_sucesso">Login sucesso</option>
+        <option value="login_falha">Login falha</option>
+        <option value="logout">Logout</option>
+        <option value="reset_senha">Reset de senha</option>
+        <option value="acesso_negado">Acesso negado</option>
+        <option value="sessao_expirada">Sessão expirada</option>
+        <option value="usuario_bloqueado">Bloqueio</option>
+      </select>
+      <input type="text" id="filtroUsuarioLog" placeholder="Filtrar por email..." oninput="carregarLogs()">
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Data/Hora</th>
+            <th>Evento</th>
+            <th>Usuário</th>
+            <th>Detalhes</th>
+            <th>Resultado</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyLogs">
+          <tr><td colspan="5" style="text-align:center;padding:32px;color:#475569;">
+            Selecione a aba Logs para carregar
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<!-- ══ MODAL NOVO / EDITAR USUÁRIO ══ -->
+<div class="modal-overlay" id="modalUsuario">
+  <div class="modal-caixa">
+    <div class="modal-titulo" id="modalUsuarioTitulo">Novo Usuário</div>
+    <input type="hidden" id="editUserId">
+
+    <div class="campo-grupo">
+      <label>Nome *</label>
+      <input type="text" id="editNome" placeholder="Nome completo">
+    </div>
+    <div class="campo-grupo">
+      <label>Email *</label>
+      <input type="email" id="editEmail" placeholder="usuario@empresa.com">
+    </div>
+    <div class="campo-grupo">
+      <label>Perfil</label>
+      <select id="editPerfil">
+        <option value="usuario">Usuário</option>
+        <option value="visualizador">Visualizador</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div class="campo-grupo" id="campoSenhaModal">
+      <label>Senha temporária (deixe em branco para gerar automaticamente)</label>
+      <input type="text" id="editSenha" placeholder="Mínimo 8 caracteres">
+    </div>
+    <div class="campo-grupo" id="campoStatusModal" style="display:none;">
+      <label>Status</label>
+      <select id="editAtivo">
+        <option value="true">Ativo</option>
+        <option value="false">Inativo</option>
+      </select>
+    </div>
+
+    <div class="senha-gerada" id="senhaGerada"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="fecharModalUsuario()">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarUsuario" onclick="salvarUsuario()">
+        <i class="fas fa-save"></i> Salvar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOASTS ══ -->
+<div id="toastAdmin"></div>
+
+<!-- ══ SCRIPTS ══ -->
+<?!= include('Compartilhado-Utilidades🔧'); ?>
+<?!= include('PaginaAdmin-JS'); ?>
+</body>
+</html>

@@ -130,10 +130,16 @@ function debounce(fn, atraso) {
 
 // ========================= INICIALIZAÇÃO =========================
 document.addEventListener('DOMContentLoaded', function() {
-  atualizarStatusCarregamento('Conectando ao servidor...');
-  setTimeout(function() { atualizarStatusCarregamento('Carregando dados...'); }, 500);
-  inicializarLayoutPagina();
-  carregarTudo();
+  // Exibir nome do usuário logado no header
+  var elNome = document.getElementById('headerUsuarioNome');
+  if (elNome && typeof USUARIO_NOME !== 'undefined') elNome.textContent = USUARIO_NOME;
+
+  atualizarStatusCarregamento('Verificando sessão...');
+  verificarSessaoCliente(function() {
+    atualizarStatusCarregamento('Carregando dados...');
+    inicializarLayoutPagina();
+    carregarTudo();
+  });
 });
 
 /** Configura o layout inicial (chat oculto) */
@@ -195,11 +201,6 @@ function preencherEstado(dados) {
     _atualizarBotaoTema(false);
   }
 
-  // ← Inicializar permissões e atualizar botão de admin
-  if (typeof inicializarPermissoes === 'function') {
-    inicializarPermissoes(dados.permissoes);
-    _atualizarUIPermissoes();
-  }
 }
 
 /** Recarrega dados do servidor SEM tela de carregamento (usa spinner inline) */
@@ -4010,14 +4011,15 @@ function configurarNavegacao() {
   if (typeof google !== 'undefined' && google.script) {
     google.script.run
       .withSuccessHandler(function(urlBase) {
+        var tk = (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) ? '&token=' + encodeURIComponent(SESSAO_TOKEN) : '';
         var links = document.querySelectorAll('a[data-pagina]');
         links.forEach(function(link) {
           var pagina = link.getAttribute('data-pagina');
-          var urlCompleta = urlBase + '?pagina=' + pagina;
+          var urlCompleta = urlBase + '?pagina=' + pagina + tk;
           link.href = urlCompleta;
           link.addEventListener('click', function(evento) {
             evento.preventDefault();
-            window.top.location.href = urlCompleta;
+            window.location.href = urlCompleta;
           });
         });
       })
@@ -4734,231 +4736,5 @@ function _escaparHtml(str) {
 
 // ========================= GERENCIAMENTO DE PERMISSÕES =========================
 
-var _permissoesCarregadas = [];
-var _permissaoEditandoId = null;
-
-/** Mostra/oculta botão de permissões conforme nível do usuário */
-function _atualizarUIPermissoes() {
-  var btn = document.getElementById('btnPermissoesCabecalho');
-  if (btn) btn.style.display = permissoesUsuario.ehAdmin ? '' : 'none';
-}
-
-/** Abre o modal de listagem de permissões (apenas admin) */
-function abrirModalPermissoes() {
-  if (!permissoesUsuario.ehAdmin) {
-    mostrarToast('Acesso restrito a administradores', 'aviso');
-    return;
-  }
-  google.script.run
-    .withSuccessHandler(function(result) {
-      if (result.sucesso) {
-        _permissoesCarregadas = result.permissoes || [];
-        _renderizarListaPermissoes();
-        abrirModal('modalPermissoes');
-      } else {
-        mostrarToast(result.mensagem || 'Erro ao carregar permissões', 'erro');
-      }
-    })
-    .withFailureHandler(function(e) { mostrarToast('Erro: ' + e.message, 'erro'); })
-    .listarTodasPermissoes();
-}
-
-/** Renderiza a lista de usuários no modal */
-function _renderizarListaPermissoes() {
-  var container = document.getElementById('listaPermissoes');
-  if (!container) return;
-
-  if (_permissoesCarregadas.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--cor-texto-secundario,#888);"><i class="fas fa-user-shield" style="font-size:2rem;margin-bottom:8px;display:block;"></i><p>Nenhuma permissão configurada</p><small>Clique em "Nova Permissão" para adicionar</small></div>';
-    return;
-  }
-
-  var labels = { admin: 'Admin', gestor: 'Gestor', colaborador: 'Colaborador' };
-  var html = '';
-
-  _permissoesCarregadas.forEach(function(perm) {
-    var iniciais = (perm.email || 'U').split('@')[0].substring(0, 2).toUpperCase();
-    var nivel = perm.nivelAcesso || 'colaborador';
-    var setoresTexto = perm.setoresPermitidos.length > 0
-      ? perm.setoresPermitidos.slice(0, 2).join(', ') + (perm.setoresPermitidos.length > 2 ? '...' : '')
-      : 'Todos';
-    var inativo = !perm.ativo ? '<span style="background:#fee2e2;color:#dc2626;font-size:0.72rem;padding:2px 8px;border-radius:10px;font-weight:600;">Inativo</span>' : '';
-
-    html += '<div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--cor-borda-clara,#e5e7eb);border-radius:8px;margin-bottom:8px;' + (!perm.ativo ? 'opacity:0.6;' : '') + '">'
-      + '<div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:var(--cor-primaria,#4a6fa5);color:#fff;flex-shrink:0;">' + _escaparHtml(iniciais) + '</div>'
-      + '<div style="flex:1;min-width:0;">'
-      + '<div style="font-weight:600;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _escaparHtml(perm.email) + '</div>'
-      + '<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center;">'
-      + '<span style="background:var(--cor-primaria-clara,#dbeafe);color:var(--cor-primaria,#4a6fa5);font-size:0.72rem;padding:2px 8px;border-radius:10px;font-weight:600;">' + (labels[nivel] || nivel) + '</span>'
-      + '<span style="background:var(--cor-fundo,#f9fafb);border:1px solid var(--cor-borda-clara,#e5e7eb);font-size:0.72rem;padding:2px 8px;border-radius:10px;"><i class="fas fa-building" style="margin-right:3px;"></i>' + _escaparHtml(setoresTexto) + '</span>'
-      + inativo
-      + '</div></div>'
-      + '<div style="display:flex;gap:6px;flex-shrink:0;">'
-      + '<button onclick="editarPermissao(\'' + perm.id + '\')" title="Editar" style="background:none;border:1px solid var(--cor-borda-clara,#e5e7eb);border-radius:6px;padding:6px 10px;cursor:pointer;"><i class="fas fa-edit"></i></button>'
-      + '<button onclick="confirmarRemoverPermissao(\'' + perm.id + '\')" title="Remover" style="background:none;border:1px solid #fca5a5;border-radius:6px;padding:6px 10px;cursor:pointer;color:#dc2626;"><i class="fas fa-trash"></i></button>'
-      + '</div></div>';
-  });
-
-  container.innerHTML = html;
-}
-
-/** Abre formulário para nova permissão */
-function abrirFormNovaPermissao() {
-  _permissaoEditandoId = null;
-  document.getElementById('permissaoId').value = '';
-  document.getElementById('permissaoEmail').value = '';
-  document.getElementById('permissaoNivel').value = 'colaborador';
-  document.getElementById('permissaoPodeCriarProjeto').checked = false;
-  document.getElementById('permissaoPodeCriarEtapa').checked = true;
-  document.getElementById('permissaoFiltrarResponsavel').value = 'false';
-  document.getElementById('permissaoAtivo').value = 'true';
-  document.getElementById('tituloModalPermissao').textContent = 'Nova Permissão';
-  document.getElementById('btnRemoverPermissao').style.display = 'none';
-  _popularCheckboxesSetores([]);
-  _popularCheckboxesProjetos([]);
-  atualizarCamposPermissao();
-  abrirModal('modalEditarPermissao');
-}
-
-/** Edita uma permissão existente */
-function editarPermissao(permissaoId) {
-  var perm = _permissoesCarregadas.find(function(p) { return p.id === permissaoId; });
-  if (!perm) return;
-  _permissaoEditandoId = permissaoId;
-  document.getElementById('permissaoId').value = perm.id;
-  document.getElementById('permissaoEmail').value = perm.email;
-  document.getElementById('permissaoNivel').value = perm.nivelAcesso || 'colaborador';
-  document.getElementById('permissaoPodeCriarProjeto').checked = perm.podeCriarProjeto;
-  document.getElementById('permissaoPodeCriarEtapa').checked = perm.podeCriarEtapa;
-  document.getElementById('permissaoFiltrarResponsavel').value = perm.filtrarPorResponsavel ? 'true' : 'false';
-  document.getElementById('permissaoAtivo').value = perm.ativo ? 'true' : 'false';
-  document.getElementById('tituloModalPermissao').textContent = 'Editar Permissão';
-  document.getElementById('btnRemoverPermissao').style.display = '';
-  _popularCheckboxesSetores(perm.setoresPermitidos || []);
-  _popularCheckboxesProjetos(perm.projetosPermitidos || []);
-  atualizarCamposPermissao();
-  abrirModal('modalEditarPermissao');
-}
-
-/** Popula checkboxes de setores */
-function _popularCheckboxesSetores(selecionados) {
-  var container = document.getElementById('setoresPermitidosContainer');
-  if (!container) return;
-  var setores = (ESTADO.setores || []).map(function(s) { return s.nome; }).filter(Boolean).sort();
-  if (setores.length === 0) { container.innerHTML = '<small>Nenhum setor cadastrado</small>'; return; }
-  container.innerHTML = setores.map(function(setor) {
-    var marcado = selecionados.includes(setor) ? 'checked' : '';
-    return '<label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;cursor:pointer;">'
-      + '<input type="checkbox" value="' + _escaparHtml(setor) + '" ' + marcado + '>'
-      + _escaparHtml(setor) + '</label>';
-  }).join('');
-}
-
-/** Popula checkboxes de projetos */
-function _popularCheckboxesProjetos(selecionados) {
-  var container = document.getElementById('projetosPermitidosContainer');
-  if (!container) return;
-  var projetos = ESTADO.listaProjetos || [];
-  if (projetos.length === 0) { container.innerHTML = '<small>Nenhum projeto cadastrado</small>'; return; }
-  container.innerHTML = projetos.map(function(p) {
-    var marcado = selecionados.includes(p.id) ? 'checked' : '';
-    return '<label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;cursor:pointer;">'
-      + '<input type="checkbox" value="' + p.id + '" ' + marcado + '>'
-      + _escaparHtml(p.nome) + (p.setor ? ' <small style="color:#888;">(' + _escaparHtml(p.setor) + ')</small>' : '') + '</label>';
-  }).join('');
-}
-
-/** Mostra/oculta campos conforme nível selecionado */
-function atualizarCamposPermissao() {
-  var nivel = document.getElementById('permissaoNivel').value;
-  var campoSetores = document.getElementById('campoSetoresPermitidos');
-  var campoProjetos = document.getElementById('campoProjetosPermitidos');
-  if (nivel === 'admin') {
-    campoSetores.style.display = 'none';
-    campoProjetos.style.display = 'none';
-    document.getElementById('permissaoPodeCriarProjeto').checked = true;
-    document.getElementById('permissaoPodeCriarEtapa').checked = true;
-  } else if (nivel === 'gestor') {
-    campoSetores.style.display = '';
-    campoProjetos.style.display = 'none';
-  } else {
-    campoSetores.style.display = '';
-    campoProjetos.style.display = '';
-  }
-}
-
-/** Coleta setores selecionados */
-function _obterSetoresSelecionados() {
-  var cbs = document.querySelectorAll('#setoresPermitidosContainer input[type="checkbox"]:checked');
-  return Array.from(cbs).map(function(cb) { return cb.value; });
-}
-
-/** Coleta projetos selecionados */
-function _obterProjetosSelecionados() {
-  var cbs = document.querySelectorAll('#projetosPermitidosContainer input[type="checkbox"]:checked');
-  return Array.from(cbs).map(function(cb) { return cb.value; });
-}
-
-/** Salva a permissão */
-function salvarPermissaoModal() {
-  var email = document.getElementById('permissaoEmail').value.trim();
-  if (!email) { mostrarToast('Email é obrigatório', 'aviso'); return; }
-
-  var dadosPermissao = {
-    id: _permissaoEditandoId,
-    email: email,
-    nivelAcesso: document.getElementById('permissaoNivel').value,
-    setoresPermitidos: _obterSetoresSelecionados(),
-    projetosPermitidos: _obterProjetosSelecionados(),
-    podeCriarProjeto: document.getElementById('permissaoPodeCriarProjeto').checked,
-    podeCriarEtapa: document.getElementById('permissaoPodeCriarEtapa').checked,
-    filtrarPorResponsavel: document.getElementById('permissaoFiltrarResponsavel').value === 'true',
-    ativo: document.getElementById('permissaoAtivo').value === 'true'
-  };
-
-  google.script.run
-    .withSuccessHandler(function(result) {
-      if (result.sucesso) {
-        fecharModal('modalEditarPermissao');
-        abrirModalPermissoes();
-        mostrarToast(result.mensagem, 'sucesso');
-      } else {
-        mostrarToast(result.mensagem || 'Erro ao salvar', 'erro');
-      }
-    })
-    .withFailureHandler(function(e) { mostrarToast('Erro: ' + e.message, 'erro'); })
-    .salvarPermissaoUsuario(dadosPermissao);
-}
-
-/** Confirma remoção */
-function confirmarRemoverPermissao(permissaoId) {
-  var perm = _permissoesCarregadas.find(function(p) { return p.id === permissaoId; });
-  if (!perm) return;
-  if (confirm('Tem certeza que deseja remover as permissões de ' + perm.email + '?')) {
-    _removerPermissao(permissaoId);
-  }
-}
-
-/** Remove permissão atual (do modal de edição) */
-function removerPermissaoAtual() {
-  if (!_permissaoEditandoId) return;
-  confirmarRemoverPermissao(_permissaoEditandoId);
-}
-
-/** Remove uma permissão pelo ID */
-function _removerPermissao(permissaoId) {
-  google.script.run
-    .withSuccessHandler(function(result) {
-      if (result.sucesso) {
-        fecharModal('modalEditarPermissao');
-        abrirModalPermissoes();
-        mostrarToast(result.mensagem, 'sucesso');
-      } else {
-        mostrarToast(result.mensagem || 'Erro ao remover', 'erro');
-      }
-    })
-    .withFailureHandler(function(e) { mostrarToast('Erro: ' + e.message, 'erro'); })
-    .removerPermissaoUsuario(permissaoId);
-}
 
 </script>

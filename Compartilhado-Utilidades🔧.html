@@ -1,43 +1,64 @@
 <script>
   /* ========================================================================
    * COMPARTILHADO-UTILIDADES🔧
-   * Definições centralizadas de permissões e datas — usadas por todas as páginas.
-   * Incluir ANTES dos scripts específicos de cada página.
+   * Sessão, autenticação e utilitários de data — usados por todas as páginas.
+   * Cada página deve definir SESSAO_TOKEN, USUARIO_NOME e USUARIO_PERFIL
+   * antes de incluir este arquivo.
    * ======================================================================== */
 
-  // ── Estrutura padrão de permissões do usuário ──────────────────────────────
-  var permissoesUsuario = {
-    nivelAcesso: 'visitante',
-    podeCriarProjeto: false,
-    podeCriarEtapa: false,
-    ehAdmin: false,
-    setoresPermitidos: [],
-    projetosPermitidos: [],
-    filtrarPorResponsavel: false,
-    email: '',
-    ativo: false
-  };
+  // ── Sessão (preenchidos via template em cada página) ──────────────────────
+  // Exemplo em cada página:
+  //   var SESSAO_TOKEN   = '<?= sessaoToken ?>';
+  //   var USUARIO_NOME   = '<?= usuarioNome ?>';
+  //   var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
 
-  // ── Níveis de acesso (espelha o backend) ──────────────────────────────────
-  var NIVEIS_ACESSO = {
-    ADMIN: 'admin',
-    GESTOR: 'gestor',
-    COLABORADOR: 'colaborador',
-    VISITANTE: 'visitante'
-  };
+  // ── Perfis disponíveis ────────────────────────────────────────────────────
+  var PERFIS = { ADMIN: 'admin', USUARIO: 'usuario', VISUALIZADOR: 'visualizador' };
 
-  // ── Preenche permissoesUsuario com dados vindos do backend ─────────────────
-  function inicializarPermissoes(dadosPermissoes) {
-    if (!dadosPermissoes) return;
-    permissoesUsuario.nivelAcesso         = dadosPermissoes.nivelAcesso         || 'visitante';
-    permissoesUsuario.podeCriarProjeto    = dadosPermissoes.podeCriarProjeto    || false;
-    permissoesUsuario.podeCriarEtapa      = dadosPermissoes.podeCriarEtapa      || false;
-    permissoesUsuario.ehAdmin             = dadosPermissoes.ehAdmin === true     || dadosPermissoes.nivelAcesso === 'admin';
-    permissoesUsuario.setoresPermitidos   = dadosPermissoes.setoresPermitidos   || [];
-    permissoesUsuario.projetosPermitidos  = dadosPermissoes.projetosPermitidos  || [];
-    permissoesUsuario.filtrarPorResponsavel = dadosPermissoes.filtrarPorResponsavel || false;
-    permissoesUsuario.email               = dadosPermissoes.email               || '';
-    permissoesUsuario.ativo               = dadosPermissoes.ativo               !== false;
+  // ── Verifica sessão no cliente e executa callback se válida ───────────────
+  // callbackSucesso(usuario) é chamado quando a sessão é válida.
+  // Em caso de sessão inválida, redireciona para login automaticamente.
+  function verificarSessaoCliente(callbackSucesso) {
+    if (typeof SESSAO_TOKEN === 'undefined' || !SESSAO_TOKEN) {
+      _redirecionarLogin();
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(function(r) {
+        if (r && r.valida) {
+          if (typeof callbackSucesso === 'function') callbackSucesso(r.usuario);
+        } else {
+          _redirecionarLogin();
+        }
+      })
+      .withFailureHandler(function() { _redirecionarLogin(); })
+      .verificarSessao(SESSAO_TOKEN);
+  }
+
+  // ── Logout ────────────────────────────────────────────────────────────────
+  function fazerLogoutCliente() {
+    if (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) {
+      google.script.run.fazerLogout(SESSAO_TOKEN);
+    }
+    sessionStorage.removeItem('sm_token');
+    sessionStorage.removeItem('sm_usuario');
+    _redirecionarLogin();
+  }
+
+  // ── Helpers internos ──────────────────────────────────────────────────────
+  function _redirecionarLogin() {
+    google.script.run.withSuccessHandler(function(url) {
+      window.location.href = url + '?pagina=login';
+    }).obterUrlWebApp();
+  }
+
+  function podeEditar() {
+    return typeof USUARIO_PERFIL !== 'undefined' &&
+           (USUARIO_PERFIL === PERFIS.ADMIN || USUARIO_PERFIL === PERFIS.USUARIO);
+  }
+
+  function ehAdmin() {
+    return typeof USUARIO_PERFIL !== 'undefined' && USUARIO_PERFIL === PERFIS.ADMIN;
   }
 
   // ── Utilitários de data ───────────────────────────────────────────────────

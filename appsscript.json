@@ -2,7 +2,7 @@
   "timeZone": "America/Sao_Paulo",
   "dependencies": {},
   "webapp": {
-    "executeAs": "USER_ACCESSING",
+    "executeAs": "USER_DEPLOYING",
     "access": "ANYONE"
   },
   "exceptionLogging": "STACKDRIVER",

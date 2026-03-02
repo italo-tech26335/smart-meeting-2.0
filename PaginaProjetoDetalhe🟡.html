@@ -12,7 +12,12 @@
     rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <?!= include('TemaPadrao-CSS'); ?>
-  <script>const MODO_ADMIN_URL = <?= modoAdmin ?>;</script>
+  <script>
+    const MODO_ADMIN_URL = <?= modoAdmin ?>;
+    var SESSAO_TOKEN   = '<?= sessaoToken ?>';
+    var USUARIO_NOME   = '<?= usuarioNome ?>';
+    var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
+  </script>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -72,9 +77,10 @@
         <button class="btn-header btn-lixeira" onclick="abrirModalLixeira()" title="Lixeira de Projetos">
           <i class="fas fa-trash-alt"></i>
         </button>
-        <button class="btn-header" id="btnPermissoesCabecalho" onclick="abrirModalPermissoes()" style="display:none;" title="Gerenciar Permissões de Usuários">
-          <i class="fas fa-user-shield"></i>
-          <span>Permissões</span>
+        <span class="header-usuario-nome" id="headerUsuarioNome" title="Usuário logado"></span>
+        <button class="btn-header btn-logout" onclick="fazerLogoutCliente()" title="Sair">
+          <i class="fas fa-sign-out-alt"></i>
+          <span>Sair</span>
         </button>
         <button class="btn-header btn-novo-projeto" onclick="abrirModalNovoProjeto()">
           <i class="fas fa-folder-plus"></i>
@@ -1059,100 +1065,6 @@
       </div>
     </div>
   </div>
-  <!-- ==================== MODAL GERENCIAR PERMISSÕES ==================== -->
-  <div class="modal-overlay" id="modalPermissoes">
-    <div class="modal-content" style="max-width:620px;">
-      <div class="modal-header">
-        <h3><i class="fas fa-user-shield"></i> Gerenciar Permissões</h3>
-        <button class="btn-fechar-modal" onclick="fecharModal('modalPermissoes')"><i class="fas fa-times"></i></button>
-      </div>
-      <div class="modal-body">
-        <div style="margin-bottom:16px;">
-          <button class="btn-acao" onclick="abrirFormNovaPermissao()">
-            <i class="fas fa-plus"></i> Nova Permissão
-          </button>
-        </div>
-        <div id="listaPermissoes"><!-- Renderizado via JS --></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== MODAL EDITAR PERMISSÃO ==================== -->
-  <div class="modal-overlay" id="modalEditarPermissao">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3><i class="fas fa-user-cog"></i> <span id="tituloModalPermissao">Nova Permissão</span></h3>
-        <button class="btn-fechar-modal" onclick="fecharModal('modalEditarPermissao')"><i class="fas fa-times"></i></button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="permissaoId">
-
-        <div class="campo-grupo">
-          <label>Email do Usuário *</label>
-          <input type="email" id="permissaoEmail" placeholder="usuario@exemplo.com">
-        </div>
-
-        <div class="campo-grupo">
-          <label>Nível de Acesso</label>
-          <select id="permissaoNivel" onchange="atualizarCamposPermissao()">
-            <option value="colaborador">Colaborador</option>
-            <option value="gestor">Gestor de Setor</option>
-            <option value="admin">Administrador</option>
-          </select>
-        </div>
-
-        <div class="campo-grupo" id="campoSetoresPermitidos">
-          <label>Setores Permitidos</label>
-          <div id="setoresPermitidosContainer" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"></div>
-          <small class="campo-hint">Deixe vazio para acesso a todos os setores (apenas admin)</small>
-        </div>
-
-        <div class="campo-grupo" id="campoProjetosPermitidos">
-          <label>Projetos Específicos (opcional)</label>
-          <div id="projetosPermitidosContainer" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;max-height:140px;overflow-y:auto;"></div>
-          <small class="campo-hint">Deixe vazio para herdar permissões do setor</small>
-        </div>
-
-        <div class="campo-grupo">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="permissaoPodeCriarProjeto">
-            Pode criar novos projetos
-          </label>
-        </div>
-
-        <div class="campo-grupo">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="permissaoPodeCriarEtapa" checked>
-            Pode criar novas atividades
-          </label>
-        </div>
-
-        <div class="campo-grupo">
-          <label>Visibilidade dos projetos</label>
-          <select id="permissaoFiltrarResponsavel">
-            <option value="false">Todos os projetos permitidos</option>
-            <option value="true">Apenas projetos onde é responsável</option>
-          </select>
-        </div>
-
-        <div class="campo-grupo">
-          <label>Status do usuário</label>
-          <select id="permissaoAtivo">
-            <option value="true">Ativo</option>
-            <option value="false">Inativo</option>
-          </select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secundario" id="btnRemoverPermissao" onclick="removerPermissaoAtual()" style="display:none;color:var(--cor-perigo,#dc2626);">
-          <i class="fas fa-trash"></i> Remover
-        </button>
-        <button class="btn-secundario" onclick="fecharModal('modalEditarPermissao')">Cancelar</button>
-        <button class="btn-acao" onclick="salvarPermissaoModal()"><i class="fas fa-save"></i> Salvar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ==================== SCRIPTS ==================== -->
   <?!= include('Compartilhado-Utilidades🔧'); ?>
   <?!= include('PaginaProjetoDetalhe-JS🟡'); ?>

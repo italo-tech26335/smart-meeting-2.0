@@ -7,6 +7,11 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <?!= include('TemaPadrao-CSS'); ?>
+<script>
+  var SESSAO_TOKEN   = '<?= sessaoToken ?>';
+  var USUARIO_NOME   = '<?= usuarioNome ?>';
+  var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
+</script>
 <style>
 /* ============================================================
    DESIGN TOKENS — VINTAGE CREAM PALETTE
@@ -621,6 +626,12 @@ select.campo-valor-grande{cursor:pointer}
     <a href="#" class="nav-link ativo" data-pagina="relatorios"><i class="fas fa-clipboard-check"></i> Relatórios IA</a>
     <a href="#" class="nav-link" data-pagina="projeto"><i class="fas fa-folder-open"></i> Projetos</a>
   </nav>
+  <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+    <span id="headerUsuarioNome" style="font-size:0.8rem;opacity:0.7;"></span>
+    <button onclick="fazerLogoutCliente()" title="Sair" style="background:none;border:none;cursor:pointer;color:inherit;opacity:0.7;font-size:0.9rem;">
+      <i class="fas fa-sign-out-alt"></i>
+    </button>
+  </div>
 </header>
 
 <!-- ============================================================
@@ -846,12 +857,17 @@ var tabAtiva='setores';
 var projetosMerge=[];
 
 document.addEventListener('DOMContentLoaded',function(){
-  carregarLista();
-  carregarContexto();
-  carregarOpcoes();
-  configurarNavegacao();
-  ['mergeTipo','mergeParaQuem','mergeGravidade','mergeUrgencia','mergeEsforco'].forEach(function(id){
-    document.getElementById(id).addEventListener('change',calcMergeAoVivo);
+  var elNome = document.getElementById('headerUsuarioNome');
+  if (elNome && typeof USUARIO_NOME !== 'undefined') elNome.textContent = USUARIO_NOME;
+
+  verificarSessaoCliente(function() {
+    carregarLista();
+    carregarContexto();
+    carregarOpcoes();
+    configurarNavegacao();
+    ['mergeTipo','mergeParaQuem','mergeGravidade','mergeUrgencia','mergeEsforco'].forEach(function(id){
+      document.getElementById(id).addEventListener('change',calcMergeAoVivo);
+    });
   });
 });
 
@@ -861,11 +877,13 @@ document.addEventListener('DOMContentLoaded',function(){
 function configurarNavegacao(){
   if(typeof google==='undefined'||!google.script) return;
   google.script.run.withSuccessHandler(function(url){
+    var tk = (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) ? '&token=' + encodeURIComponent(SESSAO_TOKEN) : '';
     document.querySelectorAll('a[data-pagina]').forEach(function(a){
       var p=a.getAttribute('data-pagina');
-      a.href=url+'?pagina='+p;
+      var full=url+'?pagina='+p+tk;
+      a.href=full;
       a.addEventListener('click',function(e){
-        e.preventDefault();window.top.location.href=url+'?pagina='+p;
+        e.preventDefault();window.location.href=full;
       });
     });
   }).obterUrlWebApp();
@@ -1734,5 +1752,6 @@ function toast(msg,tipo){
   setTimeout(function(){div.remove();},4500);
 }
 </script>
+<?!= include('Compartilhado-Utilidades🔧'); ?>
 </body>
 </html>

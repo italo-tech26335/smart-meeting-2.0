@@ -1,0 +1,297 @@
+<script>
+/* ====================================================================
+ * PaginaAdmin-JS.html
+ * JavaScript do painel de administração — Smart Meeting 2.0
+ * ==================================================================== */
+
+// ── Inicialização ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  var elNome = document.getElementById('admNomeUsuario');
+  if (elNome && typeof USUARIO_NOME !== 'undefined') elNome.textContent = USUARIO_NOME;
+
+  verificarSessaoCliente(function() {
+    carregarUsuarios();
+  });
+});
+
+// ── Navegação entre seções ────────────────────────────────────────────
+function mostrarSecao(id) {
+  document.querySelectorAll('.adm-secao').forEach(function(s) { s.classList.remove('ativa'); });
+  document.querySelectorAll('.adm-nav a').forEach(function(a) { a.classList.remove('ativo'); });
+  var sec = document.getElementById(id);
+  if (sec) sec.classList.add('ativa');
+
+  var tabMap = { secUsuarios: 'tabUsuarios', secLogs: 'tabLogs' };
+  var tab = document.getElementById(tabMap[id]);
+  if (tab) tab.classList.add('ativo');
+
+  if (id === 'secLogs') carregarLogs();
+}
+
+// ── Carregar usuários ─────────────────────────────────────────────────
+function carregarUsuarios() {
+  var tbody = document.getElementById('tbodyUsuarios');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#475569;"><span class="spinner-inline"></span> Carregando...</td></tr>';
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r.sucesso) { toast(r.mensagem || 'Erro ao carregar', 'err'); return; }
+      _renderizarUsuarios(r.usuarios || []);
+      _atualizarMetricas(r.usuarios || []);
+    })
+    .withFailureHandler(function(e) { toast('Erro: ' + e.message, 'err'); })
+    .listarUsuarios(SESSAO_TOKEN);
+}
+
+function _renderizarUsuarios(lista) {
+  var tbody = document.getElementById('tbodyUsuarios');
+  if (lista.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-users"></i><p>Nenhum usuário cadastrado</p></div></td></tr>';
+    return;
+  }
+
+  var html = lista.map(function(u) {
+    var perfilBadge = {
+      admin:        '<span class="badge badge-admin">Admin</span>',
+      usuario:      '<span class="badge badge-usuario">Usuário</span>',
+      visualizador: '<span class="badge badge-viz">Visualizador</span>'
+    }[u.perfil] || '<span class="badge">' + _esc(u.perfil) + '</span>';
+
+    var statusBadge = u.bloqueado
+      ? '<span class="badge badge-bloq"><i class="fas fa-lock"></i> Bloqueado</span>'
+      : u.ativo
+        ? '<span class="badge badge-ativo">Ativo</span>'
+        : '<span class="badge badge-inativo">Inativo</span>';
+
+    var ultimoLogin = u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString('pt-BR') : '—';
+
+    return '<tr>'
+      + '<td><div style="font-weight:600;">' + _esc(u.nome) + '</div><div style="color:#64748b;font-size:.78rem;">' + _esc(u.email) + '</div></td>'
+      + '<td>' + perfilBadge + '</td>'
+      + '<td>' + statusBadge + '</td>'
+      + '<td style="color:#64748b;">' + ultimoLogin + '</td>'
+      + '<td>'
+      + '<button class="btn btn-ghost btn-sm" onclick="abrirModalEditarUsuario(' + JSON.stringify(u) + ')" title="Editar"><i class="fas fa-edit"></i></button> '
+      + (u.bloqueado ? '<button class="btn btn-ghost btn-sm" onclick="desbloquear(\'' + _esc(u.id) + '\')" title="Desbloquear"><i class="fas fa-unlock"></i></button> ' : '')
+      + '<button class="btn btn-ghost btn-sm" onclick="resetarSenhaAdmin(\'' + _esc(u.id) + '\')" title="Resetar senha"><i class="fas fa-key"></i></button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+
+  tbody.innerHTML = html;
+}
+
+function _atualizarMetricas(lista) {
+  var total  = lista.length;
+  var ativos = lista.filter(function(u) { return u.ativo && !u.bloqueado; }).length;
+  var bloq   = lista.filter(function(u) { return u.bloqueado; }).length;
+  var admins = lista.filter(function(u) { return u.perfil === 'admin'; }).length;
+
+  _txt('metTotal',  total);
+  _txt('metAtivos', ativos);
+  _txt('metBloq',   bloq);
+  _txt('metAdmin',  admins);
+}
+
+// ── Carregar logs ─────────────────────────────────────────────────────
+function carregarLogs() {
+  var tbody = document.getElementById('tbodyLogs');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#475569;"><span class="spinner-inline"></span> Carregando...</td></tr>';
+
+  var filtros = {
+    evento:  document.getElementById('filtroEvento').value,
+    usuario: document.getElementById('filtroUsuarioLog').value.trim()
+  };
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r.sucesso) { toast(r.mensagem || 'Erro ao carregar', 'err'); return; }
+      _renderizarLogs(r.logs || []);
+    })
+    .withFailureHandler(function(e) { toast('Erro: ' + e.message, 'err'); })
+    .obterLogs(SESSAO_TOKEN, filtros);
+}
+
+function _renderizarLogs(lista) {
+  var tbody = document.getElementById('tbodyLogs');
+  if (lista.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-scroll"></i><p>Nenhum log encontrado</p></div></td></tr>';
+    return;
+  }
+
+  var corEvento = {
+    login_sucesso:    '#86efac',
+    login_falha:      '#fca5a5',
+    logout:           '#94a3b8',
+    reset_senha:      '#fcd34d',
+    acesso_negado:    '#fca5a5',
+    sessao_expirada:  '#94a3b8',
+    usuario_bloqueado:'#fcd34d'
+  };
+
+  var html = lista.map(function(log) {
+    var ts = log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '—';
+    var cor = corEvento[log.evento] || '#94a3b8';
+    return '<tr>'
+      + '<td style="color:#64748b;font-size:.78rem;white-space:nowrap;">' + ts + '</td>'
+      + '<td><span style="color:' + cor + ';font-size:.78rem;font-weight:600;">' + _esc(log.evento || '') + '</span></td>'
+      + '<td style="font-size:.82rem;">' + _esc(log.usuario || '—') + '</td>'
+      + '<td style="color:#64748b;font-size:.78rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(log.detalhes || '') + '">' + _esc(log.detalhes || '—') + '</td>'
+      + '<td><span style="font-size:.75rem;color:' + (log.resultado === 'sucesso' ? '#86efac' : '#fca5a5') + ';">' + _esc(log.resultado || '') + '</span></td>'
+      + '</tr>';
+  }).join('');
+
+  tbody.innerHTML = html;
+}
+
+// ── Modal novo usuário ────────────────────────────────────────────────
+function abrirModalNovoUsuario() {
+  _txt('modalUsuarioTitulo', 'Novo Usuário');
+  _val('editUserId', '');
+  _val('editNome', '');
+  _val('editEmail', '');
+  _val('editPerfil', 'usuario');
+  _val('editSenha', '');
+  document.getElementById('campoStatusModal').style.display = 'none';
+  document.getElementById('campoSenhaModal').style.display = '';
+  document.getElementById('senhaGerada').style.display = 'none';
+  document.getElementById('editEmail').readOnly = false;
+  document.getElementById('modalUsuario').classList.add('aberto');
+}
+
+function abrirModalEditarUsuario(u) {
+  _txt('modalUsuarioTitulo', 'Editar Usuário');
+  _val('editUserId', u.id);
+  _val('editNome', u.nome);
+  _val('editEmail', u.email);
+  _val('editPerfil', u.perfil);
+  _val('editAtivo', u.ativo ? 'true' : 'false');
+  document.getElementById('campoStatusModal').style.display = '';
+  document.getElementById('campoSenhaModal').style.display = 'none';
+  document.getElementById('senhaGerada').style.display = 'none';
+  document.getElementById('editEmail').readOnly = true;
+  document.getElementById('modalUsuario').classList.add('aberto');
+}
+
+function fecharModalUsuario() {
+  document.getElementById('modalUsuario').classList.remove('aberto');
+}
+
+function salvarUsuario() {
+  var id   = document.getElementById('editUserId').value;
+  var nome = document.getElementById('editNome').value.trim();
+  var email = document.getElementById('editEmail').value.trim();
+  var perfil = document.getElementById('editPerfil').value;
+
+  if (!nome || !email) { toast('Nome e email são obrigatórios', 'err'); return; }
+
+  var btn = document.getElementById('btnSalvarUsuario');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-inline"></span> Salvando...';
+
+  if (!id) {
+    // Criar novo usuário
+    var senha = document.getElementById('editSenha').value;
+    var dados = { nome: nome, email: email, perfil: perfil, senha: senha };
+
+    google.script.run
+      .withSuccessHandler(function(r) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Salvar';
+        if (r.sucesso) {
+          if (r.senhaTemporaria) {
+            var sg = document.getElementById('senhaGerada');
+            sg.textContent = 'Senha temporária: ' + r.senhaTemporaria;
+            sg.style.display = 'block';
+          }
+          toast(r.mensagem || 'Usuário criado!', 'ok');
+          carregarUsuarios();
+        } else {
+          toast(r.mensagem || 'Erro ao criar', 'err');
+        }
+      })
+      .withFailureHandler(function(e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Salvar';
+        toast('Erro: ' + e.message, 'err');
+      })
+      .criarUsuario(SESSAO_TOKEN, dados);
+  } else {
+    // Atualizar usuário existente
+    var ativo = document.getElementById('editAtivo').value === 'true';
+    var dadosUpd = { id: id, nome: nome, perfil: perfil, ativo: ativo };
+
+    google.script.run
+      .withSuccessHandler(function(r) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Salvar';
+        if (r.sucesso) {
+          toast(r.mensagem || 'Atualizado!', 'ok');
+          fecharModalUsuario();
+          carregarUsuarios();
+        } else {
+          toast(r.mensagem || 'Erro ao atualizar', 'err');
+        }
+      })
+      .withFailureHandler(function(e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Salvar';
+        toast('Erro: ' + e.message, 'err');
+      })
+      .atualizarUsuario(SESSAO_TOKEN, dadosUpd);
+  }
+}
+
+// ── Desbloquear usuário ────────────────────────────────────────────────
+function desbloquear(userId) {
+  google.script.run
+    .withSuccessHandler(function(r) {
+      toast(r.sucesso ? 'Usuário desbloqueado!' : (r.mensagem || 'Erro'), r.sucesso ? 'ok' : 'err');
+      if (r.sucesso) carregarUsuarios();
+    })
+    .withFailureHandler(function(e) { toast('Erro: ' + e.message, 'err'); })
+    .desbloquearUsuario(SESSAO_TOKEN, userId);
+}
+
+// ── Resetar senha (admin) ──────────────────────────────────────────────
+function resetarSenhaAdmin(userId) {
+  if (!confirm('Resetar a senha deste usuário? Uma nova senha temporária será gerada.')) return;
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (r.sucesso) {
+        toast('Senha resetada! Nova senha: ' + r.novaSenha, 'ok');
+      } else {
+        toast(r.mensagem || 'Erro ao resetar', 'err');
+      }
+    })
+    .withFailureHandler(function(e) { toast('Erro: ' + e.message, 'err'); })
+    .resetarSenhaAdmin(SESSAO_TOKEN, userId);
+}
+
+// ── Utilitários ────────────────────────────────────────────────────────
+function toast(msg, tipo) {
+  var box = document.getElementById('toastAdmin');
+  var div = document.createElement('div');
+  div.className = 'toast-adm ' + (tipo === 'ok' ? 'toast-ok' : 'toast-err');
+  div.textContent = msg;
+  box.appendChild(div);
+  setTimeout(function() { div.remove(); }, 4500);
+}
+
+function _esc(s) {
+  var d = document.createElement('div');
+  d.textContent = String(s || '');
+  return d.innerHTML;
+}
+
+function _val(id, v) {
+  var el = document.getElementById(id);
+  if (el) el.value = v;
+}
+
+function _txt(id, v) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = v;
+}
+</script>
