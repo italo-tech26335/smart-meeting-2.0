@@ -290,14 +290,9 @@ function carregarDadosEditorProjeto() {
       }
     });
 
-<<<<<<< HEAD
     // ── Obter tema e permissões do usuário ──
     var temaUsuario = obterPreferenciaTema();
     const permissoes = obterPermissoesUsuarioAtual();
-=======
-    // ── Obter tema do usuário ──
-    var temaUsuario = obterPreferenciaTema();
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
     
     let prioridadesProjetos = [];
     try {
@@ -322,12 +317,8 @@ function carregarDadosEditorProjeto() {
       prioridadesProjetos: prioridadesProjetos,
       pessoasParaQuem: pessoasParaQuem,
       configCalculoPrioridade: configCalculoPrioridade,
-<<<<<<< HEAD
       tema: temaUsuario,
       permissoes: permissoes
-=======
-      tema: temaUsuario   // ← NOVO
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
     };
     
   } catch (e) {

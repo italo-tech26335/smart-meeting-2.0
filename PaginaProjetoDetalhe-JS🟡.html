@@ -186,11 +186,7 @@ function preencherEstado(dados) {
   ESTADO.pessoasParaQuem = dados.pessoasParaQuem || {};
   ESTADO.configCalculoPrioridade = dados.configCalculoPrioridade || null;
 
-<<<<<<< HEAD
   // ← Aplicar tema vindo do servidor
-=======
-  // ← NOVO: aplicar tema vindo do servidor
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
   if (dados.tema === 'azul') {
     _injetarCssAzul();
     _atualizarBotaoTema(true);
@@ -198,15 +194,12 @@ function preencherEstado(dados) {
     _removerCssAzul();
     _atualizarBotaoTema(false);
   }
-<<<<<<< HEAD
 
   // ← Inicializar permissões e atualizar botão de admin
   if (typeof inicializarPermissoes === 'function') {
     inicializarPermissoes(dados.permissoes);
     _atualizarUIPermissoes();
   }
-=======
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
 }
 
 /** Recarrega dados do servidor SEM tela de carregamento (usa spinner inline) */
@@ -4739,7 +4732,6 @@ function _escaparHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-<<<<<<< HEAD
 // ========================= GERENCIAMENTO DE PERMISSÕES =========================
 
 var _permissoesCarregadas = [];
@@ -4969,6 +4961,4 @@ function _removerPermissao(permissaoId) {
     .removerPermissaoUsuario(permissaoId);
 }
 
-=======
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
 </script>

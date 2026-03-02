@@ -177,18 +177,8 @@ function doGet(e) {
 
     let nomeArquivoHtml, titulo;
 
-<<<<<<< HEAD
     // ==================== PÁGINA DE DETALHE DO PROJETO ====================
     if (pagina === 'projeto') {
-=======
-    // ==================== PÁGINA DE PROJETOS ====================
-    if (pagina === 'projetos') {
-      nomeArquivoHtml = 'Paginaprojetos🎈';
-      titulo = 'Smart Meeting - Gestão de Projetos';
-    }
-    // ==================== PÁGINA DE DETALHE DO PROJETO ====================
-    else if (pagina === 'projeto') {
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
       nomeArquivoHtml = 'PaginaProjetoDetalhe🟡';
       titulo = 'Smart Meeting - Detalhes do Projeto';
 
@@ -846,12 +836,8 @@ function listarTodasPermissoes() {
           projetosPermitidos: parseArrayString(dados[i][COLUNAS_PERMISSOES.PROJETOS_PERMITIDOS]),
           podeCriarProjeto: dados[i][COLUNAS_PERMISSOES.PODE_CRIAR_PROJETO] === true || dados[i][COLUNAS_PERMISSOES.PODE_CRIAR_PROJETO] === 'true',
           podeCriarEtapa: dados[i][COLUNAS_PERMISSOES.PODE_CRIAR_ETAPA] === true || dados[i][COLUNAS_PERMISSOES.PODE_CRIAR_ETAPA] === 'true',
-<<<<<<< HEAD
           ativo: dados[i][COLUNAS_PERMISSOES.ATIVO] !== false && dados[i][COLUNAS_PERMISSOES.ATIVO] !== 'false',
           filtrarPorResponsavel: dados[i][COLUNAS_PERMISSOES.FILTRAR_POR_RESPONSAVEL] === true || dados[i][COLUNAS_PERMISSOES.FILTRAR_POR_RESPONSAVEL] === 'true'
-=======
-          ativo: dados[i][COLUNAS_PERMISSOES.ATIVO] !== false && dados[i][COLUNAS_PERMISSOES.ATIVO] !== 'false'
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
         });
       }
     }
@@ -892,10 +878,7 @@ function salvarPermissaoUsuario(dadosPermissao) {
         linhaAtualizada[COLUNAS_PERMISSOES.PODE_CRIAR_PROJETO] = dadosPermissao.podeCriarProjeto === true;
         linhaAtualizada[COLUNAS_PERMISSOES.PODE_CRIAR_ETAPA] = dadosPermissao.podeCriarEtapa === true;
         linhaAtualizada[COLUNAS_PERMISSOES.ATIVO] = dadosPermissao.ativo !== false;
-<<<<<<< HEAD
         linhaAtualizada[COLUNAS_PERMISSOES.FILTRAR_POR_RESPONSAVEL] = dadosPermissao.filtrarPorResponsavel === true;
-=======
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
 
         aba.getRange(linha, 1, 1, linhaAtualizada.length).setValues([linhaAtualizada]);
         limparCacheAba(NOME_ABA_PERMISSOES);
@@ -914,16 +897,10 @@ function salvarPermissaoUsuario(dadosPermissao) {
       Array.isArray(dadosPermissao.projetosPermitidos) ? dadosPermissao.projetosPermitidos.join(',') : '',
       dadosPermissao.podeCriarProjeto === true,
       dadosPermissao.podeCriarEtapa === true,
-<<<<<<< HEAD
       dadosPermissao.ativo !== false,
       dadosPermissao.filtrarPorResponsavel === true
     ];
 
-=======
-      dadosPermissao.ativo !== false
-    ];
-    
->>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
     aba.appendRow(novaLinha);
     limparCacheAba(NOME_ABA_PERMISSOES);
     return { sucesso: true, mensagem: 'Permiss?o criada!', id: id };
