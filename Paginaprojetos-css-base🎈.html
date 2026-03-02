@@ -1,0 +1,144 @@
+<style>
+    :root {
+      /* ========== PALETA CREME/ÂMBAR (Base: #fcf4dc) ========== */
+      --cor-primaria-escura: #92400e;
+      --cor-primaria: #b45309;
+      --cor-primaria-hover: #a3410a;
+      --cor-primaria-clara: #d97706;
+      --cor-primaria-bg: rgba(180, 83, 9, 0.08);
+      
+      /* Status - mantidos para clareza semântica */
+      --status-a-fazer: #78716c;
+      --status-a-fazer-bg: rgba(120, 113, 108, 0.12);
+      --status-em-andamento: #ca8a04;
+      --status-em-andamento-bg: rgba(202, 138, 4, 0.12);
+      --status-bloqueada: #dc2626;
+      --status-bloqueada-bg: rgba(220, 38, 38, 0.12);
+      --status-concluida: #65a30d;
+      --status-concluida-bg: rgba(101, 163, 13, 0.12);
+      
+      /* Cores semânticas */
+      --cor-sucesso: #65a30d;
+      --cor-aviso: #ca8a04;
+      --cor-perigo: #dc2626;
+      --cor-info: #b45309;
+
+      /* ========== FUNDOS CREME ========== */
+      --cor-fundo: #fcf4dc;
+      --cor-fundo-card: #fffbf2;
+
+      /* Texto - tons terrosos para harmonizar */
+      --cor-texto: #292524;
+      --cor-texto-secundario: #57534e;
+      --cor-texto-terciario: #78716c;
+      
+      /* Bordas em tons bege */
+      --cor-borda: #e7e0ce;
+      --cor-borda-forte: #d6cdb8;
+      
+      /* Sombras */
+      --sombra-sm: 0 1px 3px rgba(41, 37, 36, 0.08);
+      --sombra-md: 0 4px 12px rgba(41, 37, 36, 0.1);
+      --sombra-lg: 0 8px 24px rgba(41, 37, 36, 0.12);
+      --sombra-xl: 0 12px 40px rgba(41, 37, 36, 0.15);
+      
+      /* Espaçamentos */
+      --espacamento-xs: 4px;
+      --espacamento-sm: 8px;
+      --espacamento-md: 16px;
+      --espacamento-lg: 24px;
+      
+      /* Bordas arredondadas */
+      --raio-sm: 6px;
+      --raio-md: 10px;
+      --raio-lg: 14px;
+      --raio-circular: 50%;
+      
+      /* Fontes */
+      --fonte-titulo: 'Poppins', sans-serif;
+      --fonte-corpo: 'Source Sans 3', sans-serif;
+      --tamanho-xs: 0.6875rem;
+      --tamanho-sm: 0.8125rem;
+      --tamanho-base: 0.9375rem;
+      
+      /* Transições */
+      --transicao-rapida: 0.15s ease;
+      --transicao-media: 0.25s ease;
+      
+      /* Layout */
+      --altura-header: 60px;
+      --largura-painel: 340px;
+      
+      /* Z-Index */
+      --z-conexoes: 5;
+      --z-cards: 10;
+      --z-etapas: 20;
+      --z-arrastando: 100;
+      --z-painel: 200;
+      --z-controles: 250;
+      --z-header: 300;
+      --z-modal: 400;
+      --z-toast: 500;
+      --z-loader: 600;
+
+      /* ========== CORES DE SETOR (Tema escuro terroso) ========== */
+      --cor-setor-bg: #44403c;
+      --cor-setor-borda: #78716c;
+      --cor-linha-setor: #d97706;
+      --cor-linha-projeto: #a8a29e;
+      --cor-linha-etapa: #d6d3d1;
+
+      /* Gradientes de cards */
+      --card-setor-gradient: linear-gradient(145deg, #44403c 0%, #292524 50%, #1c1917 100%);
+      --card-projeto-gradient: linear-gradient(180deg, #fffbf2 0%, #fef7e8 100%);
+      --card-etapa-shadow: 0 4px 20px rgba(41, 37, 36, 0.08);
+      
+      /* Espaçamentos de cards */
+      --espacamento-card: 100px;
+      --espacamento-nivel: 160px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body { font-family: var(--fonte-corpo); background: var(--cor-fundo); color: var(--cor-texto); line-height: 1.5; overflow: hidden; height: 100vh; }
+
+    .layout-principal { display: grid; grid-template-rows: var(--altura-header) auto 1fr; grid-template-columns: 1fr var(--largura-painel); height: 100vh; }
+    @media (max-width: 900px) { .layout-principal { grid-template-columns: 1fr; grid-template-rows: var(--altura-header) auto 1fr; } }
+
+    .barra-navegacao-superior { grid-column: 1 / -1; display: flex; flex-direction: row; background: var(--cor-fundo-card); border-bottom: 1px solid var(--cor-borda); box-shadow: var(--sombra-sm); z-index: calc(var(--z-header) - 1); height: auto; min-height: 115px; overflow: hidden; gap: 16px; padding-right: 16px; }
+    @media (max-width: 900px) { .barra-navegacao-superior { height: auto; flex-direction: column; } }
+
+    /* ========== CABEÇALHO COM GRADIENTE TERROSO ========== */
+    .cabecalho { 
+      grid-column: 1 / -1; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 0 var(--espacamento-lg); 
+      background: linear-gradient(135deg, #44403c 0%, #292524 50%, #1c1917 100%); 
+      color: white; 
+      z-index: var(--z-header); 
+      box-shadow: var(--sombra-md); 
+    }
+    .logo { display: flex; align-items: center; gap: var(--espacamento-md); font-family: var(--fonte-titulo); font-size: 1.25rem; font-weight: 600; }
+    .logo i { color: var(--cor-primaria-clara); }
+    .cabecalho-centro { display: flex; align-items: center; gap: var(--espacamento-lg); }
+    .cabecalho-acoes { display: flex; align-items: center; gap: var(--espacamento-sm); }
+    @media (max-width: 900px) { .cabecalho-acoes span { display: none; } }
+
+    /* ========== ÁREA DO DIAGRAMA COM GRID CREME ========== */
+    .area-diagrama { 
+      position: relative; 
+      overflow: hidden; 
+      background: 
+        linear-gradient(90deg, var(--cor-borda) 1px, transparent 1px), 
+        linear-gradient(var(--cor-borda) 1px, transparent 1px), 
+        var(--cor-fundo); 
+      background-size: 50px 50px, 50px 50px, 100% 100%; 
+      cursor: grab; 
+    }
+    .area-diagrama.arrastando-pan { cursor: grabbing; }
+    .container-diagrama { position: absolute; top: 0; left: 0; width: 5000px; height: 5000px; transform-origin: 0 0; }
+    .svg-conexoes { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: var(--z-conexoes); overflow: visible; }
+    path { stroke-linejoin: round; stroke-linecap: round; }
+</style>

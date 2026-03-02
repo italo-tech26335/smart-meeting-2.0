@@ -1,0 +1,1076 @@
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  PROTEÇÃO ANTI-PERDA — VERSÃO CORRIGIDA
+//  Correções aplicadas:
+//  ✅ FIX 1: Acessa variáveis globais via window.xxx (exige var no script principal)
+//  ✅ FIX 2: Recuperação inclui sessões com status 'gravando' (refresh durante gravação)
+//  ✅ FIX 3: Interceptor do ondataavailable sem race condition
+//  ✅ FIX 4: enviarGrande e enviarDireto chamam processamentoConcluido
+//  ✅ FIX 5: Proteção para arquivo selecionado (não só gravação)
+//  ✅ FIX 6: beforeunload ativo quando há arquivo pendente
+//  ✅ FIX 7: Auto-save periódico independente do ondataavailable
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  CONSTANTES DE CONFIGURAÇÃO
+// ═══════════════════════════════════════════════════════════════
+
+const PROTECAO_CONFIG = {
+  NOME_DB: 'SmartMeetingBackup',
+  VERSAO_DB: 3,                            // ✅ Versão incrementada (schema mudou)
+  STORE_CHUNKS: 'chunksAudio',
+  STORE_SESSOES: 'sessoesGravacao',
+
+  INTERVALO_AUTOSAVE_MS: 8000,            // Auto-save a cada 8s
+  INTERVALO_HEARTBEAT_MS: 30000,
+  MAX_HISTORICO_GRAVACOES: 3,
+
+  CHAVE_SESSAO_ATIVA: 'sm_sessao_ativa',
+  CHAVE_ESTADO_PROC: 'sm_processando',
+  CHAVE_ARQUIVO_PENDENTE: 'sm_arquivo_pendente', // ✅ NOVO: flag de arquivo selecionado
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  ESTADO DO MÓDULO DE PROTEÇÃO
+// ═══════════════════════════════════════════════════════════════
+
+const estadoProtecao = {
+  db: null,
+  dbPronto: false,
+  sessaoId: null,
+  wakeLock: null,
+  intervalAutoSave: null,
+  intervalHeartbeat: null,
+  operacaoCritica: false,
+  motivoOperacao: '',                      // 'gravando' | 'processando' | 'arquivo_pendente'
+  contadorChunksLocais: 0,
+  ultimoSaveLocal: null,
+  conexaoOk: true,
+  envioEmAndamento: false,
+  interceptado: false,                     // ✅ NOVO: evita interceptar 2x
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  1. INDEXEDDB — BACKUP LOCAL DE ÁUDIO EM TEMPO REAL
+// ═══════════════════════════════════════════════════════════════
+
+function inicializarIndexedDB() {
+  return new Promise((resolve) => {
+    if (!window.indexedDB) {
+      console.warn('[Proteção] IndexedDB não suportado');
+      resolve(false);
+      return;
+    }
+
+    const requisicao = indexedDB.open(
+      PROTECAO_CONFIG.NOME_DB,
+      PROTECAO_CONFIG.VERSAO_DB
+    );
+
+    requisicao.onupgradeneeded = (evento) => {
+      const db = evento.target.result;
+
+      // Apaga stores antigos se existirem (schema mudou)
+      ['chunksAudio', 'sessoesGravacao', 'historicoGravacoes'].forEach(nome => {
+        if (db.objectStoreNames.contains(nome)) {
+          db.deleteObjectStore(nome);
+        }
+      });
+
+      // Recria com schema correto
+      const storeChunks = db.createObjectStore(PROTECAO_CONFIG.STORE_CHUNKS, { keyPath: 'id' });
+      storeChunks.createIndex('sessaoId', 'sessaoId', { unique: false });
+      storeChunks.createIndex('ordem', 'ordem', { unique: false });
+
+      db.createObjectStore(PROTECAO_CONFIG.STORE_SESSOES, { keyPath: 'sessaoId' });
+    };
+
+    requisicao.onsuccess = (evento) => {
+      estadoProtecao.db = evento.target.result;
+      estadoProtecao.dbPronto = true;
+
+      // ✅ FIX: Trata erro de conexão perdida com o banco
+      estadoProtecao.db.onclose = () => {
+        estadoProtecao.dbPronto = false;
+        console.warn('[Proteção] IndexedDB fechou inesperadamente');
+      };
+
+      console.log('[Proteção] ✅ IndexedDB inicializado');
+      resolve(true);
+    };
+
+    requisicao.onerror = () => {
+      console.error('[Proteção] ❌ Erro ao abrir IndexedDB');
+      resolve(false);
+    };
+  });
+}
+
+/** Salva um chunk de áudio no IndexedDB */
+async function salvarChunkLocal(chunkBlob, sessaoId, ordem) {
+  if (!estadoProtecao.dbPronto || !estadoProtecao.db) return false;
+
+  try {
+    const transacao = estadoProtecao.db.transaction(PROTECAO_CONFIG.STORE_CHUNKS, 'readwrite');
+    const store = transacao.objectStore(PROTECAO_CONFIG.STORE_CHUNKS);
+
+    await new Promise((resolve, reject) => {
+      const req = store.put({
+        id: sessaoId + '_chunk_' + ordem,
+        sessaoId: sessaoId,
+        ordem: ordem,
+        blob: chunkBlob,
+        tamanhoBytes: chunkBlob.size,
+        timestamp: Date.now()
+      });
+      req.onsuccess = resolve;
+      req.onerror = () => reject(req.error);
+    });
+
+    estadoProtecao.contadorChunksLocais = ordem + 1;
+    estadoProtecao.ultimoSaveLocal = Date.now();
+    return true;
+
+  } catch (erro) {
+    console.warn('[Proteção] Erro ao salvar chunk:', erro);
+    return false;
+  }
+}
+
+/** Salva metadados da sessão */
+async function salvarMetadadosSessao(sessaoId, dados) {
+  if (!estadoProtecao.dbPronto || !estadoProtecao.db) return;
+
+  try {
+    const transacao = estadoProtecao.db.transaction(PROTECAO_CONFIG.STORE_SESSOES, 'readwrite');
+    const store = transacao.objectStore(PROTECAO_CONFIG.STORE_SESSOES);
+
+    // ✅ FIX: Busca dados existentes para mesclar (não sobrescrever campos)
+    const existente = await new Promise((resolve) => {
+      const req = store.get(sessaoId);
+      req.onsuccess = () => resolve(req.result || {});
+      req.onerror = () => resolve({});
+    });
+
+    const mesclado = Object.assign({}, existente, {
+      sessaoId: sessaoId,
+      titulo: dados.titulo || existente.titulo || '',
+      participantes: dados.participantes || existente.participantes || '',
+      tipoMime: dados.tipoMime || existente.tipoMime || 'audio/webm',
+      totalChunks: dados.totalChunks !== undefined ? dados.totalChunks : (existente.totalChunks || 0),
+      duracaoSegundos: dados.duracaoSegundos !== undefined ? dados.duracaoSegundos : (existente.duracaoSegundos || 0),
+      dataInicio: dados.dataInicio || existente.dataInicio || new Date().toISOString(),
+      status: dados.status || existente.status || 'gravando',
+      ultimaAtualizacao: Date.now()
+    });
+
+    await new Promise((resolve, reject) => {
+      const req = store.put(mesclado);
+      req.onsuccess = resolve;
+      req.onerror = () => reject(req.error);
+    });
+  } catch (erro) {
+    console.warn('[Proteção] Erro metadados:', erro);
+  }
+}
+
+/** Reconstrói o áudio a partir dos chunks salvos no IndexedDB */
+async function recuperarAudioDaSessao(sessaoId) {
+  if (!estadoProtecao.dbPronto || !estadoProtecao.db) return null;
+
+  try {
+    var metadados = await new Promise((resolve, reject) => {
+      var tx = estadoProtecao.db.transaction(PROTECAO_CONFIG.STORE_SESSOES, 'readonly');
+      var req = tx.objectStore(PROTECAO_CONFIG.STORE_SESSOES).get(sessaoId);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+
+    if (!metadados) return null;
+
+    var chunks = await new Promise((resolve, reject) => {
+      var tx = estadoProtecao.db.transaction(PROTECAO_CONFIG.STORE_CHUNKS, 'readonly');
+      var indice = tx.objectStore(PROTECAO_CONFIG.STORE_CHUNKS).index('sessaoId');
+      var req = indice.getAll(sessaoId);
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+
+    if (!chunks.length) return null;
+
+    chunks.sort((a, b) => a.ordem - b.ordem);
+    var blobs = chunks.map(c => c.blob);
+    var audioCompleto = new Blob(blobs, { type: metadados.tipoMime || 'audio/webm' });
+
+    return {
+      audio: audioCompleto,
+      metadados: metadados,
+      totalChunks: chunks.length,
+      tamanhoTotal: audioCompleto.size
+    };
+  } catch (erro) {
+    console.error('[Proteção] Erro ao recuperar:', erro);
+    return null;
+  }
+}
+
+/** Lista sessões recuperáveis */
+async function listarSessoesRecuperaveis() {
+  if (!estadoProtecao.dbPronto || !estadoProtecao.db) return [];
+
+  try {
+    var sessoes = await new Promise((resolve, reject) => {
+      var tx = estadoProtecao.db.transaction(PROTECAO_CONFIG.STORE_SESSOES, 'readonly');
+      var req = tx.objectStore(PROTECAO_CONFIG.STORE_SESSOES).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+
+    // ✅ FIX 2: Inclui TANTO 'finalizada' QUANTO 'gravando' (refresh durante gravação)
+    return sessoes.filter(s =>
+      (s.status === 'finalizada' || s.status === 'gravando') && s.totalChunks > 0
+    );
+  } catch (erro) {
+    console.error('[Proteção] Erro ao listar sessões:', erro);
+    return [];
+  }
+}
+
+/** Remove sessão e seus chunks do IndexedDB */
+async function limparSessaoLocal(sessaoId) {
+  if (!estadoProtecao.dbPronto || !estadoProtecao.db) return;
+
+  try {
+    // Remover chunks via cursor
+    var txChunks = estadoProtecao.db.transaction(PROTECAO_CONFIG.STORE_CHUNKS, 'readwrite');
+    var storeChunks = txChunks.objectStore(PROTECAO_CONFIG.STORE_CHUNKS);
+    var indice = storeChunks.index('sessaoId');
+
+    await new Promise((resolve) => {
+      var reqCursor = indice.openCursor(sessaoId);
+      reqCursor.onsuccess = (evento) => {
+        var cursor = evento.target.result;
+        if (cursor) { cursor.delete(); cursor.continue(); }
+        else resolve();
+      };
+      reqCursor.onerror = resolve;
+    });
+
+    // Remover metadados
+    var txSessao = estadoProtecao.db.transaction(PROTECAO_CONFIG.STORE_SESSOES, 'readwrite');
+    txSessao.objectStore(PROTECAO_CONFIG.STORE_SESSOES).delete(sessaoId);
+
+    console.log('[Proteção] 🗑️ Sessão limpa:', sessaoId);
+  } catch (erro) {
+    console.warn('[Proteção] Erro ao limpar:', erro);
+  }
+}
+
+/** Limita histórico local */
+async function limitarHistoricoLocal() {
+  if (!estadoProtecao.dbPronto || !estadoProtecao.db) return;
+
+  try {
+    var sessoes = await new Promise((resolve, reject) => {
+      var tx = estadoProtecao.db.transaction(PROTECAO_CONFIG.STORE_SESSOES, 'readonly');
+      var req = tx.objectStore(PROTECAO_CONFIG.STORE_SESSOES).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+
+    sessoes.sort((a, b) => (b.ultimaAtualizacao || 0) - (a.ultimaAtualizacao || 0));
+    var paraRemover = sessoes.slice(PROTECAO_CONFIG.MAX_HISTORICO_GRAVACOES);
+
+    for (var i = 0; i < paraRemover.length; i++) {
+      if (paraRemover[i].status !== 'gravando') {
+        await limparSessaoLocal(paraRemover[i].sessaoId);
+      }
+    }
+  } catch (erro) {
+    console.warn('[Proteção] Erro ao limitar histórico:', erro);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  2. BEFOREUNLOAD — IMPEDE FECHAR DURANTE OPERAÇÃO
+// ═══════════════════════════════════════════════════════════════
+
+function ativarProtecaoBeforeUnload() {
+  window.addEventListener('beforeunload', onBeforeUnload);
+}
+
+function onBeforeUnload(evento) {
+  // ✅ FIX 5/6: Protege também quando há arquivo pendente (não só gravação)
+  var deveBloquer = estadoProtecao.operacaoCritica || temArquivoPendente();
+
+  if (!deveBloquer) return;
+
+  var mensagem;
+  if (estadoProtecao.motivoOperacao === 'gravando') {
+    mensagem = '⚠️ Gravação em andamento! O áudio será salvo localmente, mas pode ficar incompleto.';
+  } else if (estadoProtecao.motivoOperacao === 'processando') {
+    mensagem = '⚠️ Processamento em andamento! Se sair, o progresso será perdido.';
+  } else {
+    mensagem = '⚠️ Há um áudio pendente! Se sair, precisará selecionar novamente.';
+  }
+
+  evento.preventDefault();
+  evento.returnValue = mensagem;
+  return mensagem;
+}
+
+/** ✅ NOVO: Verifica se há arquivo/gravação pendente não processada */
+function temArquivoPendente() {
+  // Verifica se existe arquivo selecionado no formulário
+  var arq = window.arquivoAtual;
+  if (arq && arq.size > 0) return true;
+
+  // Verifica se há chunks de gravação no array
+  var chunks = window.chunksAudio;
+  if (chunks && chunks.length > 0) return true;
+
+  return false;
+}
+
+function iniciarOperacaoCritica(motivo) {
+  estadoProtecao.operacaoCritica = true;
+  estadoProtecao.motivoOperacao = motivo || 'processando';
+
+  try {
+    sessionStorage.setItem(PROTECAO_CONFIG.CHAVE_SESSAO_ATIVA, JSON.stringify({
+      motivo: motivo,
+      sessaoId: estadoProtecao.sessaoId,
+      timestamp: Date.now()
+    }));
+  } catch (e) {}
+
+  bloquearNavegacao(true);
+}
+
+function finalizarOperacaoCritica() {
+  estadoProtecao.operacaoCritica = false;
+  estadoProtecao.motivoOperacao = '';
+
+  try { sessionStorage.removeItem(PROTECAO_CONFIG.CHAVE_SESSAO_ATIVA); } catch (e) {}
+  try { sessionStorage.removeItem(PROTECAO_CONFIG.CHAVE_ESTADO_PROC); } catch (e) {}
+
+  bloquearNavegacao(false);
+  liberarWakeLock();
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  3. WAKE LOCK — IMPEDE DISPOSITIVO DE DORMIR
+// ═══════════════════════════════════════════════════════════════
+
+async function solicitarWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+
+  try {
+    estadoProtecao.wakeLock = await navigator.wakeLock.request('screen');
+    console.log('[Proteção] 🔒 Wake Lock ativado');
+
+    estadoProtecao.wakeLock.addEventListener('release', () => {
+      console.log('[Proteção] 🔓 Wake Lock liberado');
+      if (estadoProtecao.operacaoCritica) {
+        setTimeout(solicitarWakeLock, 1000);
+      }
+    });
+  } catch (erro) {
+    console.warn('[Proteção] Wake Lock falhou:', erro.message);
+  }
+}
+
+function liberarWakeLock() {
+  if (estadoProtecao.wakeLock) {
+    try { estadoProtecao.wakeLock.release(); } catch (e) {}
+    estadoProtecao.wakeLock = null;
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  4. BLOQUEIO DE NAVEGAÇÃO
+// ═══════════════════════════════════════════════════════════════
+
+function bloquearNavegacao(bloquear) {
+  var links = document.querySelectorAll('a[data-pagina], .nav-link');
+
+  links.forEach(function(link) {
+    if (bloquear) {
+      link.dataset.hrefOriginal = link.href;
+      link.style.pointerEvents = 'none';
+      link.style.opacity = '0.4';
+      link.title = 'Navegação bloqueada durante ' + (estadoProtecao.motivoOperacao || 'operação');
+    } else {
+      link.style.pointerEvents = '';
+      link.style.opacity = '';
+      link.title = '';
+    }
+  });
+
+  var logo = document.querySelector('.header-logo');
+  if (logo) {
+    logo.style.pointerEvents = bloquear ? 'none' : '';
+    logo.style.opacity = bloquear ? '0.6' : '';
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  5. VISIBILITY API
+// ═══════════════════════════════════════════════════════════════
+
+function ativarProtecaoVisibilidade() {
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden && estadoProtecao.operacaoCritica) {
+      console.warn('[Proteção] ⚠️ Aba em background durante operação crítica');
+      if (estadoProtecao.motivoOperacao === 'gravando') {
+        enviarNotificacaoNativa('🎙️ Gravação em andamento', 'Não feche esta aba.');
+      }
+    }
+    if (!document.hidden && estadoProtecao.operacaoCritica && !estadoProtecao.wakeLock) {
+      solicitarWakeLock();
+    }
+  });
+}
+
+function enviarNotificacaoNativa(titulo, corpo) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    try { new Notification(titulo, { body: corpo }); } catch (e) {}
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  6. HEARTBEAT — VERIFICA CONEXÃO
+// ═══════════════════════════════════════════════════════════════
+
+function iniciarHeartbeat() {
+  pararHeartbeat();
+  estadoProtecao.intervalHeartbeat = setInterval(verificarConexao, PROTECAO_CONFIG.INTERVALO_HEARTBEAT_MS);
+}
+
+function pararHeartbeat() {
+  if (estadoProtecao.intervalHeartbeat) {
+    clearInterval(estadoProtecao.intervalHeartbeat);
+    estadoProtecao.intervalHeartbeat = null;
+  }
+}
+
+function verificarConexao() {
+  if (!navigator.onLine) {
+    if (estadoProtecao.conexaoOk) {
+      estadoProtecao.conexaoOk = false;
+      exibirAvisoConexao(false);
+      if (typeof log === 'function') log('ALERTA', '⚠️ Conexão perdida!');
+    }
+    return;
+  }
+
+  // Testa conexão com servidor GAS via chamada leve
+  if (typeof google !== 'undefined' && google.script) {
+    google.script.run
+      .withSuccessHandler(function() {
+        if (!estadoProtecao.conexaoOk) {
+          estadoProtecao.conexaoOk = true;
+          exibirAvisoConexao(true);
+          if (typeof log === 'function') log('SUCESSO', '✅ Conexão restaurada');
+        }
+      })
+      .withFailureHandler(function() {
+        if (estadoProtecao.conexaoOk) {
+          estadoProtecao.conexaoOk = false;
+          exibirAvisoConexao(false);
+          if (typeof log === 'function') log('ALERTA', '⚠️ Servidor não responde');
+        }
+      })
+      .obterUrlBaseWebApp();
+  }
+}
+
+function exibirAvisoConexao(online) {
+  var avisoAnterior = document.getElementById('avisoConexao');
+  if (avisoAnterior) avisoAnterior.remove();
+
+  if (!online) {
+    var aviso = document.createElement('div');
+    aviso.id = 'avisoConexao';
+    aviso.style.cssText =
+      'position:fixed;bottom:0;left:0;right:0;z-index:9998;' +
+      'background:#8B2E2E;color:#FAF7F0;padding:10px 20px;' +
+      'font-family:var(--fonte-corpo);font-size:0.82rem;font-weight:700;' +
+      'display:flex;align-items:center;justify-content:center;gap:8px;' +
+      'animation:fadeInUp 0.3s ease-out;';
+    aviso.innerHTML =
+      '<i class="fas fa-wifi" style="opacity:0.7"></i>' +
+      'Sem conexão — o áudio está sendo salvo localmente.' +
+      '<span style="opacity:0.6;font-weight:400;margin-left:8px;">Verifique sua internet</span>';
+    document.body.appendChild(aviso);
+  }
+
+  var pillDrive = document.getElementById('pillDrive');
+  if (pillDrive) {
+    pillDrive.classList.toggle('ok', online);
+    pillDrive.classList.toggle('erro', !online);
+  }
+}
+
+window.addEventListener('online', function() {
+  if (!estadoProtecao.conexaoOk) {
+    estadoProtecao.conexaoOk = true;
+    exibirAvisoConexao(true);
+    if (typeof log === 'function') log('SUCESSO', '✅ Rede restaurada');
+    if (typeof toast === 'function') toast('Conexão restaurada!', 'sucesso');
+  }
+});
+
+window.addEventListener('offline', function() {
+  estadoProtecao.conexaoOk = false;
+  exibirAvisoConexao(false);
+  if (typeof log === 'function') log('ERRO', '❌ Conexão perdida!');
+  if (typeof toast === 'function') toast('Sem conexão!', 'erro', 8000);
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+//  7. PROTEÇÃO CONTRA DUPLO ENVIO
+// ═══════════════════════════════════════════════════════════════
+
+function processamentoConcluido(sucesso, sessaoId) {
+  estadoProtecao.envioEmAndamento = false;
+  finalizarOperacaoCritica();
+  pararHeartbeat();
+
+  if (sucesso && sessaoId) {
+    salvarMetadadosSessao(sessaoId, { status: 'processada' });
+    setTimeout(function() { limparSessaoLocal(sessaoId); }, 5000);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  8. RECUPERAÇÃO DE SESSÃO INTERROMPIDA
+// ═══════════════════════════════════════════════════════════════
+
+async function verificarSessaoInterrompida() {
+  try {
+    // 1. Detecta refresh durante processamento
+    var estadoProc = null;
+    try { estadoProc = sessionStorage.getItem(PROTECAO_CONFIG.CHAVE_ESTADO_PROC); } catch (e) {}
+
+    if (estadoProc) {
+      try { sessionStorage.removeItem(PROTECAO_CONFIG.CHAVE_ESTADO_PROC); } catch (e) {}
+      var dados = JSON.parse(estadoProc);
+      var tempoDecorrido = Date.now() - (dados.timestamp || 0);
+      if (tempoDecorrido < 600000) {
+        if (typeof toast === 'function') {
+          toast('⚠️ Processamento anterior interrompido. Verifique se a reunião foi salva.', 'aviso', 8000);
+        }
+      }
+    }
+
+    // 2. Busca sessões recuperáveis no IndexedDB
+    var sessoes = await listarSessoesRecuperaveis();
+
+    if (sessoes.length > 0) {
+      // Ordena: mais recente primeiro
+      sessoes.sort(function(a, b) { return (b.ultimaAtualizacao || 0) - (a.ultimaAtualizacao || 0); });
+      mostrarDialogRecuperacao(sessoes[0]);
+    }
+  } catch (erro) {
+    console.warn('[Proteção] Erro verificarSessaoInterrompida:', erro);
+  }
+}
+
+function mostrarDialogRecuperacao(sessao) {
+  var dataGrav = sessao.dataInicio
+    ? new Date(sessao.dataInicio).toLocaleString('pt-BR')
+    : 'Data desconhecida';
+  var duracao = sessao.duracaoSegundos
+    ? Math.floor(sessao.duracaoSegundos / 60) + ' min ' + (sessao.duracaoSegundos % 60) + 's'
+    : '?';
+  // ✅ FIX 2: Mostra se a gravação foi interrompida ou finalizada normalmente
+  var statusTexto = sessao.status === 'gravando'
+    ? '<span style="color:#8B2E2E;font-weight:700;">⚠️ Gravação INTERROMPIDA (refresh/crash)</span>'
+    : '<span style="color:#4A6741;font-weight:700;">✅ Gravação finalizada normalmente</span>';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'overlayRecuperacao';
+  overlay.style.cssText =
+    'position:fixed;inset:0;z-index:3000;' +
+    'background:rgba(44,24,16,0.7);backdrop-filter:blur(6px);' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'animation:fadeIn 0.3s ease-out;';
+
+  overlay.innerHTML =
+    '<div style="' +
+      'background:var(--creme-claro);border-radius:var(--raio-lg);' +
+      'border:2px solid var(--ocre);box-shadow:var(--sombra-flutuante);' +
+      'max-width:460px;width:92%;padding:2rem;text-align:center;' +
+    '">' +
+      '<div style="' +
+        'width:56px;height:56px;margin:0 auto 1rem;' +
+        'background:rgba(196,130,42,0.12);border-radius:50%;' +
+        'display:flex;align-items:center;justify-content:center;' +
+      '">' +
+        '<i class="fas fa-exclamation-triangle" style="font-size:1.5rem;color:var(--ocre);"></i>' +
+      '</div>' +
+      '<h3 style="font-family:var(--fonte-titulo);font-size:1.2rem;color:var(--marrom-escuro);margin-bottom:0.5rem;">' +
+        'Gravação Recuperável Encontrada' +
+      '</h3>' +
+      '<p style="font-size:0.85rem;color:var(--marrom-medio);margin-bottom:1rem;line-height:1.6;">' +
+        statusTexto +
+      '</p>' +
+      '<div style="' +
+        'background:var(--creme-base);border:var(--borda-papel);border-radius:var(--raio-md);' +
+        'padding:0.875rem;margin-bottom:1.5rem;text-align:left;' +
+      '">' +
+        '<div style="display:flex;gap:0.5rem;font-size:0.8rem;color:var(--marrom-medio);margin-bottom:0.3rem;">' +
+          '<i class="fas fa-calendar" style="color:var(--ocre);"></i><strong>' + dataGrav + '</strong>' +
+        '</div>' +
+        '<div style="display:flex;gap:0.5rem;font-size:0.8rem;color:var(--marrom-medio);margin-bottom:0.3rem;">' +
+          '<i class="fas fa-clock" style="color:var(--ocre);"></i>Duração: ' + duracao +
+        '</div>' +
+        '<div style="display:flex;gap:0.5rem;font-size:0.8rem;color:var(--marrom-medio);">' +
+          '<i class="fas fa-database" style="color:var(--ocre);"></i>' + sessao.totalChunks + ' segmentos salvos' +
+        '</div>' +
+        (sessao.titulo ? '<div style="display:flex;gap:0.5rem;font-size:0.8rem;color:var(--marrom-medio);margin-top:0.3rem;">' +
+          '<i class="fas fa-tag" style="color:var(--ocre);"></i>"' + sessao.titulo + '"</div>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:0.75rem;justify-content:center;">' +
+        '<button onclick="descartarRecuperacao(\'' + sessao.sessaoId + '\')" class="btn btn-secundario" style="flex:1;">' +
+          '<i class="fas fa-trash"></i> Descartar' +
+        '</button>' +
+        '<button onclick="executarRecuperacao(\'' + sessao.sessaoId + '\')" class="btn btn-primario" style="flex:1;">' +
+          '<i class="fas fa-download"></i> Recuperar' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+}
+
+async function executarRecuperacao(sessaoId) {
+  var overlay = document.getElementById('overlayRecuperacao');
+  if (overlay) overlay.remove();
+
+  if (typeof mostrarLoading === 'function') mostrarLoading('Recuperando áudio...');
+
+  try {
+    var resultado = await recuperarAudioDaSessao(sessaoId);
+
+    if (!resultado || !resultado.audio) {
+      if (typeof toast === 'function') toast('Não foi possível recuperar o áudio', 'erro');
+      if (typeof esconderLoading === 'function') esconderLoading();
+      return;
+    }
+
+    // ✅ FIX: Usa window.arquivoAtual (var, não let)
+    var nomeArquivo = 'recuperado_' + new Date().toISOString().replace(/[:.]/g, '-') + '.webm';
+    window.arquivoAtual = new File([resultado.audio], nomeArquivo, {
+      type: resultado.metadados.tipoMime || 'audio/webm'
+    });
+
+    if (typeof mostrarArquivo === 'function') mostrarArquivo(window.arquivoAtual);
+    if (resultado.metadados.titulo) {
+      var elTitulo = document.getElementById('inputTitulo');
+      if (elTitulo) elTitulo.value = resultado.metadados.titulo;
+    }
+    if (resultado.metadados.participantes) {
+      var elPart = document.getElementById('inputParticipantes');
+      if (elPart) elPart.value = resultado.metadados.participantes;
+    }
+
+    // ✅ NOVO: Atualiza a duração recuperada
+    if (resultado.metadados.duracaoSegundos) {
+      window.segsGravados = resultado.metadados.duracaoSegundos;
+      var h = Math.floor(window.segsGravados / 3600);
+      var m = Math.floor((window.segsGravados % 3600) / 60);
+      var s = window.segsGravados % 60;
+      var elTimer = document.getElementById('timerDisplay');
+      if (elTimer) {
+        elTimer.textContent =
+          String(h).padStart(2, '0') + ':' +
+          String(m).padStart(2, '0') + ':' +
+          String(s).padStart(2, '0');
+      }
+    }
+
+    if (typeof esconderLoading === 'function') esconderLoading();
+    if (typeof toast === 'function') {
+      toast('Áudio recuperado! ' + fmtBytesLocal(resultado.tamanhoTotal) + ' (' + resultado.totalChunks + ' segmentos)', 'sucesso', 6000);
+    }
+    if (typeof log === 'function') {
+      log('SUCESSO', '✅ Áudio recuperado: ' + fmtBytesLocal(resultado.tamanhoTotal));
+    }
+
+  } catch (erro) {
+    if (typeof esconderLoading === 'function') esconderLoading();
+    if (typeof toast === 'function') toast('Erro: ' + erro.message, 'erro');
+  }
+}
+
+function descartarRecuperacao(sessaoId) {
+  var overlay = document.getElementById('overlayRecuperacao');
+  if (overlay) overlay.remove();
+  limparSessaoLocal(sessaoId);
+  if (typeof toast === 'function') toast('Gravação descartada', 'info');
+}
+
+// Helper para formatar bytes (caso ainda não exista)
+function fmtBytesLocal(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  9. INTERCEPTAÇÃO — HOOK NAS FUNÇÕES ORIGINAIS
+//  ✅ FIX 1: Usa window.xxx diretamente (exige var no script principal)
+//  ✅ FIX 3: Polling para ondataavailable em vez de acesso imediato
+// ═══════════════════════════════════════════════════════════════
+
+function interceptarGravacao() {
+  if (estadoProtecao.interceptado) return;
+  estadoProtecao.interceptado = true;
+
+  // Guarda referências originais
+  var _iniciarOriginal = window.iniciarGravacao;
+  var _pararOriginal = window.pararGravacao;
+  var _enviarOriginal = window.enviarAudio;
+  var _trataRespostaOriginal = window.trataResposta;
+
+  // ── INTERCEPTA: iniciarGravacao ──
+  window.iniciarGravacao = async function() {
+    estadoProtecao.sessaoId = 'grav_' + Date.now().toString(36);
+    estadoProtecao.contadorChunksLocais = 0;
+
+    // Ativa proteções ANTES de gravar
+    iniciarOperacaoCritica('gravando');
+    await solicitarWakeLock();
+    iniciarHeartbeat();
+
+    // Salva metadados iniciais
+    await salvarMetadadosSessao(estadoProtecao.sessaoId, {
+      titulo: (document.getElementById('inputTitulo') || {}).value || '',
+      participantes: (document.getElementById('inputParticipantes') || {}).value || '',
+      tipoMime: 'audio/webm',
+      totalChunks: 0,
+      duracaoSegundos: 0,
+      status: 'gravando',
+      dataInicio: new Date().toISOString()
+    });
+
+    // Chama original
+    await _iniciarOriginal.call(window);
+
+    // ✅ FIX 3: Usa polling para interceptar ondataavailable
+    // O MediaRecorder pode não estar pronto imediatamente
+    var tentativas = 0;
+    var maxTentativas = 20; // 20 × 200ms = 4s máximo
+    var intervaloHook = setInterval(function() {
+      tentativas++;
+
+      // ✅ FIX 1: Acessa via window.mediaRecorder (exige var no script principal)
+      if (window.mediaRecorder && window.mediaRecorder.state !== 'inactive') {
+        clearInterval(intervaloHook);
+        hookOnDataAvailable();
+        console.log('[Proteção] ✅ Hook no ondataavailable instalado (tentativa ' + tentativas + ')');
+        if (typeof log === 'function') {
+          log('INFO', '🛡️ Proteções ativas: backup local + wake lock + heartbeat');
+        }
+      } else if (tentativas >= maxTentativas) {
+        clearInterval(intervaloHook);
+        console.warn('[Proteção] ⚠️ Não conseguiu hookear ondataavailable após ' + maxTentativas + ' tentativas');
+      }
+    }, 200);
+
+    // ✅ FIX 7: Auto-save periódico como camada extra de segurança
+    iniciarAutoSave();
+  };
+
+  // ── INTERCEPTA: pararGravacao ──
+  window.pararGravacao = async function() {
+    _pararOriginal.call(window);
+
+    pararAutoSave();
+
+    // ✅ FIX: Salva metadados finais com dados atualizados
+    if (estadoProtecao.sessaoId) {
+      await salvarMetadadosSessao(estadoProtecao.sessaoId, {
+        titulo: (document.getElementById('inputTitulo') || {}).value || '',
+        participantes: (document.getElementById('inputParticipantes') || {}).value || '',
+        totalChunks: estadoProtecao.contadorChunksLocais,
+        duracaoSegundos: window.segsGravados || 0,
+        status: 'finalizada'
+      });
+    }
+
+    finalizarOperacaoCritica();
+    pararHeartbeat();
+
+    if (typeof log === 'function') {
+      log('INFO', '🛡️ ' + estadoProtecao.contadorChunksLocais + ' chunks salvos como backup local');
+    }
+  };
+
+  // ── INTERCEPTA: enviarAudio ──
+  window.enviarAudio = async function() {
+    if (estadoProtecao.envioEmAndamento) {
+      if (typeof toast === 'function') toast('Envio já em andamento!', 'aviso');
+      return;
+    }
+    if (!estadoProtecao.conexaoOk && !navigator.onLine) {
+      if (typeof toast === 'function') toast('Sem conexão! Verifique sua internet.', 'erro');
+      return;
+    }
+
+    estadoProtecao.envioEmAndamento = true;
+    iniciarOperacaoCritica('processando');
+    iniciarHeartbeat();
+
+    // Salva estado no sessionStorage para detectar refresh
+    try {
+      sessionStorage.setItem(PROTECAO_CONFIG.CHAVE_ESTADO_PROC, JSON.stringify({
+        sessaoId: estadoProtecao.sessaoId,
+        titulo: (document.getElementById('inputTitulo') || {}).value || '',
+        timestamp: Date.now()
+      }));
+    } catch (e) {}
+
+    // ✅ FIX 4: Envolve a chamada original com try/finally
+    try {
+      await _enviarOriginal.call(window);
+    } catch (erro) {
+      console.error('[Proteção] Erro no envio:', erro);
+      processamentoConcluido(false, estadoProtecao.sessaoId);
+    }
+  };
+
+  // ── INTERCEPTA: trataResposta (callback do envio direto/pequeno) ──
+  window.trataResposta = function(r, titulo) {
+    _trataRespostaOriginal.call(window, r, titulo);
+
+    // ✅ FIX 4: Garante cleanup após processamento direto
+    processamentoConcluido(r && r.sucesso, estadoProtecao.sessaoId);
+  };
+
+  console.log('[Proteção] ✅ Funções interceptadas com sucesso');
+}
+
+/** ✅ FIX 3: Hook no ondataavailable — salva cada chunk localmente */
+function hookOnDataAvailable() {
+  var mr = window.mediaRecorder;
+  if (!mr) return;
+
+  var _handlerOriginal = mr.ondataavailable;
+
+  mr.ondataavailable = function(evento) {
+    // 1. Chama handler original (adiciona ao chunksAudio[])
+    if (_handlerOriginal) {
+      _handlerOriginal.call(mr, evento);
+    }
+
+    // 2. Salva backup local no IndexedDB
+    if (evento.data && evento.data.size > 0 && estadoProtecao.sessaoId) {
+      var ordem = estadoProtecao.contadorChunksLocais;
+      salvarChunkLocal(evento.data, estadoProtecao.sessaoId, ordem);
+
+      // Atualiza metadados a cada 5 chunks (não a cada 1, para performance)
+      if (ordem % 5 === 0) {
+        salvarMetadadosSessao(estadoProtecao.sessaoId, {
+          totalChunks: ordem + 1,
+          duracaoSegundos: window.segsGravados || 0,
+          status: 'gravando'
+        });
+      }
+    }
+  };
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  ✅ NOVO: AUTO-SAVE PERIÓDICO (camada extra de segurança)
+//  Salva metadados atualizados mesmo se ondataavailable falhar
+// ═══════════════════════════════════════════════════════════════
+
+function iniciarAutoSave() {
+  pararAutoSave();
+  estadoProtecao.intervalAutoSave = setInterval(function() {
+    if (!estadoProtecao.sessaoId) return;
+
+    salvarMetadadosSessao(estadoProtecao.sessaoId, {
+      titulo: (document.getElementById('inputTitulo') || {}).value || '',
+      participantes: (document.getElementById('inputParticipantes') || {}).value || '',
+      totalChunks: estadoProtecao.contadorChunksLocais,
+      duracaoSegundos: window.segsGravados || 0,
+      status: 'gravando'
+    });
+
+    // ✅ NOVO: Se ondataavailable não salvou chunks mas chunksAudio tem dados,
+    // salva o Blob completo acumulado como chunk único (fallback de emergência)
+    if (estadoProtecao.contadorChunksLocais === 0 && window.chunksAudio && window.chunksAudio.length > 0) {
+      console.warn('[Proteção] ⚠️ ondataavailable não salvou chunks — fazendo backup de emergência');
+      var tipo = 'audio/webm';
+      if (window.mediaRecorder && window.mediaRecorder.mimeType) {
+        tipo = window.mediaRecorder.mimeType;
+      }
+      var blobEmergencia = new Blob(window.chunksAudio, { type: tipo });
+      salvarChunkLocal(blobEmergencia, estadoProtecao.sessaoId, 0);
+      salvarMetadadosSessao(estadoProtecao.sessaoId, {
+        totalChunks: 1,
+        tipoMime: tipo
+      });
+    }
+
+  }, PROTECAO_CONFIG.INTERVALO_AUTOSAVE_MS);
+}
+
+function pararAutoSave() {
+  if (estadoProtecao.intervalAutoSave) {
+    clearInterval(estadoProtecao.intervalAutoSave);
+    estadoProtecao.intervalAutoSave = null;
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  ✅ NOVO: INTERCEPTAÇÃO DO enviarGrande (pipeline de chunks)
+//  O enviarGrande é chamado dentro de enviarAudio e tem seu próprio
+//  fluxo de conclusão que não passava por trataResposta
+// ═══════════════════════════════════════════════════════════════
+
+// Monitora a variável global de loading para detectar fim do processamento
+// (Estratégia: observa quando o loading overlay é escondido após "processando")
+(function observarFimProcessamento() {
+  var observadorLoading = new MutationObserver(function(mutacoes) {
+    mutacoes.forEach(function(mutacao) {
+      if (mutacao.type === 'attributes' && mutacao.attributeName === 'class') {
+        var el = mutacao.target;
+        // Se o overlay de loading DEIXOU de ser visível e estávamos processando
+        if (el.id === 'loadingOverlay' &&
+            !el.classList.contains('visivel') &&
+            estadoProtecao.envioEmAndamento) {
+          // Dá um pequeno delay para permitir que o toast de sucesso/erro apareça
+          setTimeout(function() {
+            if (estadoProtecao.envioEmAndamento) {
+              console.log('[Proteção] Detectado fim do processamento via MutationObserver');
+              processamentoConcluido(true, estadoProtecao.sessaoId);
+            }
+          }, 500);
+        }
+      }
+    });
+  });
+
+  // Aguarda DOM pronto para observar
+  function iniciarObservador() {
+    var loadingEl = document.getElementById('loadingOverlay');
+    if (loadingEl) {
+      observadorLoading.observe(loadingEl, { attributes: true, attributeFilter: ['class'] });
+      console.log('[Proteção] ✅ MutationObserver no loadingOverlay ativo');
+    } else {
+      setTimeout(iniciarObservador, 500);
+    }
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(iniciarObservador, 300);
+  } else {
+    document.addEventListener('DOMContentLoaded', function() { setTimeout(iniciarObservador, 300); });
+  }
+})();
+
+
+// ═══════════════════════════════════════════════════════════════
+//  10. PILL VISUAL NO HEADER
+// ═══════════════════════════════════════════════════════════════
+
+function adicionarPillProtecao() {
+  var headerStatus = document.querySelector('.header-status');
+  if (!headerStatus) return;
+
+  var pill = document.createElement('div');
+  pill.className = 'pill-status';
+  pill.id = 'pillProtecao';
+  pill.innerHTML = '<span class="dot"></span><span>Backup</span>';
+  pill.title = 'Backup local automático';
+  headerStatus.insertBefore(pill, headerStatus.firstChild);
+  atualizarPillProtecao();
+}
+
+function atualizarPillProtecao() {
+  var pill = document.getElementById('pillProtecao');
+  if (!pill) return;
+  var ok = estadoProtecao.dbPronto;
+  pill.classList.toggle('ok', ok);
+  pill.classList.toggle('erro', !ok);
+  pill.querySelector('span:last-child').textContent = ok ? 'Backup Auto' : 'Sem Backup';
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  INICIALIZAÇÃO DO MÓDULO
+// ═══════════════════════════════════════════════════════════════
+
+(async function inicializarProtecao() {
+  console.log('[Proteção] 🚀 Inicializando...');
+
+  // 1. IndexedDB
+  await inicializarIndexedDB();
+
+  // 2. beforeunload
+  ativarProtecaoBeforeUnload();
+
+  // 3. Visibility API
+  ativarProtecaoVisibilidade();
+
+  // 4. Pill visual
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    adicionarPillProtecao();
+  } else {
+    document.addEventListener('DOMContentLoaded', adicionarPillProtecao);
+  }
+
+  // 5. Interceptar funções (DEVE esperar script principal carregar)
+  function tentarInterceptar() {
+    if (typeof window.iniciarGravacao === 'function' &&
+        typeof window.pararGravacao === 'function' &&
+        typeof window.enviarAudio === 'function') {
+      interceptarGravacao();
+    } else {
+      console.log('[Proteção] Aguardando funções do script principal...');
+      setTimeout(tentarInterceptar, 300);
+    }
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(tentarInterceptar, 200);
+  } else {
+    document.addEventListener('DOMContentLoaded', function() { setTimeout(tentarInterceptar, 200); });
+  }
+
+  // 6. Verificar sessão interrompida (com delay para UI)
+  setTimeout(verificarSessaoInterrompida, 2500);
+
+  // 7. Limitar histórico
+  await limitarHistoricoLocal();
+
+  // 8. Notificações (sem bloquear)
+  if ('Notification' in window && Notification.permission === 'default') {
+    document.addEventListener('click', function pedirNotif() {
+      Notification.requestPermission();
+      document.removeEventListener('click', pedirNotif);
+    }, { once: true });
+  }
+
+  console.log('[Proteção] ✅ Módulo inicializado');
+  if (typeof log === 'function') {
+    log('INFO', '🛡️ Proteção anti-perda ativa');
+  }
+})();
+</script>

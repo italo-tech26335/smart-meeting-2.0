@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Meeting - Gestão de Projetos</title>
+  <base target="_top">
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <?!= include('TemaPadrao-CSS'); ?>
+  <script>const MODO_ADMIN_URL = <?= modoAdmin ?>;</script>
+
+  <!-- CSS SEPARADO EM MÓDULOS -->
+  <?!= include('Paginaprojetos-css-base🎈'); ?>
+  <?!= include('Paginaprojetos-css-cards🎈'); ?>
+  <?!= include('Paginaprojetos-css-ui🎈'); ?>
+</head>
+<body>
+  <div class="layout-principal">
+    
+    <header class="cabecalho">
+      <div class="logo">
+        <i class="fas fa-project-diagram"></i>
+        <span>Smart Meeting - Projetos</span>
+      </div>
+      
+      <div class="cabecalho-centro">
+        <div class="contador-pendentes" id="contadorPendentes">
+          <i class="fas fa-clock"></i>
+          <span id="totalPendentesHeader">0</span>
+          <span>pendentes</span>
+        </div>
+        <div id="badgeFiltroResponsavel" style="display:none;align-items:center;gap:6px;background:rgba(74,111,165,0.15);border:1px solid rgba(74,111,165,0.4);border-radius:20px;padding:4px 12px;font-size:0.75rem;color:#4a6fa5;">
+          <i class="fas fa-user-tag"></i>
+          <span>Exibindo apenas seus projetos</span>
+        </div>
+        <button class="btn-bloqueio editavel" id="btnBloqueioGlobal" onclick="alternarModoBloqueioGlobal()">
+          <i class="fas fa-lock-open"></i>
+          <span id="textoBloqueioGlobal">Edit?vel</span>
+        </button>
+      </div>
+
+      <div class="cabecalho-acoes">
+        <button class="btn-cabecalho btn-toggle-painel" onclick="togglePainel()">
+          <i class="fas fa-chart-pie"></i>
+        </button>
+        <button class="btn-cabecalho" onclick="autoOrganizar()" title="Organizar Automaticamente por Setor">
+          <i class="fas fa-sitemap"></i>
+          <span>Organizar</span>
+        </button>
+        <button class="btn-cabecalho destaque" onclick="recarregarDados()">
+          <i class="fas fa-sync-alt"></i>
+          <span>Atualizar</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="barra-navegacao-superior">
+      <div class="secao-navegacao secao-setores" style="flex: 1;">
+        <div class="nav-titulo">
+          <i class="fas fa-building"></i>
+          <span>Setores</span>
+          <span class="nav-contador" id="navContadorSetores">0</span>
+        </div>
+        <div class="nav-scroll-container">
+          <div class="nav-lista" id="navListaSetores">
+          </div>
+        </div>
+      </div>
+      <!-- Seção de Etapas Pendentes -->
+      <div class="secao-navegacao secao-etapas" style="flex: 1; border-left: 1px solid var(--cor-borda);">
+        <div class="nav-titulo">
+          <i class="fas fa-tasks"></i>
+          <span>Etapas Pendentes</span>
+          <span class="nav-contador" id="navContadorEtapas">0</span>
+        </div>
+        <div class="nav-scroll-container">
+          <div class="nav-lista" id="navListaEtapas">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="area-diagrama" id="areaDiagrama">
+      <div class="container-diagrama" id="containerDiagrama">
+        <svg class="svg-conexoes" id="svgConexoes">
+          <defs>
+            <marker id="setaDependencia" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" class="seta-dependencia" />
+            </marker>
+          </defs>
+        </svg>
+      </div>
+      
+      <!-- PAINEL FIXO DE RESPONSÁVEIS (NOVO) -->
+      <div class="painel-responsaveis-fixo" id="painelResponsaveisFixo">
+        <div class="painel-resp-header">
+          <i class="fas fa-users"></i>
+          <span>Colaboradores</span>
+          <button class="btn-toggle-painel-resp" onclick="togglePainelResponsaveis()">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+        </div>
+        <div class="painel-resp-conteudo" id="painelRespConteudo">
+          <!-- Renderizado via JS -->
+        </div>
+      </div>
+    </div>
+
+    <aside class="painel-resumo" id="painelResumo">
+      <div class="painel-header">
+        <div class="painel-titulo">
+          <i class="fas fa-chart-pie"></i>
+          <span>Resumo & Filtros</span>
+        </div>
+        <button class="btn-fechar-painel" onclick="fecharPainel()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="painel-conteudo" id="painelConteudo">
+        <div class="resumo-grid">
+          <div class="resumo-card">
+            <div class="resumo-card-valor" id="resumoTotalProjetos">0</div>
+            <div class="resumo-card-label">Projetos</div>
+          </div>
+          <div class="resumo-card">
+            <div class="resumo-card-valor" id="resumoTotalEtapas">0</div>
+            <div class="resumo-card-label">Etapas</div>
+          </div>
+          <div class="resumo-card pendentes">
+            <div class="resumo-card-valor" id="resumoPendentes">0</div>
+            <div class="resumo-card-label">Pendentes</div>
+          </div>
+          <div class="resumo-card bloqueadas">
+            <div class="resumo-card-valor" id="resumoBloqueadas">0</div>
+            <div class="resumo-card-label">Bloqueadas</div>
+          </div>
+        </div>
+
+        <div class="filtros-secao">
+          <div class="filtros-titulo">
+            <i class="fas fa-filter"></i>
+            <span>Filtros</span>
+          </div>
+          
+          <div class="dashboard-setores-container">
+            <div class="dashboard-setores-titulo">
+               <i class="fas fa-chart-bar"></i>
+               <span>Análise por Setor</span>
+            </div>
+            <div id="dashboardSetores"></div>
+          </div>
+
+          <div class="filtro-grupo">
+            <div class="filtro-grupo-titulo">Visibilidade</div>
+            <div id="filtrosVisibilidade"></div>
+          </div>
+
+          <div class="filtro-grupo">
+            <div class="filtro-grupo-titulo">Responsáveis</div>
+            <div id="filtrosResponsaveis"></div>
+          </div>
+
+          <div class="filtro-grupo">
+            <div class="filtro-grupo-titulo">Status das Etapas</div>
+            <div id="filtrosStatus">
+              <div class="filtro-item">
+                <input type="checkbox" id="filtroStatusAFazer" checked onchange="aplicarFiltros()">
+                <label for="filtroStatusAFazer">A Fazer</label>
+              </div>
+              <div class="filtro-item">
+                <input type="checkbox" id="filtroStatusEmAndamento" checked onchange="aplicarFiltros()">
+                <label for="filtroStatusEmAndamento">Em Andamento</label>
+              </div>
+              <div class="filtro-item">
+                <input type="checkbox" id="filtroStatusBloqueada" checked onchange="aplicarFiltros()">
+                <label for="filtroStatusBloqueada">Bloqueada</label>
+              </div>
+              <div class="filtro-item">
+                <input type="checkbox" id="filtroStatusConcluida" checked onchange="aplicarFiltros()">
+                <label for="filtroStatusConcluida">Concluída</label>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-limpar-filtros" onclick="limparFiltros()">
+            <i class="fas fa-eraser"></i> Limpar Filtros
+          </button>
+        </div>
+      </div>
+    </aside>
+    
+    <div class="painel-overlay" id="painelOverlay" onclick="fecharPainel()"></div>
+  </div>
+
+  <div class="indicador-zoom" id="indicadorZoom">
+    <i class="fas fa-search"></i>
+    <span id="zoomNivel">100%</span>
+  </div>
+
+  <div class="btn-flutuante-container">
+    <div class="menu-flutuante" id="menuFlutuante">
+      <button class="menu-flutuante-item" onclick="abrirModalProjeto()">
+        <i class="fas fa-folder-plus"></i>
+        <span>Novo Projeto</span>
+      </button>
+      <button class="menu-flutuante-item" onclick="abrirModalResponsavel()">
+        <i class="fas fa-user-plus"></i>
+        <span>Novo Responsável</span>
+      </button>
+      <button class="menu-flutuante-item" id="btnGerenciarPermissoes" onclick="abrirModalPermissoes()" style="display: none;">
+        <i class="fas fa-user-shield"></i>
+        <span>Gerenciar Permissões</span>
+      </button>
+      <button class="menu-flutuante-item" onclick="abrirModalSetor()">
+        <i class="fas fa-building"></i>
+        <span>Novo Setor</span>
+      </button>
+    </div>
+    <button class="btn-flutuante" id="btnAdicionar" onclick="toggleMenuFlutuante()">
+      <i class="fas fa-plus"></i>
+    </button>
+  </div>
+
+  <!-- Modais Existentes -->
+  <div class="modal-overlay" id="modalProjeto">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-folder"></i><span id="modalProjetoTituloTexto">Novo Projeto</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalProjeto')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="projetoId">
+        
+        <div class="campo-form">
+          <label for="projetoNome">Nome <span class="obrigatorio">*</span></label>
+          <input type="text" id="projetoNome" placeholder="Nome do projeto">
+        </div>
+        
+        <div style="display: flex; gap: 16px;">
+          <div class="campo-form" style="flex: 1;">
+            <label for="projetoSetor">Setor</label>
+            <input type="text" id="projetoSetor" placeholder="Ex: Marketing" list="listaSetores">
+            <datalist id="listaSetores"></datalist>
+          </div>
+          <div class="campo-form" style="flex: 1;">
+            <label for="projetoPilar">Pilar</label>
+            <input type="text" id="projetoPilar" placeholder="Ex: Inovação">
+          </div>
+        </div>
+
+        <div class="campo-form">
+          <label>Responsáveis do Projeto</label>
+          <div class="multi-select-responsaveis" id="projetoResponsaveisContainer">
+            <!-- Checkboxes gerados via JS -->
+          </div>
+        </div>
+
+        <div class="campo-form">
+          <label for="projetoDescricao">Descrição</label>
+          <textarea id="projetoDescricao" placeholder="Descrição detalhada..."></textarea>
+        </div>
+        
+        <div class="campo-form">
+          <label for="projetoFinalidade">Finalidade</label>
+          <input type="text" id="projetoFinalidade" placeholder="Objetivo principal">
+        </div>
+        
+        <div class="campo-form">
+          <label for="projetoParaQuem">Para Quem</label>
+          <input type="text" id="projetoParaQuem" placeholder="Cliente ou destinatário">
+        </div>
+        
+        <div class="campo-form">
+          <label for="projetoStatus">Status</label>
+          <select id="projetoStatus">
+            <option value="Ativo">Ativo</option>
+            <option value="Pausado">Pausado</option>
+            <option value="Concluído">Concluído</option>
+          </select>
+        </div>
+        
+        <div class="campo-form">
+          <label for="projetoPrioridade">Prioridade</label>
+          <select id="projetoPrioridade">
+            <option value="Baixa">Baixa</option>
+            <option value="Média" selected>Média</option>
+            <option value="Alta">Alta</option>
+          </select>
+        </div>
+        
+        <div class="campo-form">
+          <label for="projetoLink">Link Externo</label>
+          <input type="url" id="projetoLink" placeholder="https://...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secundario" onclick="fecharModal('modalProjeto')">Cancelar</button>
+        <button class="btn btn-primario" onclick="salvarProjeto()"><i class="fas fa-save"></i>Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalResponsavel">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-user"></i><span id="modalResponsavelTituloTexto">Novo Responsável</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalResponsavel')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="responsavelId">
+        <div class="campo-form">
+          <label for="responsavelNome">Nome <span class="obrigatorio">*</span></label>
+          <input type="text" id="responsavelNome" placeholder="Nome completo">
+        </div>
+        <div class="campo-form">
+          <label for="responsavelEmail">Email</label>
+          <input type="email" id="responsavelEmail" placeholder="email@exemplo.com">
+        </div>
+        <div class="campo-form">
+          <label for="responsavelCargo">Cargo</label>
+          <input type="text" id="responsavelCargo" placeholder="Ex: Gerente">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secundario" onclick="fecharModal('modalResponsavel')">Cancelar</button>
+        <button class="btn btn-primario" onclick="salvarResponsavel()"><i class="fas fa-save"></i>Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Setor -->
+<div class="modal-overlay" id="modalSetor">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-building"></i><span id="modalSetorTituloTexto">Novo Setor</span></h3>
+      <button class="modal-fechar" onclick="fecharModal('modalSetor')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="setorId">
+      
+      <div class="campo-form">
+        <label for="setorNome">Nome do Setor <span class="obrigatorio">*</span></label>
+        <input type="text" id="setorNome" placeholder="Ex: Marketing, TI, Financeiro...">
+      </div>
+      
+      <div class="campo-form">
+        <label for="setorDescricao">Descrição</label>
+        <textarea id="setorDescricao" placeholder="Descrição do setor..." rows="3"></textarea>
+      </div>
+      
+      <div class="campo-form">
+        <label for="setorResponsavel">Gerente/Responsável</label>
+        <select id="setorResponsavel">
+          <option value="">Selecione um responsável...</option>
+        </select>
+        <small class="texto-ajuda">O gerente será responsável pelos projetos do setor</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-perigo oculto" id="btnExcluirSetor" onclick="confirmarExcluirSetor()">
+        <i class="fas fa-trash"></i>Excluir
+      </button>
+      <button class="btn btn-secundario" onclick="fecharModal('modalSetor')">Cancelar</button>
+      <button class="btn btn-primario" onclick="salvarSetor()"><i class="fas fa-save"></i>Salvar</button>
+    </div>
+  </div>
+</div>
+  
+  <div class="modal-overlay" id="modalVincularGerente">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-user-tie"></i><span id="modalVincularGerenteTitulo">Gerente do Setor</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalVincularGerente')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="campo-form">
+          <label for="vincularGerenteSelect">Selecione o Gerente</label>
+          <select id="vincularGerenteSelect">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+        <p style="font-size: var(--tamanho-sm); color: var(--cor-texto-terciario); margin-top: var(--espacamento-md);">
+          O gerente será responsável por todos os projetos deste setor que não tiverem um responsável direto.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-perigo" onclick="removerGerenteSetor()" title="Remover gerente do setor">
+          <i class="fas fa-user-slash"></i> Remover
+        </button>
+        <button class="btn btn-secundario" onclick="fecharModal('modalVincularGerente')">Cancelar</button>
+        <button class="btn btn-primario" onclick="salvarGerenteSetor()">
+          <i class="fas fa-save"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalVincularResponsavel">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-user-plus"></i><span>Adicionar Responsável</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalVincularResponsavel')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="vincularProjetoId">
+        <div class="campo-form">
+          <label for="vincularResponsavelSelect">Selecione o Responsável <span class="obrigatorio">*</span></label>
+          <select id="vincularResponsavelSelect">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+        <p style="font-size: var(--tamanho-sm); color: var(--cor-texto-terciario); margin-top: var(--espacamento-md);">
+          Ou <a href="#" onclick="fecharModal('modalVincularResponsavel'); abrirModalResponsavel(); return false;"
+            style="color: var(--cor-primaria);">crie um novo responsável</a>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secundario" onclick="fecharModal('modalVincularResponsavel')">Cancelar</button>
+        <button class="btn btn-primario" onclick="vincularResponsavelAoProjeto()"><i class="fas fa-link"></i>Vincular</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalEtapa">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-tasks"></i><span id="modalEtapaTituloTexto">Nova Etapa</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalEtapa')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="etapaId">
+        <input type="hidden" id="etapaProjetoId">
+        <input type="hidden" id="etapaPaiId">
+
+        <div class="info-etapa-pai oculto" id="infoEtapaPai">
+          <i class="fas fa-level-down-alt"></i>
+          <span>Sub-etapa de: <strong id="nomeEtapaPai"></strong></span>
+        </div>
+
+        <div class="campo-form">
+          <label for="etapaNome">Nome <span class="obrigatorio">*</span></label>
+          <input type="text" id="etapaNome" placeholder="Nome da etapa">
+        </div>
+        
+        <div class="campo-form">
+          <label>Responsáveis da Etapa</label>
+          <div class="multi-select-responsaveis" id="etapaResponsaveisContainer">
+            <!-- Checkboxes gerados via JS -->
+          </div>
+          <small class="texto-ajuda">Deixe vazio para herdar do projeto</small>
+        </div>
+
+        <div class="campo-form">
+          <label for="etapaDescricao">Descrição</label>
+          <textarea id="etapaDescricao" placeholder="Detalhes..."></textarea>
+        </div>
+        <div class="campo-form">
+          <label for="etapaOQueFazer">O Que Fazer</label>
+          <textarea id="etapaOQueFazer" placeholder="Tarefas específicas..."></textarea>
+        </div>
+<div class="campo-form campo-pendencias-estruturadas">
+  <label>
+    <i class="fas fa-exclamation-triangle"></i> Pendências
+    <span class="contador-pendencias" id="contadorPendenciasModal">0 pendentes</span>
+  </label>
+  
+  <div class="pendencias-adicionar">
+    <input type="text" id="novaPendenciaTexto" placeholder="Descreva a pendência..." class="input-pendencia">
+    <select id="novaPendenciaUrgencia" class="select-urgencia">
+      <option value="baixa">🟢 Baixa</option>
+      <option value="media" selected>🟡 Média</option>
+      <option value="alta">🔴 Alta</option>
+    </select>
+    <button type="button" class="btn-add-pendencia" onclick="adicionarPendenciaLista()">
+      <i class="fas fa-plus"></i>
+    </button>
+  </div>
+  
+  <div class="lista-pendencias-modal" id="listaPendenciasModal">
+    <div class="pendencias-vazio">
+      <i class="fas fa-check-circle"></i>
+      <span>Nenhuma pendência cadastrada</span>
+    </div>
+  </div>
+</div>
+        <div class="campo-form">
+          <label for="etapaStatus">Status</label>
+          <select id="etapaStatus">
+            <option value="A Fazer">A Fazer</option>
+            <option value="Em Andamento">Em Andamento</option>
+            <option value="Bloqueada">Bloqueada</option>
+            <option value="Concluída">Concluída</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-perigo oculto" id="btnExcluirEtapa" onclick="confirmarExcluirEtapa()">
+          <i class="fas fa-trash"></i>Excluir
+        </button>
+        <button class="btn btn-secundario" onclick="fecharModal('modalEtapa')">Cancelar</button>
+        <button class="btn btn-primario" onclick="salvarEtapa()">
+          <i class="fas fa-save"></i>Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalConfirmacao">
+    <div class="modal" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-exclamation-triangle" style="color: var(--cor-aviso);"></i><span>Confirmar</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalConfirmacao')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p id="modalConfirmacaoMensagem">Tem certeza?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secundario" onclick="fecharModal('modalConfirmacao')">Cancelar</button>
+        <button class="btn btn-perigo" id="btnConfirmarAcao" onclick="executarConfirmacao()">
+          <i class="fas fa-check"></i>Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalOrganizacao">
+    <div class="modal modal-organizacao">
+      <div class="modal-header">
+        <h3><i class="fas fa-sitemap"></i><span>Organizar Layout</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalOrganizacao')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 16px; color: var(--cor-texto-secundario);">
+          Escolha como deseja organizar os cards no diagrama:
+        </p>
+        
+        <div class="opcoes-layout">
+          <div class="opcao-layout selecionada" data-layout="arvoreVertical" onclick="selecionarLayoutOrganizacao('arvoreVertical')">
+            <div class="opcao-layout-icone">
+              <svg viewBox="0 0 80 60">
+                <rect x="30" y="2" width="20" height="12" fill="#2b6cb0" rx="2"/>
+                <line x1="40" y1="14" x2="40" y2="22" stroke="#718096" stroke-width="2"/>
+                <line x1="20" y1="22" x2="60" y2="22" stroke="#718096" stroke-width="2"/>
+                <line x1="20" y1="22" x2="20" y2="28" stroke="#718096" stroke-width="2"/>
+                <line x1="40" y1="22" x2="40" y2="28" stroke="#718096" stroke-width="2"/>
+                <line x1="60" y1="22" x2="60" y2="28" stroke="#718096" stroke-width="2"/>
+                <rect x="10" y="28" width="20" height="10" fill="#38a169" rx="2"/>
+                <rect x="30" y="28" width="20" height="10" fill="#38a169" rx="2"/>
+                <rect x="50" y="28" width="20" height="10" fill="#38a169" rx="2"/>
+              </svg>
+            </div>
+            <span class="opcao-layout-nome">Árvore Vertical</span>
+          </div>
+          
+          <div class="opcao-layout" data-layout="arvoreHorizontal" onclick="selecionarLayoutOrganizacao('arvoreHorizontal')">
+            <div class="opcao-layout-icone">
+              <svg viewBox="0 0 80 60">
+                <rect x="2" y="24" width="16" height="12" fill="#2b6cb0" rx="2"/>
+                <line x1="18" y1="30" x2="28" y2="30" stroke="#718096" stroke-width="2"/>
+                <line x1="28" y1="10" x2="28" y2="50" stroke="#718096" stroke-width="2"/>
+                <rect x="32" y="6" width="16" height="10" fill="#38a169" rx="2"/>
+                <rect x="32" y="25" width="16" height="10" fill="#38a169" rx="2"/>
+                <rect x="32" y="44" width="16" height="10" fill="#38a169" rx="2"/>
+              </svg>
+            </div>
+            <span class="opcao-layout-nome">Árvore Horizontal</span>
+          </div>
+          
+          <div class="opcao-layout" data-layout="grade" onclick="selecionarLayoutOrganizacao('grade')">
+            <div class="opcao-layout-icone">
+              <svg viewBox="0 0 80 60">
+                <rect x="4" y="4" width="22" height="14" fill="#2b6cb0" rx="2"/>
+                <rect x="30" y="4" width="22" height="14" fill="#2b6cb0" rx="2"/>
+                <rect x="56" y="4" width="22" height="14" fill="#2b6cb0" rx="2"/>
+                <rect x="4" y="22" width="22" height="14" fill="#38a169" rx="2"/>
+                <rect x="30" y="22" width="22" height="14" fill="#38a169" rx="2"/>
+                <rect x="56" y="22" width="22" height="14" fill="#38a169" rx="2"/>
+                <rect x="4" y="40" width="22" height="14" fill="#d69e2e" rx="2"/>
+                <rect x="30" y="40" width="22" height="14" fill="#d69e2e" rx="2"/>
+              </svg>
+            </div>
+            <span class="opcao-layout-nome">Grade</span>
+          </div>
+        </div>
+        
+        <div class="config-espacamento">
+          <label>Espaçamento entre cards: <span id="valorEspacamento">120</span>px</label>
+          <input type="range" min="60" max="200" value="120" step="10" onchange="atualizarEspacamento(this.value)" oninput="atualizarEspacamento(this.value)">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secundario" onclick="fecharModal('modalOrganizacao')">Cancelar</button>
+        <button class="btn btn-primario" onclick="executarOrganizacao()">
+          <i class="fas fa-check"></i> Aplicar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOVOS MODAIS ADICIONADOS -->
+  <!-- Modal Editor de Prioridades -->
+  <div class="modal-overlay" id="modalPrioridades">
+    <div class="modal modal-prioridades">
+      <div class="modal-header">
+        <h3><i class="fas fa-sort-amount-up"></i><span id="modalPrioridadesTitulo">Editor de Prioridades</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalPrioridades')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="prioridadesResponsavelId">
+        
+        <p style="color: var(--cor-texto-secundario); font-size: var(--tamanho-sm); margin-bottom: 16px;">
+          <i class="fas fa-info-circle"></i> Arraste os itens para definir a ordem de prioridade. Clique no projeto para expandir e organizar suas etapas.
+        </p>
+        
+        <div class="lista-prioridades-container" id="listaPrioridadesProjetos">
+          <!-- Renderizado via JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secundario" onclick="fecharModal('modalPrioridades')">Cancelar</button>
+        <button class="btn btn-primario" onclick="salvarPrioridades()">
+          <i class="fas fa-save"></i> Salvar Prioridades
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Envio de Email -->
+  <div class="modal-overlay" id="modalEnvioEmail">
+    <div class="modal modal-envio-email">
+      <div class="modal-header">
+        <h3><i class="fas fa-envelope"></i><span>Enviar Prioridades por Email</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalEnvioEmail')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="envioEmailResponsavelId">
+        
+        <div class="destinatario-info" id="destinatarioInfo">
+          <!-- Renderizado via JS -->
+        </div>
+        
+        <div class="campo-form">
+          <label>Selecione os projetos para enviar:</label>
+          <div class="selecao-projetos-envio" id="selecaoProjetosEnvio">
+            <!-- Renderizado via JS -->
+          </div>
+        </div>
+        
+        <div class="campo-form">
+          <label for="mensagemEmailAdicional">Mensagem adicional (opcional)</label>
+          <textarea id="mensagemEmailAdicional" placeholder="Escreva uma mensagem para o colaborador..." rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secundario" onclick="fecharModal('modalEnvioEmail')">Cancelar</button>
+        <button class="btn btn-primario" onclick="enviarEmailPrioridades()">
+          <i class="fas fa-paper-plane"></i> Enviar Email
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Gerenciamento de Permissões (Admin) -->
+  <div class="modal-overlay" id="modalPermissoes">
+    <div class="modal modal-permissoes">
+      <div class="modal-header">
+        <h3><i class="fas fa-user-shield"></i><span>Gerenciar Permissões</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalPermissoes')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="permissoes-acoes-topo">
+          <button class="btn btn-primario" onclick="abrirFormNovaPermissao()">
+            <i class="fas fa-plus"></i> Nova Permissão
+          </button>
+        </div>
+        
+        <div class="lista-permissoes" id="listaPermissoes">
+          <!-- Renderizado via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Edição de Permissão Individual -->
+  <div class="modal-overlay" id="modalEditarPermissao">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-user-cog"></i><span id="tituloModalPermissao">Nova Permissão</span></h3>
+        <button class="modal-fechar" onclick="fecharModal('modalEditarPermissao')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="permissaoId">
+        
+        <div class="campo-form">
+          <label for="permissaoEmail">Email do Usuário <span class="obrigatorio">*</span></label>
+          <input type="email" id="permissaoEmail" placeholder="usuario@exemplo.com">
+        </div>
+        
+        <div class="campo-form">
+          <label for="permissaoNivel">Nível de Acesso</label>
+          <select id="permissaoNivel" onchange="atualizarCamposPermissao()">
+            <option value="colaborador">Colaborador</option>
+            <option value="gestor">Gestor de Setor</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        
+        <div class="campo-form" id="campoSetoresPermitidos">
+          <label>Setores Permitidos</label>
+          <div class="multi-select-permissoes" id="setoresPermitidosContainer">
+            <!-- Checkboxes gerados via JS -->
+          </div>
+          <small class="texto-ajuda">Deixe vazio para acesso a todos os setores (apenas admin)</small>
+        </div>
+        
+        <div class="campo-form" id="campoProjetosPermitidos">
+          <label>Projetos Específicos (opcional)</label>
+          <div class="multi-select-permissoes" id="projetosPermitidosContainer">
+            <!-- Checkboxes gerados via JS -->
+          </div>
+          <small class="texto-ajuda">Deixe vazio para herdar permissões do setor</small>
+        </div>
+        
+        <div class="campo-form">
+          <label class="checkbox-inline">
+            <input type="checkbox" id="permissaoPodeCriarProjeto">
+            <span>Pode criar novos projetos</span>
+          </label>
+        </div>
+        
+        <div class="campo-form">
+          <label class="checkbox-inline">
+            <input type="checkbox" id="permissaoPodeCriarEtapa" checked>
+            <span>Pode criar novas etapas</span>
+          </label>
+        </div>
+        
+        <div class="campo-form">
+          <label class="checkbox-inline">
+            <input type="checkbox" id="permissaoAtivo" checked>
+            <span>Usuário Ativo</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-perigo oculto" id="btnRemoverPermissao" onclick="removerPermissaoAtual()">
+          <i class="fas fa-trash"></i> Remover
+        </button>
+        <button class="btn btn-secundario" onclick="fecharModal('modalEditarPermissao')">Cancelar</button>
+        <button class="btn btn-primario" onclick="salvarPermissaoModal()">
+          <i class="fas fa-save"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  
+  <div class="loader-overlay" id="loader">
+    <img src="https://cdn.dribbble.com/users/579262/screenshots/2155250/41-coke_overview.gif" alt="Carregando..." class="loader-gif" loading="lazy" decoding="async">
+    <span class="loader-texto">Carregando projetos...</span>
+  </div>
+
+  <!-- JS SEPARADO EM MÓDULOS -->
+  <!-- A ordem de importação é crítica: Utilidades (base) -> Config (estado) -> Render (visual) -> Interação (eventos) -> CRUD (modais) -->
+  <?!= include('Compartilhado-Utilidades🔧'); ?>
+  <?!= include('Paginaprojetos-js-config🎈'); ?>
+  <?!= include('Paginaprojetos-js-render🎈'); ?>
+  <?!= include('Paginaprojetos-js-interacao🎈'); ?>
+  <?!= include('Paginaprojetos-js-crud🎈'); ?>
+</body>
+</html>

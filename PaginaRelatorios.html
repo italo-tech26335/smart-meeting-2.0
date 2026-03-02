@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Meeting - Relat?rios IA</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <?!= include('TemaPadrao-CSS'); ?>
+<style>
+/* ============================================================
+   DESIGN TOKENS — VINTAGE CREAM PALETTE
+============================================================ */
+:root{
+  --creme-base:#f5f0e8;
+  --creme-escuro:#e8dfd0;
+  --creme-card:#faf7f2;
+  --creme-borda:#d9ceba;
+  --creme-borda-forte:#c5b49e;
+
+  --marrom:#3d2b1f;
+  --marrom-mid:#6b4226;
+  --marrom-claro:#8b5e3c;
+  --marrom-suave:rgba(107,66,38,.08);
+  --marrom-suave2:rgba(107,66,38,.15);
+
+  --sage:#4a6c50;
+  --sage-mid:#5d8464;
+  --sage-light:#7aaa82;
+  --sage-bg:rgba(93,132,100,.08);
+
+  --azul:#3d5a7a;
+  --azul-bg:rgba(61,90,122,.08);
+
+  --dourado:#b8860b;
+  --dourado-bg:rgba(184,134,11,.1);
+  --dourado-borda:rgba(184,134,11,.3);
+
+  --perigo:#9b3a2e;
+  --perigo-bg:rgba(155,58,46,.08);
+  --sucesso:#2d6a4f;
+  --sucesso-bg:rgba(45,106,79,.08);
+  --aviso:#8b5a00;
+  --aviso-bg:rgba(139,90,0,.08);
+
+  --texto:#2c1e14;
+  --texto-sec:#5c4535;
+  --texto-ter:#8c7060;
+  --texto-inv:#faf7f2;
+
+  --sombra-sm:0 1px 4px rgba(60,35,20,.07);
+  --sombra-md:0 4px 16px rgba(60,35,20,.09);
+  --sombra-lg:0 8px 32px rgba(60,35,20,.12);
+  --sombra-xl:0 16px 48px rgba(60,35,20,.16);
+
+  --raio-xs:4px;
+  --raio-sm:6px;
+  --raio-md:10px;
+  --raio-lg:14px;
+  --raio-xl:20px;
+
+  --fonte-titulo:'DM Serif Display',serif;
+  --fonte:'Plus Jakarta Sans',sans-serif;
+  --trans:.2s ease;
+
+  --header-h:58px;
+  --sidebar-w:290px;
+}
+
+/* ============================================================
+   RESET & BASE
+============================================================ */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--fonte);background:var(--creme-base);color:var(--texto);font-size:13px;line-height:1.5}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--creme-borda-forte);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--marrom-claro)}
+
+/* ============================================================
+   PAPER TEXTURE OVERLAY
+============================================================ */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:.6
+}
+
+/* ============================================================
+   HEADER
+============================================================ */
+.header{
+  position:sticky;top:0;z-index:200;height:var(--header-h);
+  background:var(--marrom);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 1.5rem;
+  box-shadow:0 2px 12px rgba(0,0,0,.2);
+}
+.header::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)
+}
+.logo{
+  display:flex;align-items:center;gap:.625rem;
+  font-family:var(--fonte-titulo);font-size:1.25rem;
+  color:var(--creme-base);text-decoration:none;letter-spacing:.01em
+}
+.logo-icon{
+  width:34px;height:34px;background:var(--marrom-mid);
+  border-radius:var(--raio-sm);display:flex;align-items:center;justify-content:center;
+  color:var(--dourado);font-size:.95rem;border:1px solid rgba(255,255,255,.08)
+}
+.nav{display:flex;gap:.2rem;align-items:center}
+.nav-link{
+  padding:.4rem .8rem;border-radius:var(--raio-sm);color:rgba(245,240,232,.5);
+  text-decoration:none;font-weight:500;font-size:.78rem;
+  transition:var(--trans);display:flex;align-items:center;gap:.35rem
+}
+.nav-link:hover{color:var(--creme-base);background:rgba(255,255,255,.06)}
+.nav-link.ativo{color:var(--dourado);background:rgba(184,134,11,.12);border:1px solid rgba(184,134,11,.2)}
+
+/* ============================================================
+   LAYOUT
+============================================================ */
+.layout{display:flex;height:calc(100vh - var(--header-h));overflow:hidden;position:relative;z-index:1}
+
+/* ============================================================
+   SIDEBAR
+============================================================ */
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  background:var(--creme-card);
+  border-right:1px solid var(--creme-borda);
+  display:flex;flex-direction:column;overflow:hidden
+}
+.sidebar-head{
+  padding:.875rem 1rem;border-bottom:1px solid var(--creme-borda);
+  flex-shrink:0;background:linear-gradient(180deg,var(--creme-card),var(--creme-base))
+}
+.sidebar-titulo{
+  font-family:var(--fonte-titulo);font-size:1rem;color:var(--marrom);
+  display:flex;align-items:center;gap:.45rem;margin-bottom:.625rem
+}
+.btn-atualizar{
+  width:100%;padding:.45rem;background:var(--creme-base);
+  border:1px solid var(--creme-borda);border-radius:var(--raio-sm);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.4rem;
+  font-weight:600;font-size:.72rem;color:var(--texto-sec);transition:var(--trans);
+  font-family:var(--fonte)
+}
+.btn-atualizar:hover{background:var(--creme-escuro);color:var(--marrom)}
+
+.sidebar-lista{flex:1;overflow-y:auto;padding:.5rem}
+.rel-item{
+  padding:.7rem .875rem;border-radius:var(--raio-sm);
+  border:1px solid var(--creme-borda);margin-bottom:.375rem;cursor:pointer;
+  transition:var(--trans);background:var(--creme-base);
+  display:flex;align-items:center;gap:.6rem
+}
+.rel-item:hover{border-color:var(--marrom-claro);box-shadow:var(--sombra-sm);background:var(--creme-card)}
+.rel-item.sel{
+  border-color:var(--marrom-mid);background:var(--creme-card);
+  box-shadow:inset 3px 0 0 var(--marrom-mid),var(--sombra-sm)
+}
+.rel-icone{
+  width:34px;height:34px;flex-shrink:0;
+  background:var(--marrom-suave2);border-radius:var(--raio-xs);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--marrom-claro);font-size:.8rem
+}
+.rel-info{flex:1;min-width:0}
+.rel-nome{font-size:.72rem;font-weight:700;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rel-meta{font-size:.62rem;color:var(--texto-ter);margin-top:.15rem;display:flex;gap:.4rem;align-items:center}
+
+.vazio-lista{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:2.5rem 1rem;color:var(--texto-ter);text-align:center
+}
+.vazio-lista i{font-size:1.75rem;margin-bottom:.5rem;opacity:.25}
+.vazio-lista p{font-size:.75rem}
+
+/* ============================================================
+   MAIN AREA
+============================================================ */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOOLBAR */
+.toolbar{
+  padding:.625rem 1.125rem;background:var(--creme-card);
+  border-bottom:1px solid var(--creme-borda);
+  display:flex;justify-content:space-between;align-items:center;
+  flex-shrink:0;gap:.75rem;flex-wrap:wrap
+}
+.toolbar-esq{display:flex;align-items:center;gap:.875rem;min-width:0}
+.toolbar-titulo{
+  font-family:var(--fonte-titulo);font-size:1rem;color:var(--marrom);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px
+}
+.chips{display:flex;gap:.3rem;flex-wrap:wrap}
+.chip{
+  display:inline-flex;align-items:center;gap:.25rem;
+  padding:.15rem .5rem;border-radius:10px;font-size:.62rem;font-weight:700;
+  border:1px solid transparent
+}
+.chip.setor{background:rgba(74,108,80,.08);color:var(--sage);border-color:rgba(74,108,80,.2)}
+.chip.projeto{background:var(--azul-bg);color:var(--azul);border-color:rgba(61,90,122,.2)}
+.chip.atividade{background:var(--marrom-suave2);color:var(--marrom-claro);border-color:rgba(107,66,38,.2)}
+.chip.novo{background:var(--dourado-bg);color:var(--dourado);border-color:var(--dourado-borda)}
+.toolbar-dir{display:flex;gap:.3rem;align-items:center}
+
+/* TABS */
+.tabs{
+  display:flex;border-bottom:1px solid var(--creme-borda);
+  background:var(--creme-card);flex-shrink:0;padding:0 1.125rem
+}
+.tab{
+  padding:.6rem 1rem;font-size:.78rem;font-weight:600;cursor:pointer;
+  border-bottom:2px solid transparent;color:var(--texto-ter);
+  transition:var(--trans);display:flex;align-items:center;gap:.35rem
+}
+.tab:hover{color:var(--texto)}
+.tab.ativo{color:var(--marrom-mid);border-bottom-color:var(--marrom-mid)}
+.tab .contagem{
+  background:var(--creme-escuro);padding:.1rem .35rem;border-radius:8px;
+  font-size:.58rem;font-weight:700;color:var(--texto-ter);min-width:18px;text-align:center
+}
+.tab.ativo .contagem{background:var(--marrom-suave2);color:var(--marrom-mid)}
+
+/* CONTENT */
+.content-area{flex:1;overflow-y:auto;padding:1rem 1.125rem}
+
+/* MERGE BAR */
+.merge-bar{
+  position:sticky;top:0;z-index:50;
+  background:linear-gradient(135deg,var(--marrom),var(--marrom-mid));
+  color:var(--creme-base);padding:.6rem 1rem;
+  border-radius:var(--raio-md);margin-bottom:.75rem;
+  display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  box-shadow:var(--sombra-md);display:none
+}
+.merge-bar.vis{display:flex}
+.merge-bar-info{flex:1;font-size:.78rem;font-weight:600}
+.merge-bar-info span{opacity:.7;font-weight:400}
+
+/* ============================================================
+   ITEM CARD
+============================================================ */
+.item-card{
+  background:var(--creme-card);border:1px solid var(--creme-borda);
+  border-radius:var(--raio-md);margin-bottom:.625rem;overflow:hidden;
+  transition:var(--trans);position:relative
+}
+.item-card:hover{box-shadow:var(--sombra-sm)}
+.item-card.tipo-setor{border-left:3px solid var(--sage)}
+.item-card.tipo-projeto{border-left:3px solid var(--azul)}
+.item-card.tipo-atividade{border-left:3px solid var(--marrom-claro)}
+.item-card.inserido{opacity:.45;pointer-events:none}
+.item-card.inserido::after{
+  content:'✓ INSERIDO';position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%) rotate(-2deg);
+  background:var(--sage);color:#fff;padding:.3rem .875rem;
+  border-radius:var(--raio-sm);font-weight:800;font-size:.65rem;z-index:5;
+  letter-spacing:.05em;box-shadow:var(--sombra-md)
+}
+.item-card.atualizado{opacity:.45;pointer-events:none}
+.item-card.atualizado::after{
+  content:'✓ ATUALIZADO';position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%) rotate(-2deg);
+  background:var(--azul);color:#fff;padding:.3rem .875rem;
+  border-radius:var(--raio-sm);font-weight:800;font-size:.65rem;z-index:5;
+  letter-spacing:.05em;box-shadow:var(--sombra-md)
+}
+.item-card.selecionado-merge{
+  border-color:var(--dourado);border-width:2px;
+  box-shadow:0 0 0 3px var(--dourado-bg),var(--sombra-sm)
+}
+
+/* MERGE CHECKBOX */
+.merge-check{
+  position:absolute;top:.5rem;right:.5rem;z-index:10;
+  width:20px;height:20px;cursor:pointer;accent-color:var(--dourado)
+}
+
+/* ITEM HEAD */
+.item-head{
+  padding:.6rem .875rem;display:flex;align-items:center;
+  gap:.5rem;cursor:pointer;user-select:none
+}
+.item-head:hover{background:rgba(0,0,0,.015)}
+.item-icone{
+  width:30px;height:30px;border-radius:var(--raio-xs);
+  display:flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0
+}
+.tipo-setor .item-icone{background:var(--sage-bg);color:var(--sage)}
+.tipo-projeto .item-icone{background:var(--azul-bg);color:var(--azul)}
+.tipo-atividade .item-icone{background:var(--marrom-suave);color:var(--marrom-claro)}
+.item-head-info{flex:1;min-width:0}
+.item-tipo-label{
+  font-size:.52rem;text-transform:uppercase;letter-spacing:.7px;
+  font-weight:700;color:var(--texto-ter)
+}
+.item-nome{font-size:.8rem;font-weight:700;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-sub{font-size:.62rem;color:var(--texto-ter);margin-top:.1rem}
+
+.badge-novo{
+  padding:.15rem .45rem;border-radius:10px;font-size:.55rem;font-weight:800;
+  text-transform:uppercase;white-space:nowrap;letter-spacing:.04em;
+  background:var(--marrom-mid);color:#fff
+}
+.badge-existente{
+  padding:.15rem .45rem;border-radius:10px;font-size:.55rem;font-weight:800;
+  text-transform:uppercase;white-space:nowrap;letter-spacing:.04em;
+  background:var(--azul);color:#fff
+}
+.item-chevron{color:var(--texto-ter);font-size:.65rem;transition:transform .2s;flex-shrink:0}
+.item-card.aberto .item-chevron{transform:rotate(180deg)}
+
+/* ITEM BODY */
+.item-body{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1)}
+.item-card.aberto .item-body{max-height:9999px}
+.item-body-inner{padding:0 .875rem .875rem}
+
+/* ============================================================
+   ESTADO ATUAL (DADOS DA PLANILHA)
+============================================================ */
+.ea-box{
+  background:linear-gradient(135deg,#edf4f8,#daeaf4);
+  border:1.5px solid #90bbd4;border-radius:var(--raio-md);
+  margin-bottom:.75rem;overflow:hidden
+}
+.ea-header{
+  background:linear-gradient(135deg,#1e4060,#2a5a80);
+  color:#fff;padding:.5rem .875rem;
+  display:flex;align-items:center;gap:.45rem;
+  font-size:.68rem;font-weight:700;letter-spacing:.3px
+}
+.ea-header-id{
+  margin-left:auto;background:rgba(255,255,255,.15);
+  padding:.1rem .45rem;border-radius:8px;font-size:.58rem;font-weight:500
+}
+.ea-body{padding:.625rem .875rem}
+.ea-grid{display:grid;grid-template-columns:1fr 1fr;gap:.3rem .75rem}
+.ea-campo{display:flex;flex-direction:column;gap:1px}
+.ea-campo.fw{grid-column:1/-1}
+.ea-label{font-size:.52rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:#2a5a80}
+.ea-val{
+  font-size:.7rem;color:#1a3a55;padding:.2rem .45rem;
+  background:rgba(255,255,255,.7);border-radius:3px;
+  border:1px solid rgba(42,90,128,.15);min-height:22px;
+  word-break:break-word;line-height:1.4
+}
+.ea-val.vazio{color:#90a8bc;font-style:italic}
+.ea-chips{display:flex;flex-wrap:wrap;gap:.2rem;margin-top:2px}
+.ea-chip-resp{
+  display:inline-flex;align-items:center;gap:.2rem;
+  padding:.12rem .4rem;background:#dbeaf4;border-radius:8px;
+  font-size:.6rem;font-weight:600;color:#1e4060;border:1px solid rgba(30,64,96,.1)
+}
+
+/* SEPARADOR EDIÇÃO */
+.sep-edicao{display:flex;align-items:center;gap:.5rem;margin:.75rem 0 .5rem}
+.sep-linha{flex:1;height:1px;background:var(--creme-borda)}
+.sep-label{
+  font-size:.58rem;text-transform:uppercase;letter-spacing:.6px;font-weight:700;
+  color:var(--marrom-mid);display:flex;align-items:center;gap:.3rem;white-space:nowrap
+}
+
+/* ============================================================
+   CAMPOS EDITÁVEIS
+============================================================ */
+.campos-grid{display:grid;grid-template-columns:1fr 1fr;gap:.35rem}
+.campo-inline{display:flex;flex-direction:column;gap:2px}
+.campo-inline.fw{grid-column:1/-1}
+.campo-label{font-size:.52rem;text-transform:uppercase;letter-spacing:.45px;font-weight:700;color:var(--texto-ter)}
+.campo-valor{
+  font-size:.75rem;padding:.3rem .5rem;background:var(--creme-base);
+  border:1px solid var(--creme-borda);border-radius:var(--raio-sm);
+  color:var(--texto);transition:var(--trans);min-height:28px;
+  display:flex;align-items:center
+}
+.campo-valor:focus-within{border-color:var(--marrom-claro);box-shadow:0 0 0 2px var(--marrom-suave)}
+.campo-input{
+  width:100%;border:none;background:transparent;font-size:.75rem;
+  color:var(--texto);font-family:var(--fonte);outline:none;padding:0
+}
+/* ✅ FIX 1 — garante que input[type=date] herde a fonte e cor corretamente */
+.campo-input[type=date]{cursor:pointer;color:var(--texto);font-family:var(--fonte)}
+.campo-input::placeholder{color:var(--texto-ter)}
+.campo-textarea{
+  width:100%;border:none;background:transparent;font-size:.75rem;
+  color:var(--texto);font-family:var(--fonte);outline:none;resize:vertical;
+  min-height:44px;padding:0;line-height:1.5
+}
+.campo-select{
+  width:100%;border:none;background:transparent;font-size:.75rem;
+  color:var(--texto);font-family:var(--fonte);outline:none;cursor:pointer
+}
+.campo-select option{background:var(--creme-card)}
+
+/* ============================================================
+   ✅ FIX 3 — SELETOR DE RESPONSÁVEIS COM CHECKBOXES
+   Substitui o multi-select nativo que exige Ctrl+clique
+============================================================ */
+.resp-picker{
+  max-height:120px;overflow-y:auto;width:100%;
+  background:var(--creme-base);border:1px solid var(--creme-borda);
+  border-radius:var(--raio-sm);padding:.2rem .3rem
+}
+.resp-picker:focus-within{border-color:var(--marrom-claro);box-shadow:0 0 0 2px var(--marrom-suave)}
+.resp-opcao{
+  display:flex;align-items:center;gap:.4rem;
+  padding:.22rem .35rem;border-radius:var(--raio-xs);cursor:pointer;
+  font-size:.72rem;color:var(--texto);transition:var(--trans);user-select:none
+}
+.resp-opcao:hover{background:var(--marrom-suave)}
+.resp-opcao.selecionado{background:var(--marrom-suave2);font-weight:600;color:var(--marrom)}
+.resp-opcao input[type=checkbox]{
+  accent-color:var(--marrom-mid);width:13px;height:13px;cursor:pointer;flex-shrink:0
+}
+.resp-vazio{
+  padding:.4rem .35rem;font-size:.7rem;color:var(--texto-ter);font-style:italic
+}
+
+/* ============================================================
+   CÁLCULO DE PRIORIDADE
+============================================================ */
+.prio-box{
+  background:linear-gradient(135deg,#fefcf3,#fdf5d9);
+  border:1.5px solid var(--dourado-borda);border-radius:var(--raio-md);
+  padding:.625rem .875rem;margin-top:.5rem;
+  box-shadow:0 2px 8px rgba(184,134,11,.08)
+}
+.prio-titulo{
+  font-size:.62rem;font-weight:700;color:#7a5a00;
+  margin-bottom:.4rem;display:flex;align-items:center;gap:.35rem;
+  text-transform:uppercase;letter-spacing:.4px
+}
+.prio-formula{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap}
+.prio-fator{display:flex;flex-direction:column;align-items:center;gap:1px}
+.prio-fator-num{
+  width:28px;height:28px;border-radius:50%;
+  background:#fff;border:2px solid var(--dourado-borda);
+  font-weight:800;font-size:.78rem;color:#7a5a00;
+  display:flex;align-items:center;justify-content:center
+}
+.prio-fator-label{font-size:.5rem;color:#a07a20;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.prio-op{font-weight:800;color:var(--dourado);font-size:.9rem}
+.prio-resultado{
+  display:inline-flex;align-items:center;gap:.3rem;
+  padding:.3rem .7rem;border-radius:var(--raio-sm);
+  font-weight:800;font-size:.88rem;margin-left:.25rem
+}
+.prio-resultado.alta{background:#fee2e2;color:#b91c1c;border:1px solid rgba(185,28,28,.2)}
+.prio-resultado.media{background:var(--dourado-bg);color:#854d0e;border:1px solid var(--dourado-borda)}
+.prio-resultado.baixa{background:#dcfce7;color:#166534;border:1px solid rgba(22,101,52,.2)}
+.prio-detalhe{font-size:.57rem;color:#a07a20;margin-top:.3rem;opacity:.8}
+
+/* ============================================================
+   JUSTIFICATIVA
+============================================================ */
+.justificativa{
+  font-size:.68rem;font-style:italic;color:var(--texto-ter);
+  padding:.4rem .6rem;margin-top:.5rem;
+  background:rgba(0,0,0,.025);border-radius:var(--raio-sm);
+  border-left:3px solid var(--creme-borda-forte)
+}
+
+/* ITEM ACTIONS */
+.item-acoes{
+  padding:.5rem .875rem;display:flex;gap:.3rem;flex-wrap:wrap;
+  border-top:1px solid var(--creme-borda);background:var(--creme-base);
+  align-items:center
+}
+
+/* ============================================================
+   BUTTONS
+============================================================ */
+.btn{
+  padding:.4rem .75rem;border:none;border-radius:var(--raio-sm);
+  font-weight:600;cursor:pointer;transition:var(--trans);
+  display:inline-flex;align-items:center;justify-content:center;
+  gap:.3rem;font-size:.75rem;font-family:var(--fonte);
+  white-space:nowrap
+}
+.btn-xs{padding:.25rem .5rem;font-size:.65rem}
+.btn-sm{padding:.35rem .625rem;font-size:.7rem}
+.btn-pri{background:var(--marrom-mid);color:#fff}
+.btn-pri:hover{background:var(--marrom)}
+.btn-sec{background:var(--creme-base);border:1px solid var(--creme-borda);color:var(--texto)}
+.btn-sec:hover{background:var(--creme-escuro)}
+.btn-verde{background:var(--sage);color:#fff}
+.btn-verde:hover{background:var(--sucesso)}
+.btn-azul{background:var(--azul);color:#fff}
+.btn-azul:hover{filter:brightness(1.1)}
+.btn-dourado{background:var(--dourado);color:#fff}
+.btn-dourado:hover{filter:brightness(1.1)}
+.btn-perigo{background:var(--perigo);color:#fff}
+.btn-perigo:hover{filter:brightness(1.1)}
+.btn-ghost{background:transparent;color:var(--texto-sec);border:1px solid var(--creme-borda)}
+.btn-ghost:hover{background:var(--creme-escuro)}
+.btn:disabled{opacity:.38;cursor:not-allowed;pointer-events:none}
+
+/* ============================================================
+   EMPTY / LOADING STATES
+============================================================ */
+.area-vazia{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:3rem;color:var(--texto-ter);text-align:center
+}
+.area-vazia i{font-size:3rem;opacity:.1;margin-bottom:1rem}
+.area-vazia h2{font-family:var(--fonte-titulo);font-size:1.2rem;color:var(--texto-sec);margin-bottom:.4rem}
+.area-vazia p{font-size:.8rem}
+
+.loading-overlay{
+  position:fixed;inset:0;background:rgba(245,240,232,.92);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:1000;opacity:0;visibility:hidden;transition:var(--trans)
+}
+.loading-overlay.vis{opacity:1;visibility:visible}
+.spinner{
+  width:40px;height:40px;border:3px solid var(--creme-borda);
+  border-top-color:var(--marrom-mid);border-radius:50%;
+  animation:girar .75s linear infinite;margin-bottom:.875rem
+}
+@keyframes girar{to{transform:rotate(360deg)}}
+.loading-texto{color:var(--texto-sec);font-weight:600;font-size:.82rem}
+
+/* TOASTS */
+.toast-box{position:fixed;bottom:1rem;right:1rem;z-index:2000;display:flex;flex-direction:column;gap:.4rem}
+.toast{
+  padding:.55rem .875rem;border-radius:var(--raio-sm);color:#fff;
+  display:flex;gap:.4rem;align-items:center;
+  box-shadow:var(--sombra-lg);animation:deslizarToast .3s ease;
+  font-weight:600;font-size:.75rem;max-width:320px
+}
+.toast-ok{background:var(--sage)}
+.toast-err{background:var(--perigo)}
+.toast-info{background:var(--azul)}
+.toast-aviso{background:var(--dourado)}
+@keyframes deslizarToast{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ============================================================
+   PAINEL MERGE
+============================================================ */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(44,30,20,.55);
+  z-index:500;display:flex;align-items:center;justify-content:center;
+  opacity:0;visibility:hidden;transition:var(--trans)
+}
+.modal-overlay.vis{opacity:1;visibility:visible}
+.modal{
+  background:var(--creme-card);border-radius:var(--raio-xl);
+  padding:1.5rem;width:560px;max-width:90vw;max-height:80vh;
+  overflow-y:auto;box-shadow:var(--sombra-xl);
+  transform:translateY(20px);transition:transform .3s ease;
+  border:1px solid var(--creme-borda)
+}
+.modal-overlay.vis .modal{transform:translateY(0)}
+.modal-titulo{font-family:var(--fonte-titulo);font-size:1.1rem;color:var(--marrom);margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.modal-secao{margin-bottom:1rem}
+.modal-secao-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--texto-ter);margin-bottom:.4rem}
+.campo-valor-grande{
+  width:100%;padding:.5rem .7rem;background:var(--creme-base);
+  border:1px solid var(--creme-borda);border-radius:var(--raio-sm);
+  font-size:.8rem;color:var(--texto);font-family:var(--fonte);outline:none;
+  transition:var(--trans)
+}
+.campo-valor-grande:focus{border-color:var(--marrom-claro);box-shadow:0 0 0 2px var(--marrom-suave)}
+textarea.campo-valor-grande{resize:vertical;min-height:60px;line-height:1.5}
+select.campo-valor-grande{cursor:pointer}
+.modal-acoes{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--creme-borda)}
+
+/* PROJETOS SELECIONADOS NO MERGE */
+.merge-proj-lista{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.875rem}
+.merge-proj-item{
+  display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;
+  background:var(--creme-base);border:1px solid var(--creme-borda);
+  border-radius:var(--raio-sm)
+}
+.merge-proj-nome{flex:1;font-size:.75rem;font-weight:600;color:var(--texto)}
+.merge-proj-id{font-size:.6rem;color:var(--texto-ter);font-family:monospace}
+
+/* SCORE DE PRIORIDADE BIG */
+.prio-score-big{
+  display:inline-flex;align-items:center;gap:.5rem;
+  padding:.5rem 1rem;border-radius:var(--raio-md);
+  font-weight:800;font-size:1.1rem
+}
+.prio-score-big.alta{background:#fee2e2;color:#b91c1c}
+.prio-score-big.media{background:var(--dourado-bg);color:#854d0e}
+.prio-score-big.baixa{background:#dcfce7;color:#166534}
+
+/* ============================================================
+   RESPONSIVE TWEAKS
+============================================================ */
+@media(max-width:900px){
+  .sidebar{width:230px}
+  .campos-grid,.ea-grid{grid-template-columns:1fr}
+}
+@media(max-width:680px){
+  .layout{flex-direction:column}
+  .sidebar{width:100%;height:140px;border-right:none;border-bottom:1px solid var(--creme-borda)}
+  .sidebar-lista{flex-direction:row;display:flex;padding:.35rem;overflow-x:auto}
+  .rel-item{min-width:160px;flex-shrink:0;margin-bottom:0}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+============================================================ -->
+<header class="header">
+  <a href="#" class="logo" data-pagina="reunioes">
+    <span class="logo-icon"><i class="fas fa-microphone-lines"></i></span>
+    Smart Meeting
+  </a>
+  <nav class="nav">
+    <a href="#" class="nav-link" data-pagina="reunioes"><i class="fas fa-video"></i> Reuniões</a>
+    <a href="#" class="nav-link ativo" data-pagina="relatorios"><i class="fas fa-clipboard-check"></i> Relatórios IA</a>
+    <a href="#" class="nav-link" data-pagina="projeto"><i class="fas fa-folder-open"></i> Projetos</a>
+  </nav>
+</header>
+
+<!-- ============================================================
+     LAYOUT
+============================================================ -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="sidebar-titulo"><i class="fas fa-scroll"></i> Relatórios IA</div>
+      <button class="btn-atualizar" onclick="carregarLista()">
+        <i class="fas fa-rotate-right"></i> Atualizar Lista
+      </button>
+    </div>
+    <div class="sidebar-lista" id="sidebarLista">
+      <div class="vazio-lista"><i class="fas fa-spinner fa-spin"></i><p>Carregando...</p></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- TOOLBAR -->
+    <div class="toolbar" id="toolbar" style="display:none">
+      <div class="toolbar-esq">
+        <span class="toolbar-titulo" id="toolbarTitulo">Relatório</span>
+        <div class="chips" id="chipsResumo">
+          <span class="chip setor"><i class="fas fa-building"></i> <span id="cSetores">0</span> setores</span>
+          <span class="chip projeto"><i class="fas fa-folder-open"></i> <span id="cProjetos">0</span> projetos</span>
+          <span class="chip atividade"><i class="fas fa-list-check"></i> <span id="cAtividades">0</span> atividades</span>
+          <span class="chip novo"><i class="fas fa-plus"></i> <span id="cNovos">0</span> novos</span>
+        </div>
+      </div>
+      <div class="toolbar-dir">
+        <button class="btn btn-verde btn-sm" onclick="inserirTodosNovos()" id="btnInserirTodos">
+          <i class="fas fa-plus-circle"></i> Inserir Novos
+        </button>
+        <button class="btn btn-azul btn-sm" onclick="aplicarTodasAlteracoes()">
+          <i class="fas fa-rotate"></i> Aplicar Todos
+        </button>
+        <a href="#" id="linkRelatorio" target="_blank" class="btn btn-ghost btn-sm">
+          <i class="fas fa-external-link-alt"></i>
+        </a>
+        <button class="btn btn-perigo btn-sm" onclick="excluirRelatorio()">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs" id="tabs" style="display:none">
+      <div class="tab ativo" onclick="mudarTab('setores',this)">
+        <i class="fas fa-building"></i> Setores
+        <span class="contagem" id="tabSetores">0</span>
+      </div>
+      <div class="tab" onclick="mudarTab('projetos',this)">
+        <i class="fas fa-folder-open"></i> Projetos
+        <span class="contagem" id="tabProjetos">0</span>
+      </div>
+      <div class="tab" onclick="mudarTab('atividades',this)">
+        <i class="fas fa-list-check"></i> Atividades
+        <span class="contagem" id="tabAtividades">0</span>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content-area" id="contentArea">
+      <div class="area-vazia" id="areaVazia">
+        <i class="fas fa-clipboard-list"></i>
+        <h2>Selecione um Relatório</h2>
+        <p>Escolha um relatório na lista ao lado para visualizar e editar as identificações da IA</p>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ============================================================
+     MERGE MODAL
+============================================================ -->
+<div class="modal-overlay" id="modalMerge">
+  <div class="modal">
+    <div class="modal-titulo"><i class="fas fa-compress-arrows-alt"></i> Compilar Projetos em Um</div>
+    <p style="font-size:.75rem;color:var(--texto-sec);margin-bottom:1rem">
+      Os projetos selecionados serão unificados. As atividades vinculadas serão reassociadas ao projeto resultante.
+    </p>
+
+    <div class="modal-secao">
+      <div class="modal-secao-label">Projetos sendo unificados</div>
+      <div class="merge-proj-lista" id="mergeProjLista"></div>
+    </div>
+
+    <div class="modal-secao">
+      <div class="modal-secao-label">Nome do projeto unificado *</div>
+      <input type="text" class="campo-valor-grande" id="mergeNome" placeholder="Nome descritivo e específico">
+    </div>
+    <div class="modal-secao">
+      <div class="modal-secao-label">Descrição</div>
+      <textarea class="campo-valor-grande" id="mergeDescricao" rows="3" placeholder="Descreva o que o projeto unificado resolve..."></textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+      <div class="modal-secao">
+        <div class="modal-secao-label">Tipo</div>
+        <select class="campo-valor-grande" id="mergeTipo">
+          <option value="">-- Selecione --</option>
+          <option value="Correção">Correção</option>
+          <option value="Nova Implementação">Nova Implementação</option>
+          <option value="Melhoria">Melhoria</option>
+        </select>
+      </div>
+      <div class="modal-secao">
+        <div class="modal-secao-label">Para Quem</div>
+        <select class="campo-valor-grande" id="mergeParaQuem">
+          <option value="">-- Selecione --</option>
+          <option value="Diretoria">Diretoria</option>
+          <option value="Demais áreas">Demais áreas</option>
+        </select>
+      </div>
+      <div class="modal-secao">
+        <div class="modal-secao-label">Gravidade</div>
+        <select class="campo-valor-grande" id="mergeGravidade">
+          <option value="">-- Selecione --</option>
+          <option value="Crítico - Não é possível cumprir as atividades">5 - Crítico</option>
+          <option value="Alto - É possível cumprir parcialmente">4 - Alto</option>
+          <option value="Médio - É possível mas demora muito">3 - Médio</option>
+        </select>
+      </div>
+      <div class="modal-secao">
+        <div class="modal-secao-label">Urgência</div>
+        <select class="campo-valor-grande" id="mergeUrgencia">
+          <option value="">-- Selecione --</option>
+          <option value="Imediata - Executar imediatamente">5 - Imediata</option>
+          <option value="Muito urgente - Prazo curto (5 dias)">4 - Muito urgente</option>
+          <option value="Urgente - Curto prazo (10 dias)">3 - Urgente</option>
+          <option value="Pouco urgente - Mais de 10 dias">2 - Pouco urgente</option>
+          <option value="Pode esperar">1 - Pode esperar</option>
+        </select>
+      </div>
+      <div class="modal-secao">
+        <div class="modal-secao-label">Esforço</div>
+        <select class="campo-valor-grande" id="mergeEsforco">
+          <option value="">-- Selecione --</option>
+          <option value="1 turno ou menos (4 horas)">5 - 1 turno ou menos (4h)</option>
+          <option value="1 dia ou menos (8 horas)">4 - 1 dia ou menos (8h)</option>
+          <option value="uma semana (40h)">3 - Uma semana (40h)</option>
+          <option value="mais de uma semana (40h)">2 - Mais de uma semana</option>
+        </select>
+      </div>
+      <div class="modal-secao">
+        <div class="modal-secao-label">Setor</div>
+        <input type="text" class="campo-valor-grande" id="mergeSetor" placeholder="ID do setor">
+      </div>
+    </div>
+
+    <!-- LIVE CALC -->
+    <div id="mergePrioCalc" style="margin-top:.5rem"></div>
+
+    <div class="modal-acoes">
+      <button class="btn btn-ghost" onclick="fecharModalMerge()">Cancelar</button>
+      <button class="btn btn-dourado" onclick="confirmarMerge()"><i class="fas fa-compress-arrows-alt"></i> Confirmar Unificação</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-texto" id="loadingTexto">Carregando...</div>
+</div>
+<div class="toast-box" id="toastBox"></div>
+
+<!-- ============================================================
+     JAVASCRIPT
+============================================================ -->
+<script>
+/* ============================================================
+   MAPAS DE PESO PARA PRIORIDADE
+============================================================ */
+var PESO_GRAVIDADE = {
+  'Crítico - Não é possível cumprir as atividades':5,
+  'Alto - É possível cumprir parcialmente':4,
+  'Médio - É possível mas demora muito':3
+};
+var PESO_URGENCIA = {
+  'Imediata - Executar imediatamente':5,
+  'Muito urgente - Prazo curto (5 dias)':4,
+  'Urgente - Curto prazo (10 dias)':3,
+  'Pouco urgente - Mais de 10 dias':2,
+  'Pode esperar':1
+};
+var PESO_PARA_QUEM = {
+  'Diretoria':5,'Diretoria / Crítico':5,'Demais áreas':4
+};
+var PESO_TIPO = {
+  'Correção':5,'Nova Implementação':4,'Melhoria':3
+};
+var PESO_ESFORCO = {
+  '1 turno ou menos (4 horas)':5,
+  '1 dia ou menos (8 horas)':4,
+  'uma semana (40h)':3,
+  'mais de uma semana (40h)':2
+};
+
+function calcPrioridade(c) {
+  var g = PESO_GRAVIDADE[c.GRAVIDADE]||0;
+  var u = PESO_URGENCIA[c.URGENCIA]||0;
+  var q = PESO_PARA_QUEM[c.PARA_QUEM]||0;
+  var t = PESO_TIPO[c.TIPO]||0;
+  var e = PESO_ESFORCO[c.ESFORCO]||0;
+  return {g:g,u:u,q:q,t:t,e:e,valor:g*u*q*t*e};
+}
+function classePrio(v){return v>=2102?'alta':v>=1078?'media':'baixa';}
+function labelPrio(v){return v>=2102?'🔴 Alta':v>=1078?'🟡 Média':'🟢 Baixa';}
+
+/* ============================================================
+   ESTADO GLOBAL
+============================================================ */
+var relAtual=null, dadosRel=null, contexto=null, opcoes=null;
+var inseridos={}, atualizados={};
+var tabAtiva='setores';
+var projetosMerge=[];
+
+document.addEventListener('DOMContentLoaded',function(){
+  carregarLista();
+  carregarContexto();
+  carregarOpcoes();
+  configurarNavegacao();
+  ['mergeTipo','mergeParaQuem','mergeGravidade','mergeUrgencia','mergeEsforco'].forEach(function(id){
+    document.getElementById(id).addEventListener('change',calcMergeAoVivo);
+  });
+});
+
+/* ============================================================
+   NAVEGAÇÃO
+============================================================ */
+function configurarNavegacao(){
+  if(typeof google==='undefined'||!google.script) return;
+  google.script.run.withSuccessHandler(function(url){
+    document.querySelectorAll('a[data-pagina]').forEach(function(a){
+      var p=a.getAttribute('data-pagina');
+      a.href=url+'?pagina='+p;
+      a.addEventListener('click',function(e){
+        e.preventDefault();window.top.location.href=url+'?pagina='+p;
+      });
+    });
+  }).obterUrlWebApp();
+}
+
+/* ============================================================
+   CARREGAMENTO
+============================================================ */
+function carregarLista(){
+  var el=document.getElementById('sidebarLista');
+  el.innerHTML='<div class="vazio-lista"><i class="fas fa-spinner fa-spin"></i><p>Carregando...</p></div>';
+  google.script.run
+    .withSuccessHandler(renderLista)
+    .withFailureHandler(function(){
+      el.innerHTML='<div class="vazio-lista"><i class="fas fa-triangle-exclamation"></i><p>Erro ao carregar</p></div>';
+    })
+    .listarRelatoriosIdentificacao();
+}
+
+function renderLista(res){
+  var el=document.getElementById('sidebarLista');
+  if(!res.sucesso||!res.relatorios.length){
+    el.innerHTML='<div class="vazio-lista"><i class="fas fa-folder-open"></i><p>Nenhum relatório encontrado</p></div>';
+    return;
+  }
+  var h='';
+  res.relatorios.forEach(function(r){
+    var nm=r.nome.replace('Relatorio_Identificacoes_','').replace('.md','');
+    h+='<div class="rel-item" onclick="selecionar(\''+esc(r.id)+'\',this)">'
+      +'<div class="rel-icone"><i class="fas fa-file-lines"></i></div>'
+      +'<div class="rel-info">'
+      +'<div class="rel-nome">'+esc(nm)+'</div>'
+      +'<div class="rel-meta"><i class="fas fa-calendar-days"></i> '+esc(r.dataFormatada)+' &bull; '+esc(r.tamanhoFormatado)+'</div>'
+      +'</div></div>';
+  });
+  el.innerHTML=h;
+}
+
+function carregarContexto(){
+  google.script.run
+    .withSuccessHandler(function(r){if(r.sucesso) contexto=r;})
+    .obterContextoAtualParaPreview();
+}
+
+function carregarOpcoes(){
+  google.script.run
+    .withSuccessHandler(function(r){if(r.sucesso) opcoes=r;})
+    .obterOpcoesParaDropdowns();
+}
+
+/* ============================================================
+   SELEÇÃO DE RELATÓRIO
+============================================================ */
+function selecionar(id,el){
+  document.querySelectorAll('.rel-item').forEach(function(e){e.classList.remove('sel');});
+  if(el) el.classList.add('sel');
+  mostrarLoading('Interpretando relatório...');
+  google.script.run
+    .withSuccessHandler(function(res){
+      esconderLoading();
+      if(!res.sucesso){toast(res.mensagem||'Erro ao carregar','err');return;}
+      relAtual=res; dadosRel=res.dadosParseados;
+      inseridos={}; atualizados={}; projetosMerge=[];
+      document.getElementById('areaVazia').style.display='none';
+      document.getElementById('toolbar').style.display='flex';
+      document.getElementById('tabs').style.display='flex';
+      var nm=res.nomeArquivo.replace('Relatorio_Identificacoes_','').replace('.md','');
+      document.getElementById('toolbarTitulo').textContent=nm;
+      document.getElementById('linkRelatorio').href='https://drive.google.com/file/d/'+id+'/view';
+      atualizarContadores();
+      renderTab();
+      toast('Relatório carregado com sucesso','ok');
+    })
+    .withFailureHandler(function(e){esconderLoading();toast('Erro: '+e.message,'err');})
+    .obterConteudoRelatorio(id);
+}
+
+function atualizarContadores(){
+  if(!dadosRel) return;
+  var r=dadosRel.resumo||{};
+  document.getElementById('cSetores').textContent=r.totalSetores||0;
+  document.getElementById('cProjetos').textContent=r.totalProjetos||0;
+  document.getElementById('cAtividades').textContent=r.totalEtapas||0;
+  document.getElementById('cNovos').textContent=(r.novosSetores||0)+(r.novosProjetos||0)+(r.novasEtapas||0);
+  document.getElementById('tabSetores').textContent=r.totalSetores||0;
+  document.getElementById('tabProjetos').textContent=r.totalProjetos||0;
+  document.getElementById('tabAtividades').textContent=r.totalEtapas||0;
+}
+
+/* ============================================================
+   TABS
+============================================================ */
+function mudarTab(tab,el){
+  tabAtiva=tab;
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('ativo');});
+  if(el) el.classList.add('ativo');
+  projetosMerge=[];
+  renderTab();
+}
+
+function renderTab(){
+  if(!dadosRel) return;
+  var content=document.getElementById('contentArea');
+  var items, tipo;
+  if(tabAtiva==='setores'){items=dadosRel.setores||[];tipo='setor';}
+  else if(tabAtiva==='projetos'){items=dadosRel.projetos||[];tipo='projeto';}
+  else{items=dadosRel.etapas||[];tipo='atividade';}
+
+  if(!items.length){
+    var icones={setor:'building',projeto:'folder-open',atividade:'list-check'};
+    var nomes={setor:'setores',projeto:'projetos',atividade:'atividades'};
+    content.innerHTML='<div class="area-vazia"><i class="fas fa-'+icones[tipo]+'"></i>'
+      +'<h2>Nenhum(a) '+nomes[tipo]+' identificado(a)</h2>'
+      +'<p>A IA não identificou itens deste tipo nesta reunião</p></div>';
+    return;
+  }
+
+  var mergeBarH='';
+  if(tipo==='projeto'){
+    mergeBarH='<div class="merge-bar" id="mergeBar">'
+      +'<div class="merge-bar-info"><i class="fas fa-compress-arrows-alt"></i> '
+      +'<span id="mergeBarInfo">Selecione projetos para unificar</span></div>'
+      +'<button class="btn btn-dourado btn-sm" onclick="abrirModalMerge()" id="btnMerge" disabled>'
+      +'<i class="fas fa-compress-arrows-alt"></i> Unificar Selecionados</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="limparMerge()">'
+      +'<i class="fas fa-times"></i></button>'
+      +'</div>';
+  }
+
+  var h=mergeBarH;
+  items.forEach(function(item,i){h+=renderCard(item,i,tipo);});
+  content.innerHTML=h;
+  if(tipo==='projeto') document.getElementById('mergeBar').classList.add('vis');
+}
+
+/* ============================================================
+   RENDER CARD
+============================================================ */
+function renderCard(item,idx,tipo){
+  var c=item.campos||{};
+  var nome=c.NOME||item.nomeExtraido||'Item sem nome';
+  var key=tipo+'_'+idx;
+  var jaDone=inseridos[key]||atualizados[key];
+  var classesDone=(inseridos[key]?' inserido':'')+(atualizados[key]?' atualizado':'');
+  var existente=null;
+  if(!item.ehNovo&&item.idExistente) existente=buscarExistente(tipo,item.idExistente);
+
+  var icones={setor:'building',projeto:'folder-open',atividade:'list-check'};
+  var subtitulos={setor:'',projeto:c.SETOR?' · '+c.SETOR:'',atividade:c.PROJETO_ID?' · Proj: '+c.PROJETO_ID.substring(0,12)+'…':''};
+
+  var mergeCheckH='';
+  if(tipo==='projeto'&&item.ehNovo){
+    mergeCheckH='<input type="checkbox" class="merge-check" title="Selecionar para unificar" '
+      +'onchange="toggleMerge('+idx+',this)" id="mchk_'+idx+'">';
+  }
+
+  var h='<div class="item-card tipo-'+tipo+classesDone+'" id="card-'+key+'">';
+  h+=mergeCheckH;
+
+  h+='<div class="item-head" onclick="toggleCard(\''+key+'\')">';
+  h+='<div class="item-icone"><i class="fas fa-'+icones[tipo]+'"></i></div>';
+  h+='<div class="item-head-info">';
+  h+='<div class="item-tipo-label">'+tipo+esc(subtitulos[tipo])+'</div>';
+  h+='<div class="item-nome">'+esc(nome)+'</div>';
+  if(tipo==='projeto'&&c.VALOR_PRIORIDADE){
+    var vp=Number(c.VALOR_PRIORIDADE)||0;
+    h+='<div class="item-sub">Prioridade calculada: <strong>'+vp+'</strong> — '+labelPrio(vp)+'</div>';
+  }
+  h+='</div>';
+  h+='<span class="'+(item.ehNovo?'badge-novo':'badge-existente')+'">'+(item.ehNovo?'✦ Novo':'● Existente')+'</span>';
+  h+='<i class="fas fa-chevron-down item-chevron"></i></div>';
+
+  h+='<div class="item-body"><div class="item-body-inner">';
+
+  if(existente&&!item.ehNovo){
+    h+=renderEstadoAtual(existente,tipo);
+    h+='<div class="sep-edicao"><div class="sep-linha"></div>'
+      +'<div class="sep-label"><i class="fas fa-pencil"></i> Dados do Relatório — editável</div>'
+      +'<div class="sep-linha"></div></div>';
+  }
+
+  h+=renderCampos(item,idx,tipo);
+  if(tipo==='projeto') h+=renderCalcPrioridade(c,key);
+  if(item.justificativa) h+='<div class="justificativa"><i class="fas fa-robot"></i> '+esc(item.justificativa)+'</div>';
+
+  h+='</div>';
+
+  if(!jaDone){
+    h+='<div class="item-acoes">';
+    if(item.ehNovo){
+      h+='<button class="btn btn-verde btn-sm" onclick="event.stopPropagation();inserirItem(\''+tipo+'\','+idx+')">'
+        +'<i class="fas fa-plus"></i> Inserir na Planilha</button>';
+    } else {
+      h+='<button class="btn btn-azul btn-sm" onclick="event.stopPropagation();aplicarAlteracoes(\''+tipo+'\','+idx+')">'
+        +'<i class="fas fa-rotate"></i> Aplicar Alterações</button>';
+    }
+    if(tipo==='projeto'){
+      h+='<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();expandirCampos(\''+key+'\')" title="Ver todos os campos">'
+        +'<i class="fas fa-expand-alt"></i></button>';
+    }
+    h+='</div>';
+  }
+  h+='</div></div>';
+  return h;
+}
+
+/* ============================================================
+   ESTADO ATUAL (PLANILHA)
+============================================================ */
+function renderEstadoAtual(ex,tipo){
+  var h='<div class="ea-box"><div class="ea-header">'
+    +'<i class="fas fa-database"></i> DADOS ATUAIS NA PLANILHA'
+    +'<span class="ea-header-id">ID: '+esc(ex.id)+'</span></div>'
+    +'<div class="ea-body"><div class="ea-grid">';
+
+  if(tipo==='setor'){
+    h+=eaF('Nome',ex.nome);
+    h+=eaF('Descrição',ex.descricao,true);
+    h+=eaResps(ex.responsaveisIds||'');
+  } else if(tipo==='projeto'){
+    h+=eaF('Nome',ex.nome);
+    h+=eaF('Descrição',ex.descricao,true);
+    h+=eaF('Tipo',ex.tipo); h+=eaF('Para Quem',ex.paraQuem);
+    h+=eaF('Status',ex.status); h+=eaF('Prioridade',ex.prioridade);
+    h+=eaF('Gravidade',ex.gravidade); h+=eaF('Urgência',ex.urgencia);
+    h+=eaF('Esforço',ex.esforco); h+=eaF('Setor',ex.setor);
+    if(ex.valorPrioridade){
+      var vp=Number(ex.valorPrioridade)||0;
+      var cp=classePrio(vp);
+      h+='<div class="ea-campo full"><div class="ea-label">Valor Prioridade</div>'
+        +'<div><span class="prio-score-big '+cp+'">'+vp+' — '+labelPrio(vp)+'</span></div></div>';
+    }
+    h+=eaResps(ex.responsaveisIds||'');
+  } else {
+    h+=eaF('Nome',ex.nome);
+    h+=eaF('Projeto ID',ex.projetoId);
+    h+=eaF('O que fazer',ex.oQueFazer,true);
+    h+=eaF('Status',ex.status);
+    h+=eaResps(ex.responsaveisIds||'');
+  }
+  h+='</div></div></div>';
+  return h;
+}
+function eaF(lbl,val,fw){
+  var cls=fw?' fw':'';
+  var vc=val?'':' vazio';
+  return '<div class="ea-campo'+cls+'"><div class="ea-label">'+esc(lbl)+'</div>'
+    +'<div class="ea-val'+vc+'">'+(val?esc(String(val)):'Não definido')+'</div></div>';
+}
+function eaResps(idsStr){
+  var resps=resolverResps(idsStr);
+  var h='<div class="ea-campo full"><div class="ea-label">Responsáveis</div>';
+  if(!resps.length) return h+'<div class="ea-val vazio">Nenhum responsável</div></div>';
+  h+='<div class="ea-chips">';
+  resps.forEach(function(r){h+='<span class="ea-chip-resp"><i class="fas fa-user-tie"></i> '+esc(r.nome)+'</span>';});
+  return h+'</div></div>';
+}
+
+/* ============================================================
+   CAMPOS EDITÁVEIS
+============================================================ */
+function renderCampos(item,idx,tipo){
+  var c=item.campos||{};
+  var campos=getCamposTipo(tipo);
+  var h='<div class="campos-grid">';
+
+  campos.forEach(function(f){
+    var val=c[f.key]!==undefined?c[f.key]:'';
+    var id=tipo+'_'+idx+'_'+f.key;
+    var fw=f.wide?' fw':'';
+    h+='<div class="campo-inline'+fw+'"><div class="campo-label">'+f.key.replace(/_/g,' ')+'</div>';
+
+    /* ── ID: somente leitura ──────────────────────────────── */
+    if(f.key==='ID'){
+      h+='<div class="campo-valor" style="background:transparent;border:none">'
+        +'<span style="font-size:.68rem;color:var(--texto-ter);font-family:monospace">'+esc(String(val))+'</span>'
+        +'</div>';
+
+    /* ✅ FIX 1 — DATA: input[type=date] com conversão ISO ─── */
+    } else if(f.type==='date'){
+      var valIso=converterParaIsoDate(String(val));
+      h+='<div class="campo-valor">'
+        +'<input class="campo-input" type="date" id="'+id+'" '
+        +'data-key="'+f.key+'" data-tipo="'+tipo+'" data-idx="'+idx+'" '
+        +'value="'+esc(valIso)+'" onchange="aoMudarCampo(this)">'
+        +'</div>';
+
+    /* ── SELECT simples ───────────────────────────────────── */
+    } else if(f.type==='select'){
+      h+='<div class="campo-valor">'
+        +'<select class="campo-select" id="'+id+'" data-key="'+f.key+'" data-tipo="'+tipo+'" data-idx="'+idx+'" onchange="aoMudarCampo(this)">'
+        +'<option value="">-- Selecione --</option>';
+      getOpcoes(f.key,tipo).forEach(function(o){
+        var s=(String(val)===o.value||String(val).indexOf(o.value)>-1)?' selected':'';
+        h+='<option value="'+esc(o.value)+'"'+s+'>'+esc(o.label)+'</option>';
+      });
+      h+='</select></div>';
+
+    /* ✅ FIX 3 — RESPONSÁVEIS: checkboxes clicáveis ─────────
+         Substitui o <select multiple> que exige Ctrl+clique  */
+    } else if(f.type==='multi'){
+      var idsSelecionados=val?String(val).split(',').map(function(s){return s.trim();}).filter(Boolean):[];
+      var listaResp=opcoes&&opcoes.responsaveis?opcoes.responsaveis:[];
+      var pickerId='picker_'+id;
+      h+='<div class="resp-picker" id="'+pickerId+'">';
+      if(!listaResp.length){
+        h+='<div class="resp-vazio"><i class="fas fa-spinner fa-spin"></i> Carregando responsáveis...</div>';
+      } else {
+        listaResp.forEach(function(r){
+          var marcado=idsSelecionados.indexOf(r.id)!==-1;
+          var clsSel=marcado?' selecionado':'';
+          h+='<label class="resp-opcao'+clsSel+'" onclick="event.stopPropagation()">'
+            +'<input type="checkbox" '+(marcado?'checked ':'')
+            +'value="'+esc(r.id)+'" '
+            +'data-key="'+f.key+'" data-tipo="'+tipo+'" data-idx="'+idx+'" '
+            +'onchange="aoMudarRespCheckbox(this,\''+pickerId+'\')">'
+            +esc(r.nome)
+            +'</label>';
+        });
+      }
+      h+='</div>';
+
+    /* ── TEXTAREA ─────────────────────────────────────────── */
+    } else if(f.wide){
+      h+='<div class="campo-valor">'
+        +'<textarea class="campo-textarea" id="'+id+'" data-key="'+f.key+'" data-tipo="'+tipo+'" data-idx="'+idx+'" onchange="aoMudarCampo(this)">'+esc(val)+'</textarea>'
+        +'</div>';
+
+    /* ── INPUT TEXT ───────────────────────────────────────── */
+    } else {
+      h+='<div class="campo-valor">'
+        +'<input class="campo-input" type="text" id="'+id+'" data-key="'+f.key+'" data-tipo="'+tipo+'" data-idx="'+idx+'" value="'+esc(val)+'" onchange="aoMudarCampo(this)">'
+        +'</div>';
+    }
+
+    h+='</div>'; // campo-inline
+  });
+  return h+'</div>';
+}
+
+/* ============================================================
+   DEFINIÇÃO DOS CAMPOS POR TIPO
+============================================================ */
+function getCamposTipo(tipo){
+  if(tipo==='setor') return [
+    {key:'ID'},
+    {key:'NOME'},
+    {key:'DESCRICAO',wide:true},
+    {key:'RESPONSAVEIS_IDS',type:'multi',wide:true}
+  ];
+  if(tipo==='projeto') return [
+    {key:'ID'},{key:'NOME'},
+    {key:'DESCRICAO',wide:true},
+    {key:'TIPO',type:'select'},{key:'PARA_QUEM',type:'select'},
+    {key:'GRAVIDADE',type:'select'},{key:'URGENCIA',type:'select'},
+    {key:'ESFORCO',type:'select'},{key:'SETOR',type:'select'},
+    {key:'STATUS',type:'select'},{key:'PILAR'},
+    {key:'LINK'},
+    // ✅ FIX 1 — type:'date' habilita datepicker nativo
+    {key:'DATA_INICIO',type:'date'},{key:'DATA_FIM',type:'date'},
+    {key:'RESPONSAVEIS_IDS',type:'multi',wide:true}
+  ];
+  return [ // atividade
+    {key:'ID'},{key:'PROJETO_ID',type:'select'},
+    {key:'NOME'},{key:'O_QUE_FAZER',wide:true},
+    {key:'STATUS',type:'select'},
+    {key:'RESPONSAVEIS_IDS',type:'multi',wide:true}
+  ];
+}
+
+/* ============================================================
+   OPÇÕES DOS SELECTS
+============================================================ */
+function getOpcoes(key,tipo){
+  if(key==='STATUS'&&tipo==='atividade') return [
+    {value:'A Fazer',label:'A Fazer'},
+    {value:'Em Andamento',label:'Em Andamento'},
+    {value:'Bloqueada',label:'Bloqueada'},
+    {value:'Concluída',label:'Concluída'}
+  ];
+  // ✅ FIX 2 — "Aguardando Setor" adicionado ao STATUS de projetos/setores
+  if(key==='STATUS') return [
+    {value:'A Fazer',label:'A Fazer'},
+    {value:'Em Andamento',label:'Em Andamento'},
+    {value:'Aguardando Setor',label:'Aguardando Setor'},
+    {value:'Concluída',label:'Concluída'}
+  ];
+  if(key==='TIPO') return [
+    {value:'Correção',label:'5 - Correção'},
+    {value:'Nova Implementação',label:'4 - Nova Implementação'},
+    {value:'Melhoria',label:'3 - Melhoria'}
+  ];
+  if(key==='PARA_QUEM') return [
+    {value:'Diretoria',label:'5 - Diretoria'},
+    {value:'Demais áreas',label:'4 - Demais áreas'}
+  ];
+  if(key==='GRAVIDADE') return [
+    {value:'Crítico - Não é possível cumprir as atividades',label:'5 - Crítico'},
+    {value:'Alto - É possível cumprir parcialmente',label:'4 - Alto'},
+    {value:'Médio - É possível mas demora muito',label:'3 - Médio'}
+  ];
+  if(key==='URGENCIA') return [
+    {value:'Imediata - Executar imediatamente',label:'5 - Imediata'},
+    {value:'Muito urgente - Prazo curto (5 dias)',label:'4 - Muito urgente'},
+    {value:'Urgente - Curto prazo (10 dias)',label:'3 - Urgente'},
+    {value:'Pouco urgente - Mais de 10 dias',label:'2 - Pouco urgente'},
+    {value:'Pode esperar',label:'1 - Pode esperar'}
+  ];
+  if(key==='ESFORCO') return [
+    {value:'1 turno ou menos (4 horas)',label:'5 - 1 turno (4h)'},
+    {value:'1 dia ou menos (8 horas)',label:'4 - 1 dia (8h)'},
+    {value:'uma semana (40h)',label:'3 - Uma semana (40h)'},
+    {value:'mais de uma semana (40h)',label:'2 - Mais de uma semana'}
+  ];
+  if(key==='SETOR'&&opcoes) return (opcoes.setores||[]).map(function(s){return {value:s.nome,label:s.nome};});
+  if(key==='PROJETO_ID'){
+    var projs=[];
+    if(dadosRel&&dadosRel.projetos){
+      dadosRel.projetos.forEach(function(p){
+        var pid=(p.campos&&p.campos.ID)||p.idSugerido||'';
+        var pnm=(p.campos&&p.campos.NOME)||p.nomeExtraido||'?';
+        if(pid) projs.push({value:pid,label:pnm+' ('+pid.substring(0,10)+'…)'});
+      });
+    }
+    if(contexto&&contexto.projetos){
+      contexto.projetos.forEach(function(p){
+        if(!projs.find(function(x){return x.value===p.id;}))
+          projs.push({value:p.id,label:p.nome+' ('+p.id.substring(0,10)+'…)'});
+      });
+    }
+    return projs;
+  }
+  return [];
+}
+
+/* ============================================================
+   HELPERS DE DATA
+   converterParaIsoDate : "DD/MM/YYYY" → "YYYY-MM-DD" (para input[type=date])
+   converterParaExibicao: "YYYY-MM-DD" → "DD/MM/YYYY" (para salvar na planilha)
+============================================================ */
+function converterParaIsoDate(val){
+  if(!val||val==='N/A'||val==='') return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(val)) return val; // já é ISO
+  var m=val.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);  // DD/MM/YYYY
+  if(m) return m[3]+'-'+m[2]+'-'+m[1];
+  return val;
+}
+function converterParaExibicao(val){
+  if(!val) return '';
+  var m=val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return m[3]+'/'+m[2]+'/'+m[1];
+  return val;
+}
+
+/* ============================================================
+   CÁLCULO DE PRIORIDADE VISUAL
+============================================================ */
+function renderCalcPrioridade(c,key){
+  var calc=calcPrioridade(c);
+  var h='<div class="prio-box" id="prio-'+key+'">';
+  h+='<div class="prio-titulo"><i class="fas fa-calculator"></i> Cálculo do Valor de Prioridade</div>';
+  h+='<div class="prio-formula">';
+  var fatores=[
+    {num:calc.g,label:'Grav.'},
+    {num:calc.u,label:'Urg.'},
+    {num:calc.q,label:'Para Quem'},
+    {num:calc.t,label:'Tipo'},
+    {num:calc.e,label:'Esforço'}
+  ];
+  fatores.forEach(function(f,i){
+    h+='<div class="prio-fator"><div class="prio-fator-num">'+(f.num||'?')+'</div>'
+      +'<div class="prio-fator-label">'+f.label+'</div></div>';
+    if(i<fatores.length-1) h+='<span class="prio-op">×</span>';
+  });
+  h+='<span class="prio-op">=</span>';
+  var cp=classePrio(calc.valor);
+  h+='<span class="prio-resultado '+cp+'">'+calc.valor+' &bull; '+labelPrio(calc.valor)+'</span>';
+  h+='</div>';
+  h+='<div class="prio-detalhe">G('+calc.g+') × U('+calc.u+') × Q('+calc.q+') × T('+calc.t+') × E('+calc.e+') = '+calc.valor+'</div>';
+  h+='</div>';
+  return h;
+}
+
+/* ============================================================
+   HANDLERS DE MUDANÇA DE CAMPO
+============================================================ */
+function aoMudarCampo(el){
+  var tipo=el.dataset.tipo, idx=parseInt(el.dataset.idx), key=el.dataset.key;
+  var val=el.value; // input[type=date] retorna YYYY-MM-DD nativamente
+
+  var items=tipo==='setor'?dadosRel.setores:tipo==='projeto'?dadosRel.projetos:dadosRel.etapas;
+  if(items[idx]){
+    if(!items[idx].campos) items[idx].campos={};
+    items[idx].campos[key]=val;
+    if(key==='NOME') items[idx].nomeExtraido=val;
+  }
+  // Recalcular prioridade ao vivo
+  if(tipo==='projeto'&&['GRAVIDADE','URGENCIA','PARA_QUEM','TIPO','ESFORCO'].indexOf(key)!==-1){
+    var prioEl=document.getElementById('prio-projeto_'+idx);
+    if(prioEl){
+      var nc=items[idx].campos||{};
+      prioEl.outerHTML=renderCalcPrioridade(nc,'projeto_'+idx);
+      items[idx].campos.VALOR_PRIORIDADE=calcPrioridade(nc).valor;
+    }
+  }
+}
+
+/**
+ * Handler dos checkboxes de responsáveis.
+ * Varre todos os checkboxes do picker, atualiza a classe visual
+ * e salva os IDs selecionados separados por vírgula em RESPONSAVEIS_IDS.
+ */
+function aoMudarRespCheckbox(el, pickerId){
+  var tipo=el.dataset.tipo, idx=parseInt(el.dataset.idx), key=el.dataset.key;
+  var items=tipo==='setor'?dadosRel.setores:tipo==='projeto'?dadosRel.projetos:dadosRel.etapas;
+  if(!items[idx]) return;
+  if(!items[idx].campos) items[idx].campos={};
+
+  var picker=document.getElementById(pickerId);
+  var selecionados=[];
+  if(picker){
+    picker.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+      var label=cb.closest('.resp-opcao');
+      if(label) label.classList.toggle('selecionado', cb.checked);
+      if(cb.checked) selecionados.push(cb.value);
+    });
+  }
+  items[idx].campos[key]=selecionados.join(',');
+}
+
+function toggleCard(key){
+  var card=document.getElementById('card-'+key);
+  if(card) card.classList.toggle('aberto');
+}
+
+/* ============================================================
+   MERGE DE PROJETOS
+============================================================ */
+function toggleMerge(idx,el){
+  if(el.checked){
+    if(projetosMerge.indexOf(idx)===-1) projetosMerge.push(idx);
+  } else {
+    projetosMerge=projetosMerge.filter(function(i){return i!==idx;});
+  }
+  var card=document.getElementById('card-projeto_'+idx);
+  if(card) card.classList.toggle('selecionado-merge',el.checked);
+  atualizarMergeBar();
+}
+
+function atualizarMergeBar(){
+  var btn=document.getElementById('btnMerge');
+  var info=document.getElementById('mergeBarInfo');
+  if(!btn||!info) return;
+  var n=projetosMerge.length;
+  if(n>=2){btn.disabled=false;info.textContent=n+' projeto(s) selecionado(s) para unificar';}
+  else{btn.disabled=true;info.textContent=n===1?'Selecione pelo menos mais 1 projeto':'Selecione projetos para unificar';}
+}
+
+function limparMerge(){
+  projetosMerge=[];
+  document.querySelectorAll('.merge-check').forEach(function(c){c.checked=false;});
+  document.querySelectorAll('.item-card').forEach(function(c){c.classList.remove('selecionado-merge');});
+  atualizarMergeBar();
+}
+
+function abrirModalMerge(){
+  if(projetosMerge.length<2){toast('Selecione 2 ou mais projetos','aviso');return;}
+  var projetos=dadosRel.projetos||[];
+  var listaH='';
+  projetosMerge.forEach(function(idx){
+    var p=projetos[idx];if(!p)return;
+    var nome=(p.campos&&p.campos.NOME)||p.nomeExtraido||'?';
+    var id=(p.campos&&p.campos.ID)||p.idSugerido||idx;
+    listaH+='<div class="merge-proj-item">'
+      +'<div class="merge-proj-nome">'+esc(nome)+'</div>'
+      +'<div class="merge-proj-id">'+esc(String(id))+'</div>'
+      +'</div>';
+  });
+  document.getElementById('mergeProjLista').innerHTML=listaH;
+
+  var melhor=null, melhorVal=0;
+  projetosMerge.forEach(function(idx){
+    var p=projetos[idx];if(!p)return;
+    var calc=calcPrioridade(p.campos||{});
+    if(calc.valor>melhorVal){melhorVal=calc.valor;melhor=p;}
+  });
+  if(melhor){
+    var mc=melhor.campos||{};
+    document.getElementById('mergeNome').value=mc.NOME||'';
+    document.getElementById('mergeDescricao').value=mc.DESCRICAO||'';
+    document.getElementById('mergeTipo').value=mc.TIPO||'';
+    document.getElementById('mergeParaQuem').value=mc.PARA_QUEM||'';
+    document.getElementById('mergeGravidade').value=mc.GRAVIDADE||'';
+    document.getElementById('mergeUrgencia').value=mc.URGENCIA||'';
+    document.getElementById('mergeEsforco').value=mc.ESFORCO||'';
+    document.getElementById('mergeSetor').value=mc.SETOR||'';
+  }
+  calcMergeAoVivo();
+  document.getElementById('modalMerge').classList.add('vis');
+}
+
+function fecharModalMerge(){document.getElementById('modalMerge').classList.remove('vis');}
+
+function calcMergeAoVivo(){
+  var c={
+    TIPO:document.getElementById('mergeTipo').value,
+    PARA_QUEM:document.getElementById('mergeParaQuem').value,
+    GRAVIDADE:document.getElementById('mergeGravidade').value,
+    URGENCIA:document.getElementById('mergeUrgencia').value,
+    ESFORCO:document.getElementById('mergeEsforco').value
+  };
+  document.getElementById('mergePrioCalc').innerHTML=renderCalcPrioridade(c,'merge');
+}
+
+function confirmarMerge(){
+  var nome=document.getElementById('mergeNome').value.trim();
+  if(!nome){toast('Nome do projeto é obrigatório','err');return;}
+  var projetos=dadosRel.projetos||[];
+  var novoId='merge_'+Date.now().toString(36);
+  var c={
+    ID:novoId,NOME:nome,
+    DESCRICAO:document.getElementById('mergeDescricao').value,
+    TIPO:document.getElementById('mergeTipo').value,
+    PARA_QUEM:document.getElementById('mergeParaQuem').value,
+    GRAVIDADE:document.getElementById('mergeGravidade').value,
+    URGENCIA:document.getElementById('mergeUrgencia').value,
+    ESFORCO:document.getElementById('mergeEsforco').value,
+    SETOR:document.getElementById('mergeSetor').value,
+    STATUS:'A Fazer'
+  };
+  c.VALOR_PRIORIDADE=calcPrioridade(c).valor;
+
+  var idsAntigos=[];
+  projetosMerge.forEach(function(idx){
+    var p=projetos[idx];
+    if(p) idsAntigos.push((p.campos&&p.campos.ID)||p.idSugerido||'');
+  });
+
+  var etapas=dadosRel.etapas||[], atualizadasCount=0;
+  etapas.forEach(function(etapa){
+    var pid=(etapa.campos&&etapa.campos.PROJETO_ID)||'';
+    if(idsAntigos.indexOf(pid)!==-1){
+      if(!etapa.campos) etapa.campos={};
+      etapa.campos.PROJETO_ID=novoId;
+      atualizadasCount++;
+    }
+  });
+
+  projetosMerge.forEach(function(idx){if(projetos[idx]) projetos[idx]._mesclado=true;});
+  dadosRel.projetos.unshift({nomeExtraido:nome,ehNovo:true,idSugerido:novoId,campos:c,justificativa:'Projeto resultante da unificação de '+projetosMerge.length+' projetos.'});
+  dadosRel.resumo.totalProjetos=(dadosRel.resumo.totalProjetos||0)+1;
+  dadosRel.resumo.novosProjetos=(dadosRel.resumo.novosProjetos||0)+1;
+
+  fecharModalMerge(); limparMerge(); atualizarContadores(); renderTab();
+  toast('Projetos unificados! '+atualizadasCount+' atividade(s) reassociada(s).','ok');
+}
+
+/* ============================================================
+   OPERAÇÕES INSERIR / APLICAR
+============================================================ */
+function inserirItem(tipo,idx){
+  var items=tipo==='setor'?dadosRel.setores:tipo==='projeto'?dadosRel.projetos:dadosRel.etapas;
+  var item=items[idx];if(!item)return;
+  var key=tipo+'_'+idx, c=item.campos||{};
+  mostrarLoading('Inserindo '+tipo+'...');
+
+  if(tipo==='setor'){
+    google.script.run
+      .withSuccessHandler(function(r){handleInsert(r,key);})
+      .withFailureHandler(handleErro)
+      .inserirSetorDaIdentificacao({
+        id:c.ID||item.idSugerido||'',
+        nome:c.NOME||'',descricao:c.DESCRICAO||'',
+        responsaveisIds:c.RESPONSAVEIS_IDS||''
+      });
+  } else if(tipo==='projeto'){
+    var calc=calcPrioridade(c);
+    google.script.run
+      .withSuccessHandler(function(r){handleInsert(r,key);})
+      .withFailureHandler(handleErro)
+      .inserirProjetoDaIdentificacao({
+        id:            c.ID           || item.idSugerido || '',
+        nome:          c.NOME         || '',
+        descricao:     c.DESCRICAO    || '',
+        tipo:          c.TIPO         || '',         
+        paraQuem:      c.PARA_QUEM    || '',
+        status:        c.STATUS       || 'A Fazer',
+        prioridade:    c.PRIORIDADE   || '',
+        link:          c.LINK         || '',
+        gravidade:     c.GRAVIDADE    || '',         
+        urgencia:      c.URGENCIA     || '',         
+        esforco:       c.ESFORCO      || '',        
+        setor:         c.SETOR        || '',
+        pilar:         c.PILAR        || '',
+        responsaveisIds: c.RESPONSAVEIS_IDS || '',
+        valorPrioridade: calc.valor,               
+        dataInicio:    converterParaExibicao(c.DATA_INICIO || ''), 
+        dataFim:       converterParaExibicao(c.DATA_FIM    || '') 
+      });
+  } else {
+    google.script.run
+      .withSuccessHandler(function(r){handleInsert(r,key);})
+      .withFailureHandler(handleErro)
+      .inserirEtapaDaIdentificacao({
+        id:             c.ID          || item.idSugerido || '',
+        projetoId:      c.PROJETO_ID  || '',
+        responsaveisIds:c.RESPONSAVEIS_IDS || '',
+        nome:           c.NOME        || '',
+        oQueFazer:      c.O_QUE_FAZER || '',
+        status:         c.STATUS      || 'A Fazer'
+      });
+  }
+}
+
+
+
+function aplicarAlteracoes(tipo,idx){
+  var items=tipo==='setor'?dadosRel.setores:tipo==='projeto'?dadosRel.projetos:dadosRel.etapas;
+  var item=items[idx];
+  if(!item||!item.idExistente){toast('Item sem ID existente','err');return;}
+  var key=tipo+'_'+idx, c=item.campos||{};
+  mostrarLoading('Aplicando alterações...');
+  var calc=calcPrioridade(c);
+
+  if(tipo==='projeto'){
+    google.script.run
+      .withSuccessHandler(function(r){handleApply(r,key);})
+      .withFailureHandler(handleErro)
+      .atualizarProjetoDaIdentificacao(item.idExistente,{
+        nome:c.NOME,descricao:c.DESCRICAO,tipo:c.TIPO,paraQuem:c.PARA_QUEM,
+        status:c.STATUS,prioridade:c.PRIORIDADE,link:c.LINK,
+        gravidade:c.GRAVIDADE,urgencia:c.URGENCIA,
+        setor:c.SETOR,pilar:c.PILAR,
+        responsaveisIds:c.RESPONSAVEIS_IDS,valorPrioridade:calc.valor,
+        dataInicio:converterParaExibicao(c.DATA_INICIO||''),
+        dataFim:converterParaExibicao(c.DATA_FIM||'')
+      });
+  } else if(tipo==='atividade'){
+    google.script.run
+      .withSuccessHandler(function(r){handleApply(r,key);})
+      .withFailureHandler(handleErro)
+      .atualizarEtapaDaIdentificacao(item.idExistente,{
+        nome:c.NOME,oQueFazer:c.O_QUE_FAZER,
+        status:c.STATUS,projetoId:c.PROJETO_ID,
+        responsaveisIds:c.RESPONSAVEIS_IDS
+      });
+  } else {
+    google.script.run
+      .withSuccessHandler(function(r){handleApply(r,key);})
+      .withFailureHandler(handleErro)
+      .atualizarSetorDaIdentificacao(item.idExistente,{
+        nome:c.NOME,descricao:c.DESCRICAO,responsaveisIds:c.RESPONSAVEIS_IDS
+      });
+  }
+}
+
+function handleInsert(res,key){
+  esconderLoading();
+  if(res.sucesso){
+    inseridos[key]=true;
+    var card=document.getElementById('card-'+key);
+    if(card){card.classList.add('inserido');card.classList.remove('aberto');}
+    toast(res.mensagem||'Inserido com sucesso','ok');
+    carregarContexto();
+  } else { toast(res.mensagem||'Erro ao inserir','err'); }
+}
+function handleApply(res,key){
+  esconderLoading();
+  if(res.sucesso){
+    atualizados[key]=true;
+    var card=document.getElementById('card-'+key);
+    if(card){card.classList.add('atualizado');card.classList.remove('aberto');}
+    toast(res.mensagem||'Atualizado com sucesso','ok');
+    carregarContexto();
+  } else { toast(res.mensagem||'Erro ao atualizar','err'); }
+}
+function handleErro(e){esconderLoading();toast('Erro: '+(e.message||e),'err');}
+
+/* ============================================================
+   AÇÕES EM LOTE
+============================================================ */
+function inserirTodosNovos(){
+  if(!dadosRel) return;
+  if(!confirm('Inserir TODOS os itens novos na planilha?')) return;
+  var delay=0;
+  [['setores','setor'],['projetos','projeto'],['etapas','atividade']].forEach(function(pair){
+    var items=dadosRel[pair[0]]||[], tipo=pair[1];
+    items.forEach(function(item,i){
+      if(item.ehNovo&&!item._mesclado&&!inseridos[tipo+'_'+i]){
+        setTimeout(function(){inserirItem(tipo,i);},delay);
+        delay+=700;
+      }
+    });
+  });
+}
+
+function aplicarTodasAlteracoes(){
+  if(!dadosRel) return;
+  if(!confirm('Aplicar alterações em TODOS os itens existentes?')) return;
+  var delay=0;
+  [['setores','setor'],['projetos','projeto'],['etapas','atividade']].forEach(function(pair){
+    var items=dadosRel[pair[0]]||[], tipo=pair[1];
+    items.forEach(function(item,i){
+      if(!item.ehNovo&&item.idExistente&&!atualizados[tipo+'_'+i]){
+        setTimeout(function(){aplicarAlteracoes(tipo,i);},delay);
+        delay+=700;
+      }
+    });
+  });
+}
+
+function excluirRelatorio(){
+  if(!relAtual||!confirm('Mover este relatório para a lixeira do Drive?')) return;
+  mostrarLoading('Excluindo...');
+  google.script.run
+    .withSuccessHandler(function(r){
+      esconderLoading();
+      if(r.sucesso){
+        relAtual=null;dadosRel=null;
+        document.getElementById('areaVazia').style.display='flex';
+        document.getElementById('toolbar').style.display='none';
+        document.getElementById('tabs').style.display='none';
+        document.getElementById('contentArea').innerHTML='';
+        carregarLista();toast('Relatório excluído','ok');
+      }
+    })
+    .withFailureHandler(handleErro)
+    .excluirRelatorioIdentificacao(relAtual.arquivoId);
+}
+
+/* ============================================================
+   HELPERS GERAIS
+============================================================ */
+function esc(t){if(!t)return '';var d=document.createElement('div');d.innerText=String(t);return d.innerHTML;}
+function trunc(t,m){if(!t)return '';t=String(t);return t.length>m?t.substring(0,m)+'…':t;}
+
+function resolverResps(idsStr){
+  if(!idsStr||!opcoes||!opcoes.responsaveis) return [];
+  return String(idsStr).split(',').map(function(id){
+    id=id.trim();if(!id) return null;
+    var r=(opcoes.responsaveis||[]).find(function(x){return x.id===id;});
+    return r?{id:id,nome:r.nome}:{id:id,nome:id};
+  }).filter(Boolean);
+}
+
+function buscarExistente(tipo,id){
+  if(!contexto) return null;
+  var lista=tipo==='setor'?contexto.setores:tipo==='projeto'?contexto.projetos:contexto.etapas;
+  return (lista||[]).find(function(item){return item.id===id;})||null;
+}
+
+function mostrarLoading(t){
+  document.getElementById('loadingTexto').textContent=t||'Carregando...';
+  document.getElementById('loadingOverlay').classList.add('vis');
+}
+function esconderLoading(){document.getElementById('loadingOverlay').classList.remove('vis');}
+
+function toast(msg,tipo){
+  var box=document.getElementById('toastBox');
+  var classes={ok:'toast-ok',err:'toast-err',info:'toast-info',aviso:'toast-aviso'};
+  var icones={ok:'circle-check',err:'circle-exclamation',info:'circle-info',aviso:'triangle-exclamation'};
+  var div=document.createElement('div');
+  div.className='toast '+(classes[tipo]||'toast-info');
+  div.innerHTML='<i class="fas fa-'+(icones[tipo]||'circle-info')+'"></i> '+esc(msg);
+  box.appendChild(div);
+  setTimeout(function(){div.remove();},4500);
+}
+</script>
+</body>
+</html>

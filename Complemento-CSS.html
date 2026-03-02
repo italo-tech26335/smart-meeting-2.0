@@ -1,0 +1,846 @@
+<style>
+/* =====================================================================
+ *  SMART MEETING — MODAIS SOFISTICADOS
+ *  Substituir/adicionar ao CSS principal (PaginaProjetoDetalhe-CSS)
+ *  Cobre: overlay, .modal-content, header, body, footer, botões,
+ *         campos, animações, micro-interações e responsividade.
+ * ===================================================================== */
+
+/* ════════════════════════════════════════════════════
+   1. OVERLAY — backdrop com blur + grain
+   ════════════════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(35, 22, 14, 0.52);
+  display: flex; align-items: flex-start; justify-content: center;
+  z-index: 2000;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.35s cubic-bezier(.4,0,.2,1),
+              visibility 0.35s cubic-bezier(.4,0,.2,1);
+  backdrop-filter: blur(6px) saturate(1.3);
+  -webkit-backdrop-filter: blur(6px) saturate(1.3);
+  padding: 28px 16px;
+  overflow-y: auto;
+}
+.modal-overlay::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: -1;
+}
+.modal-overlay.visible { opacity: 1; visibility: visible; }
+
+/* ════════════════════════════════════════════════════
+   2. MODAL CONTENT — card principal
+   ════════════════════════════════════════════════════ */
+.modal-content {
+  background: var(--cor-fundo-card);
+  border-radius: 14px;
+  width: 100%; max-width: 580px;
+  max-height: 88vh;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(107,76,59,0.08),
+    0 4px 16px rgba(45,28,16,0.12),
+    0 16px 48px rgba(45,28,16,0.18),
+    0 32px 80px rgba(45,28,16,0.08);
+  transform: scale(0.88) translateY(24px);
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(.34,1.56,.64,1),
+              opacity 0.35s cubic-bezier(.4,0,.2,1);
+  display: flex; flex-direction: column;
+  border: 1px solid rgba(107,76,59,0.12);
+  position: relative;
+}
+.modal-overlay.visible .modal-content {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* Brilho sutil no topo do card */
+.modal-content::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 10%,
+    rgba(255,253,248,0.6) 50%,
+    transparent 90%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ════════════════════════════════════════════════════
+   3. MODAL HEADER — gradiente rico + ícone animado
+   ════════════════════════════════════════════════════ */
+.modal-header {
+  padding: 18px 22px 16px;
+  background:
+    linear-gradient(135deg,
+      rgba(74,50,36,0.04) 0%,
+      rgba(184,134,11,0.04) 50%,
+      rgba(107,76,59,0.03) 100%),
+    linear-gradient(180deg,
+      var(--cor-fundo-quente) 0%,
+      #f0e8d8 100%);
+  border-bottom: 1px solid var(--cor-borda);
+  display: flex; align-items: center; justify-content: space-between;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Linha decorativa inferior do header */
+.modal-header::after {
+  content: '';
+  position: absolute; bottom: -1px; left: 22px; right: 22px;
+  height: 2px;
+  background: linear-gradient(90deg,
+    var(--cor-primaria) 0%,
+    var(--cor-destaque) 50%,
+    var(--cor-primaria-clara) 100%);
+  border-radius: 1px;
+  opacity: 0.35;
+}
+
+.modal-header h3 {
+  font-family: var(--font-titulo);
+  font-size: 1.12rem;
+  color: var(--cor-primaria-escura);
+  display: flex; align-items: center; gap: 10px;
+  margin: 0; font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.modal-header h3 i {
+  font-size: 1.05rem;
+  color: var(--cor-primaria);
+  transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), color 0.25s;
+}
+.modal-overlay.visible .modal-header h3 i {
+  animation: iconeEntrada 0.5s 0.2s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes iconeEntrada {
+  from { transform: scale(0) rotate(-45deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0);      opacity: 1; }
+}
+
+/* ── Botão fechar — círculo com hover elegante ── */
+.btn-fechar-modal {
+  width: 34px; height: 34px;
+  border: 1.5px solid var(--cor-borda-clara);
+  background: var(--cor-fundo-card);
+  color: var(--cor-texto-secundario);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  font-size: 0.82rem;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.btn-fechar-modal::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at center, var(--cor-perigo), transparent);
+  opacity: 0;
+  transition: opacity 0.25s;
+  border-radius: 50%;
+}
+.btn-fechar-modal:hover {
+  border-color: rgba(166,61,64,0.4);
+  color: #fff;
+  transform: rotate(90deg) scale(1.08);
+  box-shadow: 0 2px 12px rgba(166,61,64,0.2);
+}
+.btn-fechar-modal:hover::before { opacity: 1; }
+.btn-fechar-modal i { position: relative; z-index: 1; }
+.btn-fechar-modal:active { transform: rotate(90deg) scale(0.95); }
+
+/* ════════════════════════════════════════════════════
+   4. MODAL BODY — scroll suave + fundo texturizado
+   ════════════════════════════════════════════════════ */
+.modal-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+  background:
+    linear-gradient(180deg, var(--cor-fundo-card) 0%, var(--cor-fundo-quente) 100%);
+  scroll-behavior: smooth;
+}
+.modal-body::-webkit-scrollbar { width: 5px; }
+.modal-body::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
+.modal-body::-webkit-scrollbar-thumb {
+  background: var(--cor-primaria-clara);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+.modal-body::-webkit-scrollbar-thumb:hover { background: var(--cor-primaria); }
+
+/* ════════════════════════════════════════════════════
+   5. MODAL FOOTER — barra de ações elegante
+   ════════════════════════════════════════════════════ */
+.modal-footer {
+  padding: 14px 22px;
+  background: linear-gradient(180deg, var(--cor-fundo-quente) 0%, #ede5d5 100%);
+  border-top: 1px solid var(--cor-borda-clara);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  position: relative;
+}
+/* Sombra interna sutil no topo */
+.modal-footer::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 6px;
+  background: linear-gradient(180deg, rgba(74,50,40,0.04), transparent);
+  pointer-events: none;
+}
+
+/* ════════════════════════════════════════════════════
+   6. BOTÕES — sistema completo e coeso
+   ════════════════════════════════════════════════════ */
+
+/* ── Botão primário (Salvar, Criar, Confirmar) ── */
+.btn-acao {
+  background: linear-gradient(135deg, var(--cor-primaria) 0%, var(--cor-primaria-escura) 100%);
+  color: #faf6ee;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.84rem;
+  font-family: var(--font-corpo);
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: all 0.3s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(107,76,59,0.2), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.btn-acao::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.btn-acao:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(107,76,59,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.btn-acao:hover::before { opacity: 1; }
+.btn-acao:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 1px 4px rgba(107,76,59,0.2);
+}
+.btn-acao:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: grayscale(0.3);
+}
+.btn-acao i {
+  font-size: 0.82rem;
+  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1);
+}
+.btn-acao:hover i { transform: scale(1.15); }
+
+/* ── Botão secundário (Cancelar, Fechar) ── */
+.btn-secundario {
+  background: var(--cor-fundo-card);
+  border: 1.5px solid var(--cor-borda);
+  color: var(--cor-texto);
+  padding: 9px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  font-family: var(--font-corpo);
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.btn-secundario::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--cor-primaria);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.btn-secundario:hover {
+  border-color: var(--cor-primaria);
+  color: var(--cor-primaria);
+  background: var(--cor-primaria-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(107,76,59,0.1);
+}
+.btn-secundario:active {
+  transform: translateY(0) scale(0.97);
+}
+.btn-secundario i {
+  font-size: 0.78rem;
+  transition: transform 0.2s;
+}
+.btn-secundario:hover i { transform: translateX(-2px); }
+
+/* ── Botão perigo (Excluir, Mover para Lixeira) ── */
+.btn-perigo,
+#btnConfirmarExclusao {
+  background: linear-gradient(135deg, var(--cor-perigo) 0%, #8a3234 100%) !important;
+  color: #faf6ee !important;
+  border: none !important;
+  padding: 10px 22px !important;
+  border-radius: 8px !important;
+  cursor: pointer;
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+  font-family: var(--font-corpo);
+  display: inline-flex !important; align-items: center !important; gap: 8px !important;
+  transition: all 0.3s cubic-bezier(.4,0,.2,1) !important;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(166,61,64,0.25), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+#btnConfirmarExclusao:hover,
+.btn-perigo:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 16px rgba(166,61,64,0.35), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  filter: brightness(1.08) !important;
+}
+#btnConfirmarExclusao:active,
+.btn-perigo:active {
+  transform: translateY(0) scale(0.97) !important;
+}
+
+/* ── Botão excluir dentro de modais (com ícone trash) ── */
+#btnExcluirItem {
+  background: transparent !important;
+  border: 1.5px solid rgba(166,61,64,0.35) !important;
+  color: var(--cor-perigo) !important;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  margin-right: auto; /* empurra para a esquerda */
+}
+#btnExcluirItem:hover {
+  background: rgba(166,61,64,0.08) !important;
+  border-color: var(--cor-perigo) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(166,61,64,0.15);
+}
+
+/* ════════════════════════════════════════════════════
+   7. CAMPOS DE FORMULÁRIO — mais refinados
+   ════════════════════════════════════════════════════ */
+.campo-grupo {
+  margin-bottom: 16px;
+  position: relative;
+}
+.campo-grupo label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--cor-texto);
+  letter-spacing: 0.01em;
+}
+.campo-grupo label i {
+  font-size: 0.72rem;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1.5px solid var(--cor-borda);
+  border-radius: 8px;
+  background: var(--cor-fundo-card);
+  font-family: var(--font-corpo);
+  font-size: 0.84rem;
+  color: var(--cor-texto);
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+input:hover, select:hover, textarea:hover {
+  border-color: var(--cor-primaria-clara);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px var(--cor-primaria-bg), 0 1px 3px rgba(107,76,59,0.08);
+  background: #fff;
+}
+input::placeholder, textarea::placeholder {
+  color: var(--cor-texto-secundario);
+  font-style: italic;
+  opacity: 0.7;
+}
+textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
+select { cursor: pointer; }
+
+.campo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.campo-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--cor-texto-secundario);
+  font-style: italic;
+  padding-left: 2px;
+}
+
+/* ════════════════════════════════════════════════════
+   8. SEÇÕES DO MODAL — divisões com ícone
+   ════════════════════════════════════════════════════ */
+.secao-modal {
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--cor-borda-clara);
+  position: relative;
+}
+.secao-modal:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.secao-modal-titulo {
+  font-family: var(--font-titulo);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cor-primaria-escura);
+  margin: 0 0 14px;
+  display: flex; align-items: center; gap: 9px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--cor-borda-clara);
+}
+.secao-modal-titulo i {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--cor-primaria) 0%, var(--cor-primaria-escura) 100%);
+  color: #faf6ee;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════
+   9. MULTI-SELECT RESPONSÁVEIS — mais polido
+   ════════════════════════════════════════════════════ */
+.multi-select-responsaveis {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--cor-fundo);
+  border: 1.5px solid var(--cor-borda);
+  border-radius: 8px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.multi-select-responsaveis::-webkit-scrollbar { width: 4px; }
+.multi-select-responsaveis::-webkit-scrollbar-thumb {
+  background: var(--cor-primaria-clara); border-radius: 2px;
+}
+
+.responsavel-checkbox-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  background: var(--cor-fundo-card);
+  border-radius: 8px;
+  border: 1.5px solid var(--cor-borda-clara);
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
+  cursor: pointer;
+}
+.responsavel-checkbox-item:hover {
+  background: var(--cor-primaria-bg);
+  border-color: var(--cor-primaria-clara);
+  transform: translateX(3px);
+}
+.responsavel-checkbox-item:has(input:checked) {
+  background: var(--cor-primaria-bg);
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 2px rgba(107,76,59,0.06);
+}
+.responsavel-checkbox-item input[type="checkbox"] {
+  width: 16px; height: 16px;
+  cursor: pointer;
+  accent-color: var(--cor-primaria);
+  border-radius: 4px;
+}
+.responsavel-checkbox-item label {
+  cursor: pointer; flex: 1;
+  font-size: 0.84rem; margin: 0;
+  font-weight: 500;
+}
+
+/* ════════════════════════════════════════════════════
+   10. MODAL DE EXCLUSÃO — design dramático
+   ════════════════════════════════════════════════════ */
+#modalConfirmarExclusao .modal-content {
+  max-width: 440px;
+  border: 1px solid rgba(166,61,64,0.15);
+}
+#modalConfirmarExclusao .modal-header {
+  background: linear-gradient(135deg,
+    rgba(166,61,64,0.06) 0%,
+    var(--cor-fundo-quente) 100%);
+  border-bottom-color: rgba(166,61,64,0.2);
+}
+#modalConfirmarExclusao .modal-header::after {
+  background: linear-gradient(90deg,
+    var(--cor-perigo) 0%,
+    rgba(166,61,64,0.3) 100%);
+  opacity: 0.5;
+}
+#exclusaoIcone {
+  width: 72px !important; height: 72px !important;
+  margin: 0 auto 18px !important;
+  background: linear-gradient(135deg, rgba(166,61,64,0.08), rgba(166,61,64,0.15)) !important;
+  border: 2px solid rgba(166,61,64,0.2) !important;
+  border-radius: 50% !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  animation: pulsoPerigo 2s ease-in-out infinite;
+}
+@keyframes pulsoPerigo {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(166,61,64,0.15); }
+  50%      { box-shadow: 0 0 0 10px rgba(166,61,64,0); }
+}
+#exclusaoNomeProjeto {
+  font-size: 1.02rem !important;
+  font-weight: 700 !important;
+  color: var(--cor-texto) !important;
+  margin: 10px 0 18px !important;
+  padding: 12px 16px !important;
+  background: var(--cor-fundo) !important;
+  border: 1.5px solid var(--cor-borda) !important;
+  border-left: 3px solid var(--cor-perigo) !important;
+  border-radius: 8px !important;
+  text-align: center;
+}
+
+/* ════════════════════════════════════════════════════
+   11. MODAL DA LIXEIRA — visual melhorado
+   ════════════════════════════════════════════════════ */
+#modalLixeira .modal-content { max-width: 700px; }
+#modalLixeira .modal-header h3 i { color: var(--cor-perigo); }
+
+/* ════════════════════════════════════════════════════
+   12. MODAL CÁLCULO DE PRIORIDADE — sofisticado
+   ════════════════════════════════════════════════════ */
+.modal-calculo-prioridade .modal-content { max-width: 660px; }
+
+.calculo-prioridade-container {
+  display: flex; flex-direction: column; gap: 16px;
+}
+.indicador-grupo {
+  background: var(--cor-fundo);
+  border: 1.5px solid var(--cor-borda-clara);
+  border-radius: 10px;
+  padding: 14px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.indicador-grupo:hover {
+  border-color: var(--cor-primaria-clara);
+  box-shadow: 0 2px 8px rgba(107,76,59,0.06);
+}
+.indicador-grupo:has(.indicador-opcao.selecionado) {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 2px var(--cor-primaria-bg);
+}
+
+.indicador-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.indicador-icone {
+  width: 38px; height: 38px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; color: #faf6ee;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.indicador-info h4 {
+  margin: 0; font-size: 0.92rem;
+  color: var(--cor-texto); font-weight: 700;
+}
+.indicador-info p {
+  margin: 2px 0 0; font-size: 0.74rem;
+  color: var(--cor-texto-secundario);
+}
+
+.indicador-opcao {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px;
+  background: var(--cor-fundo-card);
+  border: 1.5px solid var(--cor-borda-clara);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
+}
+.indicador-opcao:hover {
+  border-color: var(--cor-primaria-clara);
+  background: var(--cor-primaria-bg);
+  transform: translateX(4px);
+}
+.indicador-opcao.selecionado {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria-bg);
+  box-shadow: 0 0 0 2px rgba(107,76,59,0.06);
+}
+.indicador-opcao.selecionado .indicador-opcao-valor {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(107,76,59,0.2);
+}
+
+.indicador-opcao-valor {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.75rem;
+  flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), box-shadow 0.25s;
+}
+
+/* Resultado do cálculo */
+.calculo-resultado {
+  background: linear-gradient(135deg, var(--cor-fundo-quente) 0%, #ede5d5 50%, var(--cor-fundo-quente) 100%);
+  border: 1.5px solid var(--cor-borda);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.calculo-resultado::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(184,134,11,0.06), transparent 70%);
+  pointer-events: none;
+}
+.calculo-resultado-titulo {
+  font-size: 0.78rem; color: var(--cor-texto-secundario);
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.calculo-resultado-valor {
+  font-size: 2.4rem; font-weight: 800;
+  color: var(--cor-primaria-escura);
+  margin-bottom: 6px;
+  font-family: var(--font-titulo);
+  transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+}
+.calculo-resultado-categoria {
+  font-size: 0.95rem; font-weight: 700;
+  padding: 4px 16px; border-radius: 20px;
+  display: inline-block;
+  transition: all 0.3s;
+}
+.calculo-formula {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: var(--cor-texto-secundario);
+}
+.calculo-formula span {
+  background: var(--cor-fundo-card);
+  padding: 3px 8px; border-radius: 4px;
+  font-weight: 700; margin: 0 2px;
+  display: inline-block;
+  border: 1px solid var(--cor-borda-clara);
+  transition: all 0.25s;
+}
+.calculo-formula span:hover {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria-bg);
+}
+
+/* ════════════════════════════════════════════════════
+   13. INDICADORES COMPACTOS (Novo Projeto)
+   ════════════════════════════════════════════════════ */
+.indicador-grupo-compact {
+  background: var(--cor-fundo);
+  border: 1.5px solid var(--cor-borda-clara);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.indicador-grupo-compact:hover {
+  border-color: var(--cor-primaria-clara);
+}
+.indicador-grupo-compact:has(.indicador-opcao-compact.selecionado) {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 2px var(--cor-primaria-bg);
+}
+
+.indicador-header-compact {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.indicador-icone-compact {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.78rem; color: #faf6ee; flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.indicador-info-compact strong {
+  font-size: 0.8rem; color: var(--cor-texto);
+}
+.indicador-info-compact span {
+  font-size: 0.68rem; color: var(--cor-texto-secundario);
+}
+
+.indicador-opcao-compact {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  background: var(--cor-fundo-card);
+  border: 1.5px solid var(--cor-borda-clara);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
+  font-size: 0.74rem;
+  flex: 1; min-width: 115px;
+}
+.indicador-opcao-compact:hover {
+  border-color: var(--cor-primaria-clara);
+  background: var(--cor-primaria-bg);
+  transform: translateY(-1px);
+}
+.indicador-opcao-compact.selecionado {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria-bg);
+  box-shadow: 0 0 0 2px rgba(107,76,59,0.05);
+}
+.indicador-opcao-compact .opcao-valor {
+  width: 20px; height: 20px;
+  border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.66rem; flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1);
+}
+.indicador-opcao-compact.selecionado .opcao-valor {
+  transform: scale(1.12);
+}
+
+/* Fórmula compacta (Novo Projeto) */
+.calculo-formula-compact {
+  font-size: 0.74rem; color: var(--cor-texto-secundario);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px;
+  padding: 8px 0;
+}
+.calculo-formula-compact span {
+  background: var(--cor-fundo-card);
+  padding: 3px 7px; border-radius: 5px;
+  font-weight: 700; border: 1px solid var(--cor-borda-clara);
+}
+.calculo-formula-compact strong {
+  font-size: 0.88rem; color: var(--cor-primaria-escura);
+}
+.calculo-resultado-valor-compact {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 0;
+}
+.calculo-resultado-valor-compact > span:first-child {
+  font-size: 1.6rem; font-weight: 800;
+  color: var(--cor-primaria-escura);
+  font-family: var(--font-titulo);
+}
+.calculo-resultado-categoria-compact {
+  font-size: 0.75rem; font-weight: 700;
+  padding: 4px 12px; border-radius: 16px;
+}
+
+/* ════════════════════════════════════════════════════
+   14. MODAIS DE TEMA — estilo preservado + botões fix
+   ════════════════════════════════════════════════════ */
+#modalTemaParaAzul .modal-content,
+#modalTemaParaClassico .modal-content {
+  max-width: 470px;
+}
+#modalTemaParaAzul .modal-footer,
+#modalTemaParaClassico .modal-footer {
+  justify-content: center;
+  gap: 14px;
+}
+
+/* ════════════════════════════════════════════════════
+   15. ANIMAÇÕES EXTRAS — entrada staggered
+   ════════════════════════════════════════════════════ */
+
+/* Animar campos sequencialmente ao abrir modal */
+.modal-overlay.visible .campo-grupo,
+.modal-overlay.visible .secao-modal,
+.modal-overlay.visible .indicador-grupo,
+.modal-overlay.visible .indicador-grupo-compact {
+  animation: campoEntrada 0.35s cubic-bezier(.4,0,.2,1) both;
+}
+.modal-overlay.visible .campo-grupo:nth-child(1),
+.modal-overlay.visible .indicador-grupo:nth-child(1) { animation-delay: 0.06s; }
+.modal-overlay.visible .campo-grupo:nth-child(2),
+.modal-overlay.visible .indicador-grupo:nth-child(2) { animation-delay: 0.1s; }
+.modal-overlay.visible .campo-grupo:nth-child(3),
+.modal-overlay.visible .indicador-grupo:nth-child(3) { animation-delay: 0.14s; }
+.modal-overlay.visible .campo-grupo:nth-child(4),
+.modal-overlay.visible .indicador-grupo:nth-child(4) { animation-delay: 0.18s; }
+.modal-overlay.visible .campo-grupo:nth-child(5),
+.modal-overlay.visible .indicador-grupo:nth-child(5) { animation-delay: 0.22s; }
+
+@keyframes campoEntrada {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Animação de saída (via JS adicionando classe .saindo) */
+.modal-overlay.saindo {
+  opacity: 0 !important;
+  transition: opacity 0.25s !important;
+}
+.modal-overlay.saindo .modal-content {
+  transform: scale(0.92) translateY(16px) !important;
+  opacity: 0 !important;
+}
+
+/* ════════════════════════════════════════════════════
+   16. RESPONSIVIDADE DOS MODAIS
+   ════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .modal-overlay { padding: 10px 8px; }
+  .modal-content {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+  .modal-header { padding: 14px 16px 12px; }
+  .modal-header h3 { font-size: 1rem; }
+  .modal-body { padding: 16px; }
+  .modal-footer { padding: 12px 16px; }
+  .campo-row { grid-template-columns: 1fr; }
+  .btn-acao, .btn-secundario {
+    padding: 9px 16px;
+    font-size: 0.8rem;
+  }
+  .indicador-opcao-compact { min-width: 100px; }
+}
+
+@media (max-width: 480px) {
+  .modal-header h3 { font-size: 0.92rem; gap: 7px; }
+  .btn-fechar-modal { width: 30px; height: 30px; }
+  .modal-footer { flex-wrap: wrap; }
+  .btn-acao, .btn-secundario { flex: 1; justify-content: center; }
+}
+
+/* ════════════════════════════════════════════════════
+   17. FOCUS-VISIBLE — acessibilidade
+   ════════════════════════════════════════════════════ */
+.btn-acao:focus-visible,
+.btn-secundario:focus-visible,
+.btn-fechar-modal:focus-visible,
+#btnConfirmarExclusao:focus-visible {
+  outline: 2px solid var(--cor-destaque);
+  outline-offset: 2px;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none; /* já tratado pelo box-shadow */
+}
+</style>

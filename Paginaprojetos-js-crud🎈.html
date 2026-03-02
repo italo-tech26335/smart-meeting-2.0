@@ -1,0 +1,2275 @@
+<script>
+
+  let pendenciasModalTemp = [];
+
+
+function abrirModalProjeto() {
+  // Verifica permissão para criar projetos
+  if (!podeCriarProjetoLocal()) {
+    mostrarToast('Você não tem permissão para criar projetos.', 'aviso');
+    return;
+  }
+  
+  const campos = ['projetoId', 'projetoNome', 'projetoSetor', 'projetoPilar', 
+                  'projetoDescricao', 'projetoFinalidade', 'projetoParaQuem', 'projetoLink'];
+  
+  campos.forEach(campoId => {
+    const elemento = document.getElementById(campoId);
+    if (elemento) elemento.value = '';
+  });
+  
+  const elStatus = document.getElementById('projetoStatus');
+  if (elStatus) elStatus.value = 'Ativo';
+  
+  const elPrioridade = document.getElementById('projetoPrioridade');
+  if (elPrioridade) elPrioridade.value = 'Média';
+  
+  const selectResponsavel = document.getElementById('projetoResponsavel');
+  const containerResponsaveis = document.getElementById('projetoResponsaveisContainer');
+  
+  if (containerResponsaveis) {
+    popularCheckboxesResponsaveis('projetoResponsaveisContainer', []);
+  } else if (selectResponsavel) {
+    popularSelectResponsaveis('projetoResponsavel');
+    selectResponsavel.value = '';
+  }
+  
+  const tituloModal = document.getElementById('modalProjetoTituloTexto');
+  if (tituloModal) tituloModal.textContent = 'Novo Projeto';
+  
+  abrirModal('modalProjeto');
+}
+    
+function editarProjeto(id) {
+  // Verifica permissão local antes de abrir modal
+  if (!podeEditarProjetoLocal(id)) {
+    mostrarToast('Você não tem permissão para editar este projeto.', 'aviso');
+    return;
+  }
+  
+  if (!podeEditar()) return;
+  const p = dadosDiagrama.projetos.find(x => x.id === id);
+  if (!p) return;
+  
+  const campos = {
+    'projetoId': p.id,
+    'projetoNome': p.nome || '',
+    'projetoSetor': p.setor || '',
+    'projetoPilar': p.pilar || '',
+    'projetoDescricao': p.descricao || '',
+    'projetoFinalidade': p.finalidade || '',
+    'projetoParaQuem': p.paraQuem || '',
+    'projetoStatus': p.status || 'Ativo',
+    'projetoPrioridade': p.prioridade || 'Média',
+    'projetoLink': p.link || ''
+  };
+  
+  Object.keys(campos).forEach(campoId => {
+    const elemento = document.getElementById(campoId);
+    if (elemento) elemento.value = campos[campoId];
+  });
+  
+  const selectResponsavel = document.getElementById('projetoResponsavel');
+  const containerResponsaveis = document.getElementById('projetoResponsaveisContainer');
+  
+  if (containerResponsaveis) {
+    const idsResponsaveis = Array.isArray(p.responsaveisIds) ? p.responsaveisIds : 
+                           (p.responsavelId ? [p.responsavelId] : []);
+    popularCheckboxesResponsaveis('projetoResponsaveisContainer', idsResponsaveis);
+  } else if (selectResponsavel) {
+    popularSelectResponsaveis('projetoResponsavel');
+    selectResponsavel.value = p.responsavelId || '';
+  }
+  
+  const tituloModal = document.getElementById('modalProjetoTituloTexto');
+  if (tituloModal) tituloModal.textContent = 'Editar Projeto';
+  
+  abrirModal('modalProjeto');
+}
+    
+    function salvarProjeto() {
+      const elId = document.getElementById('projetoId');
+      const id = elId ? elId.value : '';
+      
+      const obterValor = (campoId, padrao = '') => {
+        const el = document.getElementById(campoId);
+        return el ? el.value.trim() : padrao;
+      };
+      
+      const d = {
+        nome: obterValor('projetoNome'),
+        setor: obterValor('projetoSetor'),
+        pilar: obterValor('projetoPilar'),
+        descricao: obterValor('projetoDescricao'),
+        finalidade: obterValor('projetoFinalidade'),
+        paraQuem: obterValor('projetoParaQuem'),
+        status: obterValor('projetoStatus', 'Ativo'),
+        prioridade: obterValor('projetoPrioridade', 'Média'),
+        link: obterValor('projetoLink')
+      };
+      
+      const containerResponsaveis = document.getElementById('projetoResponsaveisContainer');
+      const selectResponsavel = document.getElementById('projetoResponsavel');
+      
+      if (containerResponsaveis) {
+        d.responsaveisIds = obterResponsaveisSelecionados('projetoResponsaveisContainer');
+        d.responsavelId = d.responsaveisIds.length > 0 ? d.responsaveisIds[0] : '';
+      } else if (selectResponsavel) {
+        d.responsavelId = selectResponsavel.value;
+      }
+      
+      if (!d.nome) { 
+        mostrarToast('Nome obrigatório', 'aviso'); 
+        return; 
+      }
+      
+      mostrarLoader();
+      const callback = (r) => {
+        esconderLoader();
+        if (r.sucesso) {
+          if (id) {
+            const p = dadosDiagrama.projetos.find(x => x.id === id);
+            if (p) Object.assign(p, d);
+          } else {
+            carregarDados();
+            fecharModal('modalProjeto');
+            mostrarToast('Criado com sucesso', 'sucesso');
+            return;
+          }
+          renderizarDiagrama();
+          fecharModal('modalProjeto');
+          mostrarToast('Atualizado', 'sucesso');
+        } else {
+          mostrarToast(r.mensagem, 'erro');
+        }
+      };
+      
+      if (id) google.script.run.withSuccessHandler(callback).atualizarProjeto(id, d);
+      else google.script.run.withSuccessHandler(callback).adicionarProjeto(d);
+    }
+        
+    function alternarBloqueioProjeto(id) {
+       const p = dadosDiagrama.projetos.find(x => x.id === id);
+       if(p) {
+          p.bloqueado = !p.bloqueado;
+          renderizarDiagrama();
+          google.script.run.atualizarBloqueioProjeto(id, p.bloqueado);
+       }
+    }
+    
+    function toggleExpandirProjeto(id) {
+       if (estado.projetosExpandidos.has(id)) estado.projetosExpandidos.delete(id);
+       else estado.projetosExpandidos.add(id);
+       renderizarDiagrama();
+    }
+
+function criarEtapa(projetoId) {
+  // Verifica permissão para criar etapa neste projeto
+  if (!podeCriarEtapaLocal(projetoId)) {
+    mostrarToast('Você não tem permissão para criar etapas neste projeto.', 'aviso');
+    return;
+  }
+  
+  if (!podeEditar()) return;
+  try {
+    document.getElementById('etapaId').value = '';
+    document.getElementById('etapaProjetoId').value = projetoId;
+    document.getElementById('etapaPaiId').value = '';
+    document.getElementById('infoEtapaPai').classList.add('oculto');
+    document.getElementById('etapaNome').value = '';
+    document.getElementById('etapaDescricao').value = '';
+    document.getElementById('etapaOQueFazer').value = '';
+    document.getElementById('etapaStatus').value = 'A Fazer';
+
+    pendenciasModalTemp = [];
+    renderizarListaPendenciasModal();
+    
+    popularCheckboxesResponsaveis('etapaResponsaveisContainer', []);
+    
+    document.getElementById('btnExcluirEtapa').classList.add('oculto');
+    document.getElementById('modalEtapaTituloTexto').textContent = 'Nova Etapa';
+    abrirModal('modalEtapa');
+  } catch (e) {
+    console.error('Erro em criarEtapa:', e);
+    mostrarToast('Erro ao abrir modal de etapa', 'erro');
+  }
+}
+
+    function abrirModalSubEtapa(etapaPaiId) {
+       if (!podeEditar()) return;
+       const pai = dadosDiagrama.etapas.find(e => e.id === etapaPaiId);
+       if (!pai) return;
+       document.getElementById('etapaId').value = '';
+       document.getElementById('etapaProjetoId').value = pai.projetoId;
+       document.getElementById('etapaPaiId').value = etapaPaiId;
+       document.getElementById('infoEtapaPai').classList.remove('oculto');
+       document.getElementById('nomeEtapaPai').textContent = pai.nome;
+       document.getElementById('etapaNome').value = '';
+       document.getElementById('etapaDescricao').value = '';
+       document.getElementById('etapaOQueFazer').value = '';
+       document.getElementById('etapaPendencias').value = '';
+       document.getElementById('etapaStatus').value = 'A Fazer';
+        popularCheckboxesResponsaveis('etapaResponsaveisContainer', []);
+       document.getElementById('btnExcluirEtapa').classList.add('oculto');
+       document.getElementById('modalEtapaTituloTexto').textContent = 'Nova Sub-etapa';
+       abrirModal('modalEtapa');
+    }
+
+function editarEtapa(id) {
+  // Verifica permissão local antes de abrir modal
+  if (!podeEditarEtapaLocal(id)) {
+    mostrarToast('Você não tem permissão para editar esta etapa.', 'aviso');
+    return;
+  }
+  
+  if (!podeEditar()) return;
+  const e = dadosDiagrama.etapas.find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('etapaId').value = e.id;
+  document.getElementById('etapaProjetoId').value = e.projetoId;
+  document.getElementById('etapaPaiId').value = e.etapaPaiId || '';
+  if (e.etapaPaiId) {
+    const pai = dadosDiagrama.etapas.find(p => p.id === e.etapaPaiId);
+    document.getElementById('infoEtapaPai').classList.remove('oculto');
+    document.getElementById('nomeEtapaPai').textContent = pai ? pai.nome : '(Desconhecido)';
+  } else {
+    document.getElementById('infoEtapaPai').classList.add('oculto');
+  }
+  document.getElementById('etapaNome').value = e.nome;
+  document.getElementById('etapaDescricao').value = e.descricao || '';
+  document.getElementById('etapaOQueFazer').value = e.oQueFazer || '';
+  document.getElementById('etapaStatus').value = e.status;
+  const responsaveisSelecionados = e.responsaveisIds || (e.responsavelId ? [e.responsavelId] : []);
+  popularCheckboxesResponsaveis('etapaResponsaveisContainer', responsaveisSelecionados);
+  document.getElementById('btnExcluirEtapa').classList.remove('oculto');
+  document.getElementById('modalEtapaTituloTexto').textContent = 'Editar Etapa';
+  abrirModal('modalEtapa');
+
+  pendenciasModalTemp = Array.isArray(e.pendencias) ? [...e.pendencias] : [];
+  renderizarListaPendenciasModal();
+}
+
+    function salvarEtapa() {
+      const id = document.getElementById('etapaId').value;
+      const projetoId = document.getElementById('etapaProjetoId').value;
+      const paiId = document.getElementById('etapaPaiId').value || '';
+        
+      if (!projetoId) {
+        mostrarToast('Erro: Projeto não identificado', 'erro');
+        return;
+      }
+        
+      const d = {
+        projetoId: projetoId, 
+        nome: document.getElementById('etapaNome').value.trim(),
+        descricao: document.getElementById('etapaDescricao').value.trim(),
+        oQueFazer: document.getElementById('etapaOQueFazer').value.trim(),
+        pendencias: [...pendenciasModalTemp],
+        status: document.getElementById('etapaStatus').value,
+        etapaPaiId: paiId,
+        responsaveisIds: obterResponsaveisSelecionados('etapaResponsaveisContainer'),
+        offsetX: 0,
+        offsetY: 0
+      };
+        
+      if (!d.nome) {
+        mostrarToast('Nome obrigatório', 'aviso');
+        return;
+      }
+        
+      mostrarLoader();
+        
+      const callback = (r) => {
+        esconderLoader();
+        if (r.sucesso) {
+          carregarDados(); 
+          fecharModal('modalEtapa');
+          mostrarToast(id ? 'Etapa atualizada' : 'Etapa criada', 'sucesso');
+        } else {
+          mostrarToast(r.mensagem, 'erro');
+        }
+      };
+        
+      if (id) {
+        google.script.run.withSuccessHandler(callback).atualizarEtapa(id, d);
+      } else {
+        google.script.run.withSuccessHandler(callback).adicionarEtapa(d);
+      }
+    }
+    
+    function confirmarExcluirEtapa() {
+       const id = document.getElementById('etapaId').value;
+       if(!id) return;
+       if(confirm('Tem certeza? Isso excluirá também todas as sub-etapas.')) {
+          google.script.run.withSuccessHandler(() => {
+             carregarDados();
+             fecharModal('modalEtapa');
+             mostrarToast('Excluída', 'sucesso');
+          }).excluirEtapa(id);
+       }
+    }
+
+    function toggleFilhasEtapa(id) {
+       if (estado.etapasFilhasColapsadas.has(id)) estado.etapasFilhasColapsadas.delete(id);
+       else estado.etapasFilhasColapsadas.add(id);
+       renderizarDiagrama();
+    }
+    
+/**
+ * Expande/colapsa os detalhes de uma etapa
+ * E desloca sub-etapas e etapas irmãs para evitar sobreposição
+ * @param {string} etapaId - ID da etapa
+ */
+function toggleExpandirEtapa(etapaId) {
+  const cardAtual = document.getElementById('etapa-' + etapaId);
+  if (!cardAtual) return;
+    
+  const estaExpandida = estado.etapasExpandidas.has(etapaId);
+  
+  // Captura altura ANTES
+  const alturaAntes = cardAtual.offsetHeight;
+  
+  // Alterna estado
+  if (estaExpandida) {
+    estado.etapasExpandidas.delete(etapaId);
+    cardAtual.classList.remove('expandida');
+  } else {
+    estado.etapasExpandidas.add(etapaId);
+    cardAtual.classList.add('expandida');
+  }
+  
+  // Atualiza ícone do botão
+  const btnExpandir = cardAtual.querySelector('.btn-etapa-expandir i');
+  if (btnExpandir) {
+    btnExpandir.className = estaExpandida ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+  }
+  
+  // Aguarda transição CSS e calcula delta
+  setTimeout(() => {
+    const alturaDepois = cardAtual.offsetHeight;
+    const deltaAltura = alturaDepois - alturaAntes;
+    
+    if (Math.abs(deltaAltura) > 5) {
+      // Desloca sub-etapas e etapas irmãs abaixo
+      deslocarCardsAbaixoDaEtapa(etapaId, deltaAltura);
+    }
+    
+    // Atualiza conexões
+    atualizarConexoesParciais('etapa', etapaId);
+  }, 180); // Tempo da transição CSS da etapa
+}
+
+/**
+ * Desloca cards que estão posicionados abaixo de uma etapa expandida/colapsada
+ * @param {string} etapaId - ID da etapa que mudou de tamanho
+ * @param {number} deltaY - Quanto deslocar
+ */
+function deslocarCardsAbaixoDaEtapa(etapaId, deltaY) {
+  const etapa = dadosDiagrama.etapas.find(e => e.id === etapaId);
+  if (!etapa) return;
+  
+  const cardEtapa = document.getElementById('etapa-' + etapaId);
+  if (!cardEtapa) return;
+  
+  const yEtapa = parseFloat(cardEtapa.style.top) || 0;
+  const alturaEtapa = cardEtapa.offsetHeight;
+  const limiteY = yEtapa + alturaEtapa - deltaY; // Posição original do fundo do card
+  
+  // 1. Desloca sub-etapas diretas
+  const subEtapas = dadosDiagrama.etapas.filter(e => e.etapaPaiId === etapaId);
+  deslocarListaEtapas(subEtapas, deltaY);
+  
+  // 2. Desloca etapas irmãs que estão ABAIXO verticalmente
+  const etapasIrmas = dadosDiagrama.etapas.filter(e => {
+    if (e.id === etapaId) return false;
+    if (e.projetoId !== etapa.projetoId) return false;
+    if (e.etapaPaiId !== etapa.etapaPaiId) return false;
+    
+    const cardIrma = document.getElementById('etapa-' + e.id);
+    if (!cardIrma) return false;
+    
+    const yIrma = parseFloat(cardIrma.style.top) || 0;
+    return yIrma > limiteY; // Só as que estão abaixo
+  });
+  
+  deslocarListaEtapas(etapasIrmas, deltaY);
+}
+
+/**
+ * Desloca uma lista de etapas e suas sub-etapas recursivamente
+ * @param {Array} etapas - Array de etapas para deslocar
+ * @param {number} deltaY - Quanto deslocar
+ */
+function deslocarListaEtapas(etapas, deltaY) {
+  etapas.forEach(etapa => {
+    const card = document.getElementById('etapa-' + etapa.id);
+    if (card) {
+      card.classList.add('card-deslocando-expansao');
+      
+      const yAtual = parseFloat(card.style.top) || 0;
+      card.style.top = (yAtual + deltaY) + 'px';
+      
+      // Atualiza cache
+      if (cachePosicoesEtapas.has(etapa.id)) {
+        const cache = cachePosicoesEtapas.get(etapa.id);
+        cachePosicoesEtapas.set(etapa.id, { x: cache.x, y: cache.y + deltaY });
+      }
+      
+      setTimeout(() => {
+        card.classList.remove('card-deslocando-expansao');
+        atualizarConexoesParciais('etapa', etapa.id);
+      }, 350);
+    }
+    
+    // Recursivamente desloca sub-etapas
+    const filhas = dadosDiagrama.etapas.filter(e => e.etapaPaiId === etapa.id);
+    if (filhas.length > 0) {
+      deslocarListaEtapas(filhas, deltaY);
+    }
+  });
+}
+
+    function recalcularLayoutEtapa(etapaId) {
+      const card = document.getElementById('etapa-' + etapaId);
+      if (!card) return;
+      
+      const expandida = estado.etapasExpandidas.has(etapaId);
+      const alturaAtual = card.offsetHeight;
+      const alturaColapsada = 80;
+      const alturaExpandida = alturaAtual;
+      
+      const deltaAltura = expandida ? (alturaExpandida - alturaColapsada) : -(alturaExpandida - alturaColapsada);
+      
+      const filhas = obterEtapasFilhas(etapaId);
+      deslocarArvoreVertical(filhas, deltaAltura);
+    }
+
+    function deslocarArvoreVertical(etapas, deltaY) {
+      etapas.forEach(etapa => {
+        const card = document.getElementById('etapa-' + etapa.id);
+        if (card) {
+          const yAtual = parseFloat(card.style.top);
+          card.style.top = (yAtual + deltaY) + 'px';
+          atualizarConexoesParciais('etapa', etapa.id);
+        }
+        
+        const filhas = obterEtapasFilhas(etapa.id);
+        if (filhas.length > 0) {
+          deslocarArvoreVertical(filhas, deltaY);
+        }
+      });
+    }
+
+    function alternarBloqueioEtapa(id) {
+       const e = dadosDiagrama.etapas.find(x => x.id === id);
+       if(e) {
+          e.bloqueado = !e.bloqueado;
+          renderizarDiagrama();
+          google.script.run.alternarBloqueioEtapa(id);
+       }
+    }
+
+    function abrirModalResponsavel() {
+      document.getElementById('responsavelId').value = '';
+      document.getElementById('responsavelNome').value = '';
+      document.getElementById('responsavelEmail').value = '';
+      document.getElementById('responsavelCargo').value = '';
+      document.getElementById('modalResponsavelTituloTexto').textContent = 'Novo Responsável';
+      abrirModal('modalResponsavel');
+    }
+
+    function editarResponsavel(id) {
+       if (!podeEditar()) return;
+       const r = dadosDiagrama.responsaveis.find(x => x.id === id);
+       if (!r) return;
+       document.getElementById('responsavelId').value = r.id;
+       document.getElementById('responsavelNome').value = r.nome;
+       document.getElementById('responsavelEmail').value = r.email || '';
+       document.getElementById('responsavelCargo').value = r.cargo || '';
+       document.getElementById('modalResponsavelTituloTexto').textContent = 'Editar Responsável';
+       abrirModal('modalResponsavel');
+    }
+
+    function salvarResponsavel() {
+       const id = document.getElementById('responsavelId').value;
+       const d = {
+          nome: document.getElementById('responsavelNome').value.trim(),
+          email: document.getElementById('responsavelEmail').value.trim(),
+          cargo: document.getElementById('responsavelCargo').value.trim()
+       };
+       if (!d.nome) { mostrarToast('Nome obrigatório', 'aviso'); return; }
+       mostrarLoader();
+       const callback = (r) => {
+          esconderLoader();
+          if (r.sucesso) {
+             carregarDados();
+             fecharModal('modalResponsavel');
+             mostrarToast('Salvo', 'sucesso');
+          } else {
+             mostrarToast(r.mensagem, 'erro');
+          }
+       };
+       if(id) google.script.run.withSuccessHandler(callback).atualizarResponsavel(id, d);
+       else google.script.run.withSuccessHandler(callback).adicionarResponsavel(d);
+    }
+
+    function popularCheckboxesResponsaveis(containerId, selecionadosIds = []) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      
+      container.innerHTML = dadosDiagrama.responsaveis.map(r => {
+        const marcado = selecionadosIds.includes(r.id) ? 'checked' : '';
+        return `
+          <label class="checkbox-responsavel">
+            <input type="checkbox" value="${r.id}" ${marcado}>
+            <span class="checkbox-nome">${escaparHtml(r.nome)}</span>
+            ${r.cargo ? `<span class="checkbox-cargo">(${escaparHtml(r.cargo)})</span>` : ''}
+          </label>
+        `;
+      }).join('');
+    }
+
+    function obterResponsaveisSelecionados(containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return [];
+      
+      const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    let setorParaVincularGerente = null;
+
+    function abrirModalVincularResponsavelSetor(nomeSetor) {
+      if (!podeEditar()) return;
+      
+      setorParaVincularGerente = nomeSetor;
+      
+      const select = document.getElementById('vincularGerenteSelect');
+      if (!select) {
+        console.error('Select vincularGerenteSelect não encontrado');
+        mostrarToast('Erro: Modal não encontrado', 'erro');
+        return;
+      }
+      
+      select.innerHTML = '<option value="">Selecione um gerente...</option>';
+      
+      if (dadosDiagrama && dadosDiagrama.responsaveis && Array.isArray(dadosDiagrama.responsaveis)) {
+        dadosDiagrama.responsaveis.forEach(r => {
+          if (r && r.id) {
+            const option = document.createElement('option');
+            option.value = r.id;
+            option.textContent = (r.nome || 'Sem nome') + (r.cargo ? ` (${r.cargo})` : '');
+            select.appendChild(option);
+          }
+        });
+      }
+      
+      const gerenteAtual = obterGerenteSetor(nomeSetor);
+      if (gerenteAtual && gerenteAtual.id) {
+        select.value = gerenteAtual.id;
+      }
+      
+      const tituloEl = document.getElementById('modalVincularGerenteTitulo');
+      if (tituloEl) {
+        tituloEl.textContent = `Gerente do Setor: ${nomeSetor}`;
+      }
+      
+      abrirModal('modalVincularGerente');
+    }
+
+    function abrirModalGerenteSetor(nomeSetor) {
+      abrirModalVincularResponsavelSetor(nomeSetor);
+    }
+
+    function salvarGerenteSetor() {
+      if (!setorParaVincularGerente) {
+        mostrarToast('Erro: Setor não identificado', 'erro');
+        return;
+      }
+      
+      const select = document.getElementById('vincularGerenteSelect');
+      const responsavelId = select ? select.value : '';
+      
+      mostrarLoader();
+      
+      google.script.run
+        .withSuccessHandler(function(resultado) {
+          esconderLoader();
+          if (resultado.sucesso) {
+            if (!dadosDiagrama.setoresResponsaveis) {
+              dadosDiagrama.setoresResponsaveis = [];
+            }
+            
+            const idx = dadosDiagrama.setoresResponsaveis.findIndex(s => s && s.nomeSetor === setorParaVincularGerente);
+            if (idx >= 0) {
+              dadosDiagrama.setoresResponsaveis[idx].responsavelId = responsavelId;
+            } else {
+              dadosDiagrama.setoresResponsaveis.push({
+                id: resultado.id || '',
+                nomeSetor: setorParaVincularGerente,
+                responsavelId: responsavelId
+              });
+            }
+            
+            fecharModal('modalVincularGerente');
+            renderizarDiagrama();
+            mostrarToast(resultado.mensagem || 'Gerente vinculado!', 'sucesso');
+            setorParaVincularGerente = null;
+          } else {
+            mostrarToast(resultado.mensagem || 'Erro ao vincular', 'erro');
+          }
+        })
+        .withFailureHandler(function(erro) {
+          esconderLoader();
+          mostrarToast('Erro de conexão: ' + erro.message, 'erro');
+        })
+        .vincularResponsavelAoSetor(setorParaVincularGerente, responsavelId);
+    }
+
+    function removerGerenteSetor() {
+      if (!setorParaVincularGerente) return;
+      
+      const select = document.getElementById('vincularGerenteSelect');
+      if (select) select.value = '';
+      salvarGerenteSetor();
+    }
+
+    function renderizarFiltros() {
+       const divResp = document.getElementById('filtrosResponsaveis');
+       divResp.innerHTML = '';
+       const todosChecked = dadosDiagrama.responsaveis.every(r => estado.filtroResponsaveis.has(r.id));
+       const divTodos = document.createElement('div');
+       divTodos.className = 'filtro-item';
+       divTodos.innerHTML = `<input type="checkbox" id="filtroRespTodos" ${todosChecked ? 'checked' : ''}><label for="filtroRespTodos"><strong>Todos</strong></label>`;
+       divTodos.querySelector('input').addEventListener('change', (e) => {
+          if (e.target.checked) dadosDiagrama.responsaveis.forEach(r => estado.filtroResponsaveis.add(r.id));
+          else estado.filtroResponsaveis.clear();
+          renderizarFiltros(); 
+          renderizarDiagrama();
+          renderizarBarraNavegacao();
+       });
+       divResp.appendChild(divTodos);
+       dadosDiagrama.responsaveis.forEach(r => {
+          const div = document.createElement('div');
+          div.className = 'filtro-item';
+          const vinculos = dadosDiagrama.etapas.filter(e => e.responsavelId === r.id);
+          const count = vinculos.length;
+          const checked = estado.filtroResponsaveis.has(r.id) ? 'checked' : '';
+          div.innerHTML = `
+             <input type="checkbox" id="fr-${r.id}" ${checked}>
+             <label for="fr-${r.id}">${escaparHtml(r.nome)}</label>
+             <span class="filtro-contador">${count}</span>
+          `;
+          div.querySelector('input').addEventListener('change', (e) => {
+             if(e.target.checked) estado.filtroResponsaveis.add(r.id);
+             else estado.filtroResponsaveis.delete(r.id);
+             const all = dadosDiagrama.responsaveis.every(x => estado.filtroResponsaveis.has(x.id));
+             document.getElementById('filtroRespTodos').checked = all;
+             renderizarDiagrama();
+             renderizarBarraNavegacao();
+          });
+          divResp.appendChild(div);
+       });
+    }
+
+    function renderizarFiltrosAvancados() {
+       const container = document.getElementById('filtrosVisibilidade');
+       if (!container) return;
+       
+       container.innerHTML = `
+          <div class="filtro-item">
+             <input type="checkbox" id="filtroOcultarEtapas" 
+                     ${estado.ocultarEtapasAbertas ? 'checked' : ''}
+                    onchange="alternarOcultarEtapasAbertas()">
+             <label for="filtroOcultarEtapas">
+                <i class="fas fa-eye-slash"></i> Ocultar Etapas Expandidas
+             </label>
+          </div>
+          <div class="filtro-item">
+             <input type="checkbox" id="filtroOcultarProjetos" 
+                     ${estado.ocultarTodosProjetos ? 'checked' : ''}
+                    onchange="alternarOcultarProjetos()">
+             <label for="filtroOcultarProjetos">
+                <i class="fas fa-folder-minus"></i> Ocultar Todos os Projetos
+             </label>
+          </div>
+       `;
+    }
+
+    function alternarOcultarEtapasAbertas() {
+       estado.ocultarEtapasAbertas = !estado.ocultarEtapasAbertas;
+       if (estado.ocultarEtapasAbertas) {
+       }
+       renderizarDiagrama();
+       mostrarToast(estado.ocultarEtapasAbertas ? 'Etapas ocultadas' : 'Etapas visíveis', 'info');
+    }
+
+    function alternarOcultarProjetos() {
+       estado.ocultarTodosProjetos = !estado.ocultarTodosProjetos;
+       renderizarDiagrama();
+       mostrarToast(estado.ocultarTodosProjetos ? 'Projetos ocultos' : 'Projetos visíveis', 'info');
+    }
+
+    function aplicarFiltros() {
+       estado.filtroStatus.clear();
+       if(document.getElementById('filtroStatusAFazer').checked) estado.filtroStatus.add('A Fazer');
+       if(document.getElementById('filtroStatusEmAndamento').checked) estado.filtroStatus.add('Em Andamento');
+       if(document.getElementById('filtroStatusBloqueada').checked) estado.filtroStatus.add('Bloqueada');
+       if(document.getElementById('filtroStatusConcluida').checked) estado.filtroStatus.add('Concluída');
+       renderizarDiagrama();
+    }
+
+    function limparFiltros() {
+       dadosDiagrama.responsaveis.forEach(r => estado.filtroResponsaveis.add(r.id));
+       estado.filtroStatus = new Set(['A Fazer', 'Em Andamento', 'Bloqueada', 'Concluída']);
+       document.getElementById('filtroStatusAFazer').checked = true;
+       document.getElementById('filtroStatusEmAndamento').checked = true;
+       document.getElementById('filtroStatusBloqueada').checked = true;
+       document.getElementById('filtroStatusConcluida').checked = true;
+       renderizarFiltros();
+       renderizarDiagrama();
+    }
+
+    function atualizarResumo() {
+        const totalProjetos = dadosDiagrama.projetos.length;
+        const totalEtapas = dadosDiagrama.etapas.length;
+        const pendentes = dadosDiagrama.etapas.filter(e => e.status !== STATUS_ETAPAS.CONCLUIDA).length;
+        const bloqueadas = dadosDiagrama.etapas.filter(e => e.status === STATUS_ETAPAS.BLOQUEADA).length;
+        
+        const elTotalProj = document.getElementById('resumoTotalProjetos');
+        const elTotalEtapas = document.getElementById('resumoTotalEtapas');
+        const elPendentes = document.getElementById('resumoPendentes');
+        const elBloqueadas = document.getElementById('resumoBloqueadas');
+        const elTotalHeader = document.getElementById('totalPendentesHeader');
+        
+        if (elTotalProj) elTotalProj.textContent = totalProjetos;
+        if (elTotalEtapas) elTotalEtapas.textContent = totalEtapas;
+        if (elPendentes) elPendentes.textContent = pendentes;
+        if (elBloqueadas) elBloqueadas.textContent = bloqueadas;
+        if (elTotalHeader) elTotalHeader.textContent = pendentes;
+        
+        if (pendentes !== valorAnteriorPendentes) {
+           const el = document.getElementById('contadorPendentes');
+           if (el) {
+             el.classList.remove('animando');
+             void el.offsetWidth;
+             el.classList.add('animando');
+           }
+           valorAnteriorPendentes = pendentes;
+        }
+        
+        renderizarDashboardSetores();
+        renderizarFiltrosAvancados();
+    }
+
+    function togglePainel() {
+       const painel = document.getElementById('painelResumo');
+       const overlay = document.getElementById('painelOverlay');
+       if (painel.classList.contains('aberto')) {
+          painel.classList.remove('aberto');
+          overlay.classList.remove('visivel');
+       } else {
+          painel.classList.add('aberto');
+          overlay.classList.add('visivel');
+       }
+    }
+    
+    function fecharPainel() {
+       document.getElementById('painelResumo').classList.remove('aberto');
+       document.getElementById('painelOverlay').classList.remove('visivel');
+    }
+
+    function toggleMenuFlutuante() {
+       const menu = document.getElementById('menuFlutuante');
+       const btn = document.getElementById('btnAdicionar');
+       if (menu.classList.contains('visivel')) {
+          menu.classList.remove('visivel');
+          btn.innerHTML = '<i class="fas fa-plus"></i>';
+          btn.style.transform = 'rotate(0deg)';
+       } else {
+          menu.classList.add('visivel');
+          btn.innerHTML = '<i class="fas fa-times"></i>';
+          btn.style.transform = 'rotate(90deg)';
+       }
+    }
+    
+    function fecharMenuFlutuante() {
+       const menu = document.getElementById('menuFlutuante');
+       if (menu && menu.classList.contains('visivel')) toggleMenuFlutuante();
+    }
+
+    function abrirModal(id) {
+       document.getElementById(id).classList.add('visivel');
+       fecharMenuFlutuante();
+    }
+    
+    function fecharModal(id) {
+       document.getElementById(id).classList.remove('visivel');
+    }
+    
+    function fecharTodosModais() {
+       document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('visivel'));
+    }
+
+    function mostrarToast(msg, tipo = 'info') {
+       const container = document.getElementById('toastContainer');
+       const toast = document.createElement('div');
+       toast.className = `toast ${tipo}`;
+       let icone = 'info-circle';
+       if(tipo === 'sucesso') icone = 'check-circle';
+       if(tipo === 'erro') icone = 'exclamation-circle';
+       if(tipo === 'aviso') icone = 'exclamation-triangle';
+       toast.innerHTML = `
+          <i class="fas fa-${icone} toast-icone"></i>
+          <span class="toast-texto">${escaparHtml(msg)}</span>
+       `;
+       container.appendChild(toast);
+       setTimeout(() => {
+          toast.classList.add('saindo');
+          setTimeout(() => toast.remove(), 300);
+       }, 4000);
+    }
+
+    function mostrarLoader() {
+       document.getElementById('loader').classList.remove('oculto');
+    }
+    
+    function esconderLoader() {
+       document.getElementById('loader').classList.add('oculto');
+    }
+
+    function podeEditar() {
+       if (!modoEdicaoGlobal) return false;
+       if (!podeEditarBackend) {
+          mostrarToast('Você não tem permissão de edição.', 'erro');
+          return false;
+       }
+       return true;
+    }
+    
+    function atualizarUIBloqueio() {
+       const btn = document.getElementById('btnBloqueioGlobal');
+       const txt = document.getElementById('textoBloqueioGlobal');
+       if (modoEdicaoGlobal) {
+          document.body.classList.remove('modo-bloqueado');
+          btn.classList.remove('bloqueado');
+          btn.classList.add('editavel');
+          btn.innerHTML = '<i class="fas fa-lock-open"></i><span id="textoBloqueioGlobal">Editável</span>';
+       } else {
+          document.body.classList.add('modo-bloqueado');
+          btn.classList.remove('editavel');
+          btn.classList.add('bloqueado');
+          btn.innerHTML = '<i class="fas fa-lock"></i><span id="textoBloqueioGlobal">Bloqueado</span>';
+       }
+       localStorage.setItem('modoEdicaoGlobal', modoEdicaoGlobal);
+       renderizarDiagrama(); 
+    }
+    
+    function alternarModoBloqueioGlobal() {
+       modoEdicaoGlobal = !modoEdicaoGlobal;
+       atualizarUIBloqueio();
+    }
+
+    function vincularResponsavelAoProjeto() {
+       fecharModal('modalVincularResponsavel');
+    }
+    
+    function executarConfirmacao() {
+       if (callbackConfirmacao) callbackConfirmacao();
+       fecharModal('modalConfirmacao');
+    }
+
+    function atualizarModeloPosicao(tipo, id, x, y) {
+      switch(tipo) {
+        case 'projeto':
+          const p = dadosDiagrama.projetos.find(proj => proj.id === id);
+          if (p) { p.posX = x; p.posY = y; }
+          break;
+        case 'responsavel':
+          const r = dadosDiagrama.responsaveis.find(resp => resp.id === id);
+          if (r) { r.posX = x; r.posY = y; }
+          break;
+        case 'setor':
+          if (!estado.posicoesSetores) estado.posicoesSetores = {};
+          estado.posicoesSetores[id] = { x, y };
+          break;
+      }
+    }
+    
+    function salvarPosicaoAsync(tipo, id, x, y) {
+      const handlers = {
+        projeto: () => google.script.run
+          .withFailureHandler(e => console.error('Erro ao salvar projeto:', e))
+          .atualizarPosicaoProjeto(id, x, y),
+            
+        responsavel: () => google.script.run
+          .withFailureHandler(e => console.error('Erro ao salvar responsável:', e))
+          .atualizarPosicaoResponsavel(id, x, y),
+            
+        setor: () => {
+          console.log(`Posição do setor ${id} atualizada localmente`);
+        }
+      };
+        
+      handlers[tipo]?.();
+    }
+
+    function atualizarCardEtapaLocal(etapaId) {
+      const card = document.getElementById('etapa-' + etapaId);
+      if (!card) return;
+        
+      const expandida = estado.etapasExpandidas.has(etapaId);
+        
+      if (expandida) {
+        card.classList.add('expandida');
+      } else {
+        card.classList.remove('expandida');
+      }
+        
+      const btnExpandir = card.querySelector('.btn-etapa-expandir i');
+      if (btnExpandir) {
+        btnExpandir.className = expandida ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+      }
+    }
+    
+    function propagarDeslocamentoEtapas(projetoId, deltaX, deltaY) {
+      const etapasDoProj = dadosDiagrama.etapas.filter(e => e.projetoId === projetoId);
+      
+      etapasDoProj.forEach(etapa => {
+        const card = document.getElementById('etapa-' + etapa.id);
+        if (card) {
+          const xAtual = parseFloat(card.style.left);
+          const yAtual = parseFloat(card.style.top);
+          
+          card.style.left = (xAtual + deltaX) + 'px';
+          card.style.top = (yAtual + deltaY) + 'px';
+          
+          if (cachePosicoesEtapas.has(etapa.id)) {
+            const cache = cachePosicoesEtapas.get(etapa.id);
+            cachePosicoesEtapas.set(etapa.id, {
+                x: cache.x + deltaX,
+                y: cache.y + deltaY
+            });
+          }
+        }
+      });
+      
+      etapasDoProj.forEach(e => atualizarConexoesParciais('etapa', e.id));
+    }
+
+    /* ========================================================================
+     * SISTEMA DE PRIORIDADES
+     * ======================================================================== */
+    let prioridadesTemporarias = [];
+    let projetosExpandidosPrioridade = new Set();
+
+    function abrirEditorPrioridades(responsavelId) {
+      if (!podeEditar()) return;
+      
+      const resp = dadosDiagrama.responsaveis.find(r => r.id === responsavelId);
+      if (!resp) return;
+      
+      document.getElementById('prioridadesResponsavelId').value = responsavelId;
+      document.getElementById('modalPrioridadesTitulo').textContent = `Prioridades de ${resp.nome}`;
+      
+      projetosExpandidosPrioridade.clear();
+      
+      mostrarLoader();
+      google.script.run
+        .withSuccessHandler(result => {
+          esconderLoader();
+          if (result.sucesso) {
+            prioridadesTemporarias = result.prioridades || [];
+            renderizarListaPrioridades(responsavelId);
+            abrirModal('modalPrioridades');
+          } else {
+            mostrarToast(result.mensagem || 'Erro ao carregar prioridades', 'erro');
+          }
+        })
+        .withFailureHandler(e => {
+          esconderLoader();
+          mostrarToast('Erro: ' + e.message, 'erro');
+        })
+        .obterPrioridadesResponsavel(responsavelId);
+    }
+
+function renderizarListaPrioridades(responsavelId) {
+  const container = document.getElementById('listaPrioridadesProjetos');
+  if (!container) return;
+  
+  // Busca projetos do responsável
+  const projetosDoResp = dadosDiagrama.projetos.filter(p => {
+    if (p.responsaveisIds && Array.isArray(p.responsaveisIds)) {
+      return p.responsaveisIds.includes(responsavelId);
+    }
+    return p.responsavelId === responsavelId;
+  });
+  
+  // Ordena projetos por prioridade existente
+  const projetosOrdenados = [...projetosDoResp].sort((a, b) => {
+    const prioA = prioridadesTemporarias.find(p => p.tipoItem === 'projeto' && p.itemId === a.id)?.ordemPrioridade || 999;
+    const prioB = prioridadesTemporarias.find(p => p.tipoItem === 'projeto' && p.itemId === b.id)?.ordemPrioridade || 999;
+    return prioA - prioB;
+  });
+  
+  if (projetosOrdenados.length === 0) {
+    container.innerHTML = '<p class="painel-vazio">Nenhum projeto atribuído a este colaborador</p>';
+    return;
+  }
+  
+  let html = '';
+  let numeroProjeto = 1;
+  
+  projetosOrdenados.forEach((projeto, index) => {
+    const expandido = projetosExpandidosPrioridade.has(projeto.id);
+    const etapasDoProjeto = dadosDiagrama.etapas.filter(e => e.projetoId === projeto.id);
+    
+    // Ordena etapas por prioridade existente
+    const etapasOrdenadas = [...etapasDoProjeto].sort((a, b) => {
+      const prioA = prioridadesTemporarias.find(p => p.tipoItem === 'etapa' && p.itemId === a.id)?.ordemPrioridade || 999;
+      const prioB = prioridadesTemporarias.find(p => p.tipoItem === 'etapa' && p.itemId === b.id)?.ordemPrioridade || 999;
+      return prioA - prioB;
+    });
+    
+    // Busca prioridade atual do projeto
+    const prioProjeto = prioridadesTemporarias.find(p => p.tipoItem === 'projeto' && p.itemId === projeto.id)?.ordemPrioridade || numeroProjeto;
+    
+    html += `
+      <div class="item-prioridade"
+           draggable="true"
+           data-tipo="projeto"
+           data-id="${projeto.id}"
+           ondragstart="iniciarArrastePrioridade(event)"
+           ondragover="sobreArrastePrioridade(event)"
+           ondragleave="sairArrastePrioridade(event)"
+           ondrop="soltarPrioridade(event)">
+        <i class="fas fa-grip-vertical item-prioridade-handle"></i>
+        <div class="item-prioridade-numero">${prioProjeto}</div>
+        <div class="item-prioridade-info">
+          <div class="item-prioridade-nome">${escaparHtml(projeto.nome)}</div>
+          <div class="item-prioridade-meta">
+            <i class="fas fa-building"></i> ${escaparHtml(projeto.setor || 'Sem setor')}
+            ${etapasDoProjeto.length > 0 ? ` • <i class="fas fa-tasks"></i> ${etapasDoProjeto.length} etapas` : ''}
+          </div>
+        </div>
+        ${etapasDoProjeto.length > 0 ? `
+          <button class="item-prioridade-toggle" onclick="toggleProjetoExpandidoPrioridade('${projeto.id}')" type="button">
+            <i class="fas fa-chevron-${expandido ? 'up' : 'down'}"></i>
+          </button>
+        ` : ''}
+      </div>
+      
+      ${etapasDoProjeto.length > 0 ? `
+        <div class="etapas-prioridade-container" 
+             data-projeto-id="${projeto.id}"
+             style="display: ${expandido ? 'block' : 'none'};">
+          ${etapasOrdenadas.map((etapa, idxEtapa) => {
+            const prioEtapa = prioridadesTemporarias.find(p => p.tipoItem === 'etapa' && p.itemId === etapa.id)?.ordemPrioridade || (idxEtapa + 1);
+            return `
+              <div class="item-etapa-prioridade"
+                   draggable="true"
+                   data-tipo="etapa"
+                   data-id="${etapa.id}"
+                   data-projeto-id="${projeto.id}"
+                   ondragstart="iniciarArrastePrioridade(event)"
+                   ondragover="sobreArrastePrioridade(event)"
+                   ondragleave="sairArrastePrioridade(event)"
+                   ondrop="soltarPrioridade(event)">
+                <i class="fas fa-grip-vertical item-prioridade-handle"></i>
+                <div class="item-etapa-numero">${prioEtapa}</div>
+                <span style="flex: 1;">${escaparHtml(etapa.nome)}</span>
+                <span style="font-size: 10px; color: var(--cor-texto-terciario);">${etapa.status}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
+    `;
+    
+    numeroProjeto++;
+  });
+  
+  container.innerHTML = html;
+  
+  // ============================================================
+  // IMPORTANTE: Sincroniza o estado inicial após renderização
+  // ============================================================
+  sincronizarPrioridadesComDOM();
+}
+
+function toggleProjetoExpandidoPrioridade(projetoId) {
+  const containerEtapas = document.querySelector(`.etapas-prioridade-container[data-projeto-id="${projetoId}"]`);
+  const itemProjeto = document.querySelector(`.item-prioridade[data-id="${projetoId}"]`);
+  const btnToggle = itemProjeto ? itemProjeto.querySelector('.item-prioridade-toggle i') : null;
+  
+  if (projetosExpandidosPrioridade.has(projetoId)) {
+    // Colapsar
+    projetosExpandidosPrioridade.delete(projetoId);
+    if (containerEtapas) containerEtapas.style.display = 'none';
+    if (btnToggle) btnToggle.className = 'fas fa-chevron-down';
+  } else {
+    // Expandir
+    projetosExpandidosPrioridade.add(projetoId);
+    if (containerEtapas) containerEtapas.style.display = 'block';
+    if (btnToggle) btnToggle.className = 'fas fa-chevron-up';
+  }
+  
+  // ============================================================
+  // NÃO re-renderiza! Apenas alterna visibilidade.
+  // Os elementos permanecem no DOM para serem capturados ao salvar.
+  // ============================================================
+}
+
+    let itemArrastando = null;
+
+    function iniciarArrastePrioridade(e) {
+      itemArrastando = e.target.closest('[draggable]');
+      itemArrastando.classList.add('arrastando');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function sobreArrastePrioridade(e) {
+      e.preventDefault();
+      const alvo = e.target.closest('[draggable]');
+      if (alvo && alvo !== itemArrastando) {
+        const tipoArrastando = itemArrastando.dataset.tipo;
+        const tipoAlvo = alvo.dataset.tipo;
+        
+        if (tipoArrastando === tipoAlvo) {
+          if (tipoArrastando === 'etapa') {
+            if (itemArrastando.dataset.projetoId !== alvo.dataset.projetoId) return;
+          }
+          alvo.classList.add('sobre');
+        }
+      }
+    }
+
+    function sairArrastePrioridade(e) {
+      const alvo = e.target.closest('[draggable]');
+      if (alvo) alvo.classList.remove('sobre');
+    }
+
+function soltarPrioridade(e) {
+  e.preventDefault();
+  const alvo = e.target.closest('[draggable]');
+  if (alvo) alvo.classList.remove('sobre');
+  
+  if (!alvo || alvo === itemArrastando) {
+    if (itemArrastando) {
+      itemArrastando.classList.remove('arrastando');
+      itemArrastando = null;
+    }
+    return;
+  }
+  
+  const tipoArrastando = itemArrastando.dataset.tipo;
+  const tipoAlvo = alvo.dataset.tipo;
+  
+  if (tipoArrastando !== tipoAlvo) {
+    itemArrastando.classList.remove('arrastando');
+    itemArrastando = null;
+    return;
+  }
+  
+  // Validação adicional para etapas: devem pertencer ao mesmo projeto
+  if (tipoArrastando === 'etapa') {
+    if (itemArrastando.dataset.projetoId !== alvo.dataset.projetoId) {
+      itemArrastando.classList.remove('arrastando');
+      itemArrastando = null;
+      mostrarToast('Etapas só podem ser reordenadas dentro do mesmo projeto', 'aviso');
+      return;
+    }
+  }
+  
+  const container = alvo.parentNode;
+  const items = Array.from(container.querySelectorAll(`[data-tipo="${tipoArrastando}"]`));
+  const indexArrastando = items.indexOf(itemArrastando);
+  const indexAlvo = items.indexOf(alvo);
+  
+  if (indexArrastando < indexAlvo) {
+    container.insertBefore(itemArrastando, alvo.nextSibling);
+  } else {
+    container.insertBefore(itemArrastando, alvo);
+  }
+  
+  itemArrastando.classList.remove('arrastando');
+  itemArrastando = null;
+  
+  // Atualiza números visuais
+  atualizarNumerosPrioridade();
+  
+  // ============================================================
+  // CRÍTICO: Sincroniza o estado em memória com a nova ordem do DOM
+  // ============================================================
+  sincronizarPrioridadesComDOM();
+}
+
+
+
+
+    /* ========================================================================
+     * SISTEMA DE ENVIO DE EMAIL
+     * ======================================================================== */
+    function abrirModalEnvioEmail(responsavelId) {
+      const resp = dadosDiagrama.responsaveis.find(r => r.id === responsavelId);
+      if (!resp) return;
+      
+      if (!resp.email) {
+        mostrarToast('Este colaborador não possui email cadastrado', 'aviso');
+        return;
+      }
+      
+      document.getElementById('envioEmailResponsavelId').value = responsavelId;
+      
+      const iniciais = (resp.nome || 'N').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      document.getElementById('destinatarioInfo').innerHTML = `
+        <div class="destinatario-avatar">${iniciais}</div>
+        <div class="destinatario-dados">
+          <h4>${escaparHtml(resp.nome)}</h4>
+          <p><i class="fas fa-envelope"></i> ${escaparHtml(resp.email)}</p>
+        </div>
+      `;
+      
+      const projetosDoResp = dadosDiagrama.projetos.filter(p => {
+        if (p.responsaveisIds && Array.isArray(p.responsaveisIds)) {
+          return p.responsaveisIds.includes(responsavelId);
+        }
+        return p.responsavelId === responsavelId;
+      });
+      
+      const containerProjetos = document.getElementById('selecaoProjetosEnvio');
+      if (projetosDoResp.length === 0) {
+        containerProjetos.innerHTML = '<p class="painel-vazio">Nenhum projeto atribuído</p>';
+      } else {
+        containerProjetos.innerHTML = projetosDoResp.map(p => `
+          <label class="projeto-checkbox-item">
+            <input type="checkbox" value="${p.id}" checked>
+            <div class="projeto-checkbox-info">
+              <div class="projeto-checkbox-nome">${escaparHtml(p.nome)}</div>
+              <div class="projeto-checkbox-setor">${escaparHtml(p.setor || 'Sem setor')}</div>
+            </div>
+          </label>
+        `).join('');
+      }
+      
+      document.getElementById('mensagemEmailAdicional').value = '';
+      
+      abrirModal('modalEnvioEmail');
+    }
+
+    function enviarEmailPrioridades() {
+      const responsavelId = document.getElementById('envioEmailResponsavelId').value;
+      if (!responsavelId) return;
+      
+      const checkboxes = document.querySelectorAll('#selecaoProjetosEnvio input[type="checkbox"]:checked');
+      const projetosIds = Array.from(checkboxes).map(cb => cb.value);
+      
+      if (projetosIds.length === 0) {
+        mostrarToast('Selecione ao menos um projeto', 'aviso');
+        return;
+      }
+      
+      const mensagemAdicional = document.getElementById('mensagemEmailAdicional').value.trim();
+      
+      mostrarLoader();
+      google.script.run
+        .withSuccessHandler(result => {
+          esconderLoader();
+          if (result.sucesso) {
+            fecharModal('modalEnvioEmail');
+            mostrarToast(result.mensagem, 'sucesso');
+          } else {
+            mostrarToast(result.mensagem || 'Erro ao enviar email', 'erro');
+          }
+        })
+        .withFailureHandler(e => {
+          esconderLoader();
+          mostrarToast('Erro: ' + e.message, 'erro');
+        })
+        .enviarEmailPrioridadesColaborador(responsavelId, projetosIds, mensagemAdicional);
+    }
+
+/**
+ * Atualiza o array prioridadesTemporarias baseado na ordem atual do DOM
+ * Chamado após cada operação de drag and drop
+ */
+function sincronizarPrioridadesComDOM() {
+  const container = document.getElementById('listaPrioridadesProjetos');
+  if (!container) return;
+  
+  const novaListaPrioridades = [];
+  let contadorProjetos = 1;
+  const contadoresEtapasPorProjeto = {};
+  
+  // Itera sobre todos os filhos do container na ordem atual
+  const filhos = Array.from(container.children);
+  let projetoAtual = null;
+  
+  filhos.forEach(elemento => {
+    if (elemento.classList.contains('item-prioridade')) {
+      // É um PROJETO
+      const tipo = elemento.dataset.tipo;
+      const itemId = elemento.dataset.id;
+      
+      if (tipo === 'projeto' && itemId) {
+        projetoAtual = itemId;
+        
+        novaListaPrioridades.push({
+          tipoItem: 'projeto',
+          itemId: itemId,
+          ordemPrioridade: contadorProjetos,
+          projetoReferencia: null
+        });
+        
+        contadorProjetos++;
+        contadoresEtapasPorProjeto[itemId] = 0;
+      }
+    } else if (elemento.classList.contains('etapas-prioridade-container')) {
+      // É um CONTAINER DE ETAPAS (pode estar visível ou oculto no CSS)
+      const projetoId = elemento.dataset.projetoId;
+      
+      if (projetoId) {
+        const etapas = elemento.querySelectorAll('.item-etapa-prioridade');
+        
+        etapas.forEach(etapa => {
+          const tipo = etapa.dataset.tipo;
+          const itemId = etapa.dataset.id;
+          
+          if (tipo === 'etapa' && itemId) {
+            if (!contadoresEtapasPorProjeto[projetoId]) {
+              contadoresEtapasPorProjeto[projetoId] = 0;
+            }
+            contadoresEtapasPorProjeto[projetoId]++;
+            
+            novaListaPrioridades.push({
+              tipoItem: 'etapa',
+              itemId: itemId,
+              ordemPrioridade: contadoresEtapasPorProjeto[projetoId],
+              projetoReferencia: projetoId
+            });
+          }
+        });
+      }
+    }
+  });
+  
+  // Atualiza o array global
+  prioridadesTemporarias = novaListaPrioridades;
+  
+  console.log('prioridadesTemporarias sincronizado:', prioridadesTemporarias.length, 'itens');
+}
+
+/**
+ * Salva as prioridades editadas no modal
+ * USA prioridadesTemporarias como fonte de verdade (não o DOM)
+ */
+function salvarPrioridades() {
+  console.log('=== INICIANDO SALVAR PRIORIDADES ===');
+  
+  const responsavelId = document.getElementById('prioridadesResponsavelId').value;
+  
+  if (!responsavelId) {
+    mostrarToast('ID do responsável não encontrado', 'erro');
+    console.error('ResponsavelId não encontrado!');
+    return;
+  }
+  
+  console.log('ResponsavelId:', responsavelId);
+  
+  // ============================================================
+  // CORREÇÃO PRINCIPAL: Garantir sincronização final antes de salvar
+  // ============================================================
+  sincronizarPrioridadesComDOM();
+  
+  // ============================================================
+  // USA prioridadesTemporarias como fonte de verdade
+  // ============================================================
+  const listaPrioridades = prioridadesTemporarias.map(item => ({
+    tipoItem: item.tipoItem,
+    itemId: item.itemId,
+    projetoReferencia: item.projetoReferencia || null
+  }));
+  
+  console.log('Lista de prioridades a salvar:', JSON.stringify(listaPrioridades));
+  console.log('Total de prioridades:', listaPrioridades.length);
+  
+  // Contagem para log
+  const projetos = listaPrioridades.filter(p => p.tipoItem === 'projeto').length;
+  const etapas = listaPrioridades.filter(p => p.tipoItem === 'etapa').length;
+  console.log(`Projetos: ${projetos} | Etapas: ${etapas}`);
+  
+  // ============================================================
+  // VALIDAÇÃO: Não permitir salvar lista completamente vazia
+  // (mas permitir salvar só projetos sem etapas expandidas)
+  // ============================================================
+  if (listaPrioridades.length === 0) {
+    mostrarToast('Nenhuma prioridade para salvar. Adicione itens à lista primeiro.', 'aviso');
+    console.warn('Lista vazia! Não enviando ao backend.');
+    return;
+  }
+  
+  mostrarLoader();
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      esconderLoader();
+      console.log('Resposta do backend:', resultado);
+      
+      if (resultado.sucesso) {
+        mostrarToast(resultado.mensagem || 'Prioridades salvas com sucesso!', 'sucesso');
+        fecharModal('modalPrioridades');
+        
+        // Limpar estado temporário
+        prioridadesTemporarias = [];
+        projetosExpandidosPrioridade.clear();
+        
+        // Atualizar cache local e re-renderizar
+        atualizarPrioridadesAposSalvar(responsavelId);
+        
+      } else {
+        mostrarToast('Erro ao salvar: ' + (resultado.mensagem || 'Desconhecido'), 'erro');
+      }
+    })
+    .withFailureHandler(function(erro) {
+      esconderLoader();
+      console.error('Erro do backend:', erro);
+      mostrarToast('Erro ao salvar prioridades: ' + erro.message, 'erro');
+    })
+    .salvarPrioridadesResponsavel(responsavelId, listaPrioridades);
+}
+
+/**
+ * Atualiza as prioridades no Map local após salvar no backend
+ * @param {string} responsavelId - ID do responsável cujas prioridades foram salvas
+ */
+function atualizarPrioridadesAposSalvar(responsavelId) {
+  console.log('Recarregando prioridades para responsável:', responsavelId);
+  
+  google.script.run
+    .withSuccessHandler(function(resultado) {
+      if (resultado && resultado.sucesso && resultado.prioridades) {
+        // ============================================================
+        // ATUALIZAR O MAP LOCAL COM OS NOVOS DADOS
+        // ============================================================
+        if (!dadosDiagrama.prioridadesPorResponsavel) {
+          dadosDiagrama.prioridadesPorResponsavel = new Map();
+        }
+        
+        dadosDiagrama.prioridadesPorResponsavel.set(responsavelId, resultado.prioridades);
+        
+        console.log('Map atualizado com novas prioridades:', resultado.prioridades);
+        
+        // ============================================================
+        // AGORA SIM, RE-RENDERIZAR COM DADOS ATUALIZADOS
+        // ============================================================
+        renderizarPainelResponsaveisFixo();
+        
+        // Se houver uma função para atualizar badges nos cards, chame-a também
+        if (typeof atualizarBadgesPrioridadeCards === 'function') {
+          atualizarBadgesPrioridadeCards();
+        }
+        
+      } else {
+        console.warn('Falha ao recarregar prioridades:', resultado ? resultado.mensagem : 'Sem resultado');
+        // Mesmo assim, tenta re-renderizar
+        renderizarPainelResponsaveisFixo();
+      }
+    })
+    .withFailureHandler(function(erro) {
+      console.error('Erro ao recarregar prioridades:', erro);
+      // Mesmo com erro, tenta re-renderizar com dados antigos
+      renderizarPainelResponsaveisFixo();
+    })
+    .obterPrioridadesResponsavel(responsavelId);
+}
+
+// ========== FUNÇÕES DE GERENCIAMENTO DE PENDÊNCIAS ==========
+
+/**
+ * Renderiza a lista de pendências no modal de edição de etapa
+ */
+function renderizarListaPendenciasModal() {
+  const container = document.getElementById('listaPendenciasModal');
+  const contador = document.getElementById('contadorPendenciasModal');
+  
+  if (!container) {
+    console.error('Container listaPendenciasModal não encontrado');
+    return;
+  }
+  
+  const total = pendenciasModalTemp.length;
+  const pendentes = pendenciasModalTemp.filter(p => !p.concluido).length;
+  const concluidos = total - pendentes;
+  
+  // Atualiza contador no header
+  if (contador) {
+    if (total === 0) {
+      contador.textContent = 'Nenhuma';
+    } else {
+      contador.textContent = `${pendentes} pendente${pendentes !== 1 ? 's' : ''}${concluidos > 0 ? ` • ${concluidos} ✓` : ''}`;
+    }
+  }
+  
+  // Se não há pendências, mostra mensagem vazia
+  if (total === 0) {
+    container.innerHTML = `
+      <div class="pendencias-vazio">
+        <i class="fas fa-check-double"></i>
+        <span>Nenhuma pendência cadastrada</span>
+        <small style="color: var(--cor-texto-terciario); font-size: 0.75rem;">
+          Use o campo acima para adicionar
+        </small>
+      </div>
+    `;
+    return;
+  }
+  
+  // Ordenar: não concluídos primeiro, depois por urgência (alta > media > baixa)
+  const pendenciasOrdenadas = [...pendenciasModalTemp].sort((a, b) => {
+    if (a.concluido !== b.concluido) return a.concluido ? 1 : -1;
+    const ordemUrgencia = { alta: 0, media: 1, baixa: 2 };
+    return (ordemUrgencia[a.urgencia] || 1) - (ordemUrgencia[b.urgencia] || 1);
+  });
+  
+  // Gera HTML dos itens
+  let html = '';
+  
+  pendenciasOrdenadas.forEach(function(pend) {
+    const textoEscapado = escaparHtml(pend.texto || '');
+    const classConcluido = pend.concluido ? 'concluido' : '';
+    const checkado = pend.concluido ? 'checked' : '';
+    const urgencia = pend.urgencia || 'media';
+    
+    html += `
+      <div class="item-pendencia-modal ${classConcluido}" data-id="${pend.id}">
+        <div class="pendencia-checkbox-wrapper">
+          <input 
+            type="checkbox" 
+            class="pendencia-checkbox" 
+            id="pend-check-${pend.id}"
+            ${checkado}
+            onchange="alternarPendenciaModal('${pend.id}')"
+          >
+          <div class="pendencia-checkbox-visual">
+            <i class="fas fa-check"></i>
+          </div>
+        </div>
+        <span class="pendencia-urgencia-badge ${urgencia}" title="Urgência: ${urgencia}"></span>
+        <span class="pendencia-texto">${textoEscapado}</span>
+        <button 
+          type="button" 
+          class="btn-remover-pendencia" 
+          onclick="removerPendenciaModal('${pend.id}')" 
+          title="Remover pendência"
+        >
+          <i class="fas fa-trash-alt"></i>
+        </button>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+/**
+ * Adiciona uma nova pendência à lista temporária do modal
+ */
+function adicionarPendenciaLista() {
+  const inputTexto = document.getElementById('novaPendenciaTexto');
+  const selectUrgencia = document.getElementById('novaPendenciaUrgencia');
+  
+  if (!inputTexto || !selectUrgencia) {
+    console.error('Elementos do formulário de pendência não encontrados');
+    return;
+  }
+  
+  const texto = inputTexto.value.trim();
+  if (!texto) {
+    mostrarToast('Digite o texto da pendência', 'aviso');
+    inputTexto.focus();
+    // Efeito visual de erro
+    inputTexto.style.borderColor = 'var(--cor-perigo)';
+    setTimeout(() => {
+      inputTexto.style.borderColor = '';
+    }, 2000);
+    return;
+  }
+  
+  const novaPendencia = {
+    id: 'pnd_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+    texto: texto,
+    urgencia: selectUrgencia.value || 'media',
+    concluido: false,
+    dataCriacao: new Date().toISOString()
+  };
+  
+  // Adiciona no início da lista (mais recentes primeiro)
+  pendenciasModalTemp.unshift(novaPendencia);
+  renderizarListaPendenciasModal();
+  
+  // Limpar e focar no input para adicionar mais
+  inputTexto.value = '';
+  inputTexto.focus();
+  
+  // Feedback visual sutil
+  const container = document.getElementById('listaPendenciasModal');
+  const primeiroItem = container ? container.querySelector('.item-pendencia-modal') : null;
+  if (primeiroItem) {
+    primeiroItem.style.animation = 'none';
+    primeiroItem.offsetHeight; // Trigger reflow
+    primeiroItem.style.animation = 'fadeInSlide 0.3s ease';
+  }
+  
+  mostrarToast('Pendência adicionada', 'sucesso');
+}
+
+/**
+ * Alterna o status de conclusão de uma pendência no modal
+ */
+function alternarPendenciaModal(pendenciaId) {
+  const idx = pendenciasModalTemp.findIndex(p => p.id === pendenciaId);
+  if (idx !== -1) {
+    pendenciasModalTemp[idx].concluido = !pendenciasModalTemp[idx].concluido;
+    renderizarListaPendenciasModal();
+  }
+}
+
+/**
+ * Remove uma pendência da lista temporária
+ */
+function removerPendenciaModal(pendenciaId) {
+  pendenciasModalTemp = pendenciasModalTemp.filter(p => p.id !== pendenciaId);
+  renderizarListaPendenciasModal();
+}
+
+/**
+ * Alterna conclusão de pendência diretamente no card (sem abrir modal)
+ * @param {string} etapaId - ID da etapa
+ * @param {string} pendenciaId - ID da pendência
+ * @param {Event} event - Evento do clique
+ */
+function alternarPendenciaCard(etapaId, pendenciaId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  
+  // Encontra o checkbox e o item para feedback visual imediato
+  const card = document.getElementById('etapa-' + etapaId);
+  const itemElement = card ? card.querySelector('[data-pendencia-id="' + pendenciaId + '"]') : null;
+  const checkbox = itemElement ? itemElement.querySelector('.etapa-pendencia-checkbox') : null;
+  
+  // Desabilita temporariamente para evitar cliques duplos
+  if (checkbox) {
+    checkbox.disabled = true;
+  }
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.sucesso) {
+        // Atualizar dados locais
+        const etapa = dadosDiagrama.etapas.find(function(e) { return e.id === etapaId; });
+        if (etapa && Array.isArray(etapa.pendencias)) {
+          const pend = etapa.pendencias.find(function(p) { return p.id === pendenciaId; });
+          if (pend) {
+            pend.concluido = result.concluido;
+          }
+          
+          // ============================================================
+          // CORREÇÃO: Atualizar o badge de pendências em tempo real
+          // ============================================================
+          atualizarBadgePendenciasCard(card, etapa.pendencias);
+        }
+        
+        // Atualizar visual do item individual
+        if (itemElement) {
+          if (result.concluido) {
+            itemElement.classList.add('concluido');
+            if (checkbox) checkbox.checked = true;
+          } else {
+            itemElement.classList.remove('concluido');
+            if (checkbox) checkbox.checked = false;
+          }
+        }
+        
+        // Atualizar contador no resumo geral (header)
+        atualizarResumo();
+        
+        mostrarToast(result.mensagem || 'Pendência atualizada', 'sucesso');
+      } else {
+        // Reverter checkbox em caso de erro
+        if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+        }
+        mostrarToast(result.mensagem || 'Erro ao atualizar pendência', 'erro');
+      }
+      
+      // Reabilitar checkbox
+      if (checkbox) {
+        checkbox.disabled = false;
+      }
+    })
+    .withFailureHandler(function(erro) {
+      // Reverter checkbox em caso de erro
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.disabled = false;
+      }
+      mostrarToast('Erro: ' + erro.message, 'erro');
+    })
+    .alternarConclusaoPendencia(etapaId, pendenciaId);
+}
+
+/**
+ * Atualiza o badge de contagem de pendências no card da etapa
+ * @param {HTMLElement} card - Elemento do card da etapa
+ * @param {Array} pendencias - Array de pendências atualizado
+ */
+function atualizarBadgePendenciasCard(card, pendencias) {
+  if (!card || !Array.isArray(pendencias)) return;
+  
+  // Encontra o badge existente
+  const badge = card.querySelector('.badge-pendencias');
+  if (!badge) return;
+  
+  // Recalcula as contagens
+  const pendentes = pendencias.filter(function(p) { return !p.concluido; });
+  const totalPendentes = pendentes.length;
+  const urgentes = pendentes.filter(function(p) { return p.urgencia === 'alta'; }).length;
+  
+  // Atualiza as classes do badge
+  badge.className = 'badge-pendencias ' + (urgentes > 0 ? 'tem-urgentes' : 'sem-urgentes');
+  
+  // Atualiza o conteúdo do badge
+  let textoBadge = totalPendentes + ' pendente' + (totalPendentes !== 1 ? 's' : '');
+  if (urgentes > 0) {
+    textoBadge += ' • ' + urgentes + ' urgente' + (urgentes !== 1 ? 's' : '');
+  }
+  
+  badge.textContent = textoBadge;
+  
+  // Animação sutil para indicar mudança
+  badge.style.transform = 'scale(1.1)';
+  badge.style.transition = 'transform 0.2s ease';
+  setTimeout(function() {
+    badge.style.transform = 'scale(1)';
+  }, 200);
+}
+
+/**
+ * Alterna conclusão de pendência diretamente no card (sem abrir modal)
+ * @param {string} etapaId - ID da etapa
+ * @param {string} pendenciaId - ID da pendência
+ * @param {Event} event - Evento do clique
+ */
+function alternarPendenciaCard(etapaId, pendenciaId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  
+  // Encontra o card e elementos para feedback visual
+  const card = document.getElementById('etapa-' + etapaId);
+  const itemElement = card ? card.querySelector('[data-pendencia-id="' + pendenciaId + '"]') : null;
+  const checkbox = itemElement ? itemElement.querySelector('.etapa-pendencia-checkbox') : null;
+  
+  // Desabilita temporariamente para evitar cliques duplos
+  if (checkbox) {
+    checkbox.disabled = true;
+  }
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.sucesso) {
+        // Atualizar dados locais
+        const etapa = dadosDiagrama.etapas.find(function(e) { return e.id === etapaId; });
+        if (etapa && Array.isArray(etapa.pendencias)) {
+          const pend = etapa.pendencias.find(function(p) { return p.id === pendenciaId; });
+          if (pend) {
+            // Garante que seja boolean
+            pend.concluido = result.concluido === true;
+          }
+          
+          // Atualiza o badge de pendências em tempo real
+          atualizarBadgePendenciasCard(etapaId);
+        }
+        
+        // Atualizar visual do item individual
+        if (itemElement) {
+          if (result.concluido === true) {
+            itemElement.classList.add('concluido');
+            if (checkbox) checkbox.checked = true;
+          } else {
+            itemElement.classList.remove('concluido');
+            if (checkbox) checkbox.checked = false;
+          }
+        }
+        
+        // Atualizar contador no resumo geral (header)
+        atualizarResumo();
+        
+        mostrarToast(result.mensagem || 'Pendência atualizada', 'sucesso');
+      } else {
+        // Reverter checkbox em caso de erro
+        if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+        }
+        mostrarToast(result.mensagem || 'Erro ao atualizar pendência', 'erro');
+      }
+      
+      // Reabilitar checkbox
+      if (checkbox) {
+        checkbox.disabled = false;
+      }
+    })
+    .withFailureHandler(function(erro) {
+      // Reverter checkbox em caso de erro
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.disabled = false;
+      }
+      mostrarToast('Erro: ' + erro.message, 'erro');
+    })
+    .alternarConclusaoPendencia(etapaId, pendenciaId);
+}
+
+/**
+ * Verifica se uma pendência está concluída (trata string e boolean)
+ * @param {Object} pendencia - Objeto da pendência
+ * @returns {boolean}
+ */
+function isPendenciaConcluida(pendencia) {
+  if (!pendencia) return false;
+  // Trata tanto boolean quanto string
+  return pendencia.concluido === true || pendencia.concluido === 'true';
+}
+
+/**
+ * Atualiza o badge de contagem de pendências no card da etapa
+ * @param {string} etapaId - ID da etapa
+ */
+function atualizarBadgePendenciasCard(etapaId) {
+  const card = document.getElementById('etapa-' + etapaId);
+  if (!card) {
+    console.warn('Card não encontrado para etapa:', etapaId);
+    return;
+  }
+  
+  const etapa = dadosDiagrama.etapas.find(function(e) { return e.id === etapaId; });
+  if (!etapa || !Array.isArray(etapa.pendencias)) {
+    console.warn('Etapa ou pendências não encontradas:', etapaId);
+    return;
+  }
+  
+  // Encontra o badge existente
+  const badge = card.querySelector('.badge-pendencias');
+  if (!badge) {
+    console.warn('Badge não encontrado no card:', etapaId);
+    return;
+  }
+  
+  // Recalcula as contagens usando função helper que trata string/boolean
+  const pendentes = etapa.pendencias.filter(function(p) { 
+    return !isPendenciaConcluida(p); 
+  });
+  const totalPendentes = pendentes.length;
+  const urgentes = pendentes.filter(function(p) { 
+    return p.urgencia === 'alta'; 
+  }).length;
+  
+  // Atualiza as classes do badge
+  if (urgentes > 0) {
+    badge.className = 'badge-pendencias tem-urgentes';
+  } else {
+    badge.className = 'badge-pendencias sem-urgentes';
+  }
+  
+  // Monta o texto do badge
+  var textoBadge = totalPendentes + ' pendente';
+  if (totalPendentes !== 1) {
+    textoBadge += 's';
+  }
+  if (urgentes > 0) {
+    textoBadge += ' • ' + urgentes + ' urgente';
+    if (urgentes !== 1) {
+      textoBadge += 's';
+    }
+  }
+  
+  badge.textContent = textoBadge;
+  
+  // Animação sutil para indicar mudança
+  badge.style.transition = 'transform 0.2s ease';
+  badge.style.transform = 'scale(1.15)';
+  setTimeout(function() {
+    badge.style.transform = 'scale(1)';
+  }, 200);
+  
+  console.log('Badge atualizado:', textoBadge, '| Pendências:', etapa.pendencias);
+}
+
+// ==========================================
+// GERENCIAMENTO DE PERMISSÕES (ADMIN)
+// ==========================================
+
+let permissoesCarregadas = [];
+let permissaoEditandoId = null;
+
+/**
+ * Abre o modal de gerenciamento de permissões
+ */
+function abrirModalPermissoes() {
+  if (!permissoesUsuario.ehAdmin) {
+    mostrarToast('Acesso restrito a administradores', 'aviso');
+    return;
+  }
+  
+  mostrarLoader();
+  google.script.run
+    .withSuccessHandler(result => {
+      esconderLoader();
+      if (result.sucesso) {
+        permissoesCarregadas = result.permissoes || [];
+        renderizarListaPermissoes();
+        abrirModal('modalPermissoes');
+      } else {
+        mostrarToast(result.mensagem || 'Erro ao carregar permissões', 'erro');
+      }
+    })
+    .withFailureHandler(e => {
+      esconderLoader();
+      mostrarToast('Erro: ' + e.message, 'erro');
+    })
+    .listarTodasPermissoes();
+}
+
+/**
+ * Renderiza a lista de permissões no modal
+ */
+function renderizarListaPermissoes() {
+  const container = document.getElementById('listaPermissoes');
+  if (!container) return;
+  
+  if (permissoesCarregadas.length === 0) {
+    container.innerHTML = `
+      <div class="lista-permissoes-vazia">
+        <i class="fas fa-user-shield"></i>
+        <p>Nenhuma permissão configurada</p>
+        <small>Clique em "Nova Permissão" para adicionar</small>
+      </div>
+    `;
+    return;
+  }
+  
+  const icones = {
+    admin: 'fa-shield-halved',
+    gestor: 'fa-user-tie',
+    colaborador: 'fa-user'
+  };
+  
+  const labels = {
+    admin: 'Admin',
+    gestor: 'Gestor',
+    colaborador: 'Colaborador'
+  };
+  
+  let html = '';
+  
+  permissoesCarregadas.forEach(perm => {
+    const iniciais = (perm.email || 'U').split('@')[0].substring(0, 2).toUpperCase();
+    const nivel = perm.nivelAcesso || 'colaborador';
+    const setoresTexto = perm.setoresPermitidos.length > 0 
+      ? perm.setoresPermitidos.slice(0, 2).join(', ') + (perm.setoresPermitidos.length > 2 ? '...' : '')
+      : 'Todos';
+    
+    html += `
+      <div class="item-permissao ${perm.ativo ? '' : 'inativo'}" data-id="${perm.id}">
+        <div class="permissao-avatar ${nivel}">${iniciais}</div>
+        <div class="permissao-info">
+          <div class="permissao-email">${escaparHtml(perm.email)}</div>
+          <div class="permissao-detalhes">
+            <span class="permissao-badge nivel">
+              <i class="fas ${icones[nivel] || 'fa-user'}"></i>
+              ${labels[nivel] || nivel}
+            </span>
+            <span class="permissao-badge setores">
+              <i class="fas fa-building"></i>
+              ${escaparHtml(setoresTexto)}
+            </span>
+            ${!perm.ativo ? '<span class="permissao-badge" style="background: var(--status-bloqueada-bg); color: var(--cor-perigo);">Inativo</span>' : ''}
+          </div>
+        </div>
+        <div class="permissao-acoes">
+          <button class="btn-permissao-acao" onclick="editarPermissao('${perm.id}')" title="Editar">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="btn-permissao-acao perigo" onclick="confirmarRemoverPermissao('${perm.id}')" title="Remover">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+/**
+ * Abre o formulário para nova permissão
+ */
+function abrirFormNovaPermissao() {
+  permissaoEditandoId = null;
+  
+  document.getElementById('permissaoId').value = '';
+  document.getElementById('permissaoEmail').value = '';
+  document.getElementById('permissaoNivel').value = 'colaborador';
+  document.getElementById('permissaoPodeCriarProjeto').checked = false;
+  document.getElementById('permissaoPodeCriarEtapa').checked = true;
+  document.getElementById('permissaoAtivo').checked = true;
+  
+  document.getElementById('tituloModalPermissao').textContent = 'Nova Permissão';
+  document.getElementById('btnRemoverPermissao').classList.add('oculto');
+  
+  popularCheckboxesSetores([]);
+  popularCheckboxesProjetos([]);
+  atualizarCamposPermissao();
+  
+  abrirModal('modalEditarPermissao');
+}
+
+/**
+ * Edita uma permissão existente
+ */
+function editarPermissao(permissaoId) {
+  const perm = permissoesCarregadas.find(p => p.id === permissaoId);
+  if (!perm) return;
+  
+  permissaoEditandoId = permissaoId;
+  
+  document.getElementById('permissaoId').value = perm.id;
+  document.getElementById('permissaoEmail').value = perm.email;
+  document.getElementById('permissaoNivel').value = perm.nivelAcesso || 'colaborador';
+  document.getElementById('permissaoPodeCriarProjeto').checked = perm.podeCriarProjeto;
+  document.getElementById('permissaoPodeCriarEtapa').checked = perm.podeCriarEtapa;
+  document.getElementById('permissaoAtivo').checked = perm.ativo;
+  
+  document.getElementById('tituloModalPermissao').textContent = 'Editar Permissão';
+  document.getElementById('btnRemoverPermissao').classList.remove('oculto');
+  
+  popularCheckboxesSetores(perm.setoresPermitidos || []);
+  popularCheckboxesProjetos(perm.projetosPermitidos || []);
+  atualizarCamposPermissao();
+  
+  abrirModal('modalEditarPermissao');
+}
+
+/**
+ * Popula checkboxes de setores disponíveis
+ */
+function popularCheckboxesSetores(selecionados) {
+  const container = document.getElementById('setoresPermitidosContainer');
+  if (!container) return;
+  
+  const setores = [...new Set(dadosDiagrama.projetos.map(p => p.setor).filter(s => s))].sort();
+  
+  if (setores.length === 0) {
+    container.innerHTML = '<p class="texto-ajuda">Nenhum setor cadastrado</p>';
+    return;
+  }
+  
+  container.innerHTML = setores.map(setor => {
+    const marcado = selecionados.includes(setor) ? 'checked' : '';
+    return `
+      <label class="checkbox-responsavel">
+        <input type="checkbox" value="${escaparHtml(setor)}" ${marcado}>
+        <span class="checkbox-nome">${escaparHtml(setor)}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+/**
+ * Popula checkboxes de projetos disponíveis
+ */
+function popularCheckboxesProjetos(selecionados) {
+  const container = document.getElementById('projetosPermitidosContainer');
+  if (!container) return;
+  
+  if (dadosDiagrama.projetos.length === 0) {
+    container.innerHTML = '<p class="texto-ajuda">Nenhum projeto cadastrado</p>';
+    return;
+  }
+  
+  container.innerHTML = dadosDiagrama.projetos.map(p => {
+    const marcado = selecionados.includes(p.id) ? 'checked' : '';
+    return `
+      <label class="checkbox-responsavel">
+        <input type="checkbox" value="${p.id}" ${marcado}>
+        <span class="checkbox-nome">${escaparHtml(p.nome)}</span>
+        ${p.setor ? `<span class="checkbox-cargo">(${escaparHtml(p.setor)})</span>` : ''}
+      </label>
+    `;
+  }).join('');
+}
+
+/**
+ * Atualiza campos visíveis baseado no nível selecionado
+ */
+function atualizarCamposPermissao() {
+  const nivel = document.getElementById('permissaoNivel').value;
+  const campoSetores = document.getElementById('campoSetoresPermitidos');
+  const campoProjetos = document.getElementById('campoProjetosPermitidos');
+  
+  if (nivel === 'admin') {
+    // Admin não precisa selecionar setores/projetos
+    campoSetores.style.display = 'none';
+    campoProjetos.style.display = 'none';
+    document.getElementById('permissaoPodeCriarProjeto').checked = true;
+    document.getElementById('permissaoPodeCriarEtapa').checked = true;
+  } else if (nivel === 'gestor') {
+    campoSetores.style.display = '';
+    campoProjetos.style.display = 'none';
+  } else {
+    campoSetores.style.display = '';
+    campoProjetos.style.display = '';
+  }
+}
+
+/**
+ * Obtém setores selecionados
+ */
+function obterSetoresSelecionados() {
+  const container = document.getElementById('setoresPermitidosContainer');
+  if (!container) return [];
+  
+  const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
+/**
+ * Obtém projetos selecionados
+ */
+function obterProjetosSelecionados() {
+  const container = document.getElementById('projetosPermitidosContainer');
+  if (!container) return [];
+  
+  const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
+/**
+ * Salva a permissão (criar ou atualizar)
+ */
+function salvarPermissaoModal() {
+  const email = document.getElementById('permissaoEmail').value.trim();
+  
+  if (!email) {
+    mostrarToast('Email é obrigatório', 'aviso');
+    return;
+  }
+  
+  const dadosPermissao = {
+    id: permissaoEditandoId,
+    email: email,
+    nivelAcesso: document.getElementById('permissaoNivel').value,
+    setoresPermitidos: obterSetoresSelecionados(),
+    projetosPermitidos: obterProjetosSelecionados(),
+    podeCriarProjeto: document.getElementById('permissaoPodeCriarProjeto').checked,
+    podeCriarEtapa: document.getElementById('permissaoPodeCriarEtapa').checked,
+    ativo: document.getElementById('permissaoAtivo').checked
+  };
+  
+  mostrarLoader();
+  google.script.run
+    .withSuccessHandler(result => {
+      esconderLoader();
+      if (result.sucesso) {
+        fecharModal('modalEditarPermissao');
+        abrirModalPermissoes(); // Recarrega a lista
+        mostrarToast(result.mensagem, 'sucesso');
+      } else {
+        mostrarToast(result.mensagem || 'Erro ao salvar', 'erro');
+      }
+    })
+    .withFailureHandler(e => {
+      esconderLoader();
+      mostrarToast('Erro: ' + e.message, 'erro');
+    })
+    .salvarPermissaoUsuario(dadosPermissao);
+}
+
+/**
+ * Confirma remoção de permissão
+ */
+function confirmarRemoverPermissao(permissaoId) {
+  const perm = permissoesCarregadas.find(p => p.id === permissaoId);
+  if (!perm) return;
+  
+  if (confirm(`Tem certeza que deseja remover as permissões de ${perm.email}?`)) {
+    removerPermissao(permissaoId);
+  }
+}
+
+/**
+ * Remove a permissão atual (do modal de edição)
+ */
+function removerPermissaoAtual() {
+  if (!permissaoEditandoId) return;
+  confirmarRemoverPermissao(permissaoEditandoId);
+}
+
+/**
+ * Remove uma permissão
+ */
+function removerPermissao(permissaoId) {
+  mostrarLoader();
+  google.script.run
+    .withSuccessHandler(result => {
+      esconderLoader();
+      if (result.sucesso) {
+        fecharModal('modalEditarPermissao');
+        abrirModalPermissoes(); // Recarrega a lista
+        mostrarToast(result.mensagem, 'sucesso');
+      } else {
+        mostrarToast(result.mensagem || 'Erro ao remover', 'erro');
+      }
+    })
+    .withFailureHandler(e => {
+      esconderLoader();
+      mostrarToast('Erro: ' + e.message, 'erro');
+    })
+    .removerPermissaoUsuario(permissaoId);
+}
+
+/**
+ * Abre modal de edição buscando setor pelo nome
+ * @param {string} nomeSetor - Nome do setor
+ */
+function editarSetorPorNome(nomeSetor) {
+  if (!podeEditar()) return;
+  
+  // Busca o setor pelo nome
+  let setor = null;
+  
+  if (dadosDiagrama.setoresResponsaveis) {
+    setor = dadosDiagrama.setoresResponsaveis.find(s => s.nomeSetor === nomeSetor);
+  }
+  
+  if (setor && setor.id) {
+    editarSetor(setor.id);
+  } else {
+    // Setor existe nos projetos mas não na aba Setores
+    // Abre modal para criar o registro oficial
+    document.getElementById('setorId').value = '';
+    document.getElementById('setorNome').value = nomeSetor;
+    document.getElementById('setorDescricao').value = '';
+    popularSelectSetorResponsavel('');
+    
+    document.getElementById('modalSetorTituloTexto').textContent = 'Cadastrar Setor';
+    document.getElementById('btnExcluirSetor').classList.add('oculto');
+    
+    mostrarToast('Este setor ainda não está cadastrado. Preencha os dados.', 'info');
+    abrirModal('modalSetor');
+  }
+}
+
+</script>

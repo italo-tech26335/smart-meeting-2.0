@@ -1,0 +1,88 @@
+<script>
+  /* ========================================================================
+   * COMPARTILHADO-UTILIDADES🔧
+   * Definições centralizadas de permissões e datas — usadas por todas as páginas.
+   * Incluir ANTES dos scripts específicos de cada página.
+   * ======================================================================== */
+
+  // ── Estrutura padrão de permissões do usuário ──────────────────────────────
+  var permissoesUsuario = {
+    nivelAcesso: 'visitante',
+    podeCriarProjeto: false,
+    podeCriarEtapa: false,
+    ehAdmin: false,
+    setoresPermitidos: [],
+    projetosPermitidos: [],
+    filtrarPorResponsavel: false,
+    email: '',
+    ativo: false
+  };
+
+  // ── Níveis de acesso (espelha o backend) ──────────────────────────────────
+  var NIVEIS_ACESSO = {
+    ADMIN: 'admin',
+    GESTOR: 'gestor',
+    COLABORADOR: 'colaborador',
+    VISITANTE: 'visitante'
+  };
+
+  // ── Preenche permissoesUsuario com dados vindos do backend ─────────────────
+  function inicializarPermissoes(dadosPermissoes) {
+    if (!dadosPermissoes) return;
+    permissoesUsuario.nivelAcesso         = dadosPermissoes.nivelAcesso         || 'visitante';
+    permissoesUsuario.podeCriarProjeto    = dadosPermissoes.podeCriarProjeto    || false;
+    permissoesUsuario.podeCriarEtapa      = dadosPermissoes.podeCriarEtapa      || false;
+<<<<<<< HEAD
+    permissoesUsuario.ehAdmin             = dadosPermissoes.ehAdmin === true     || dadosPermissoes.nivelAcesso === 'admin';
+=======
+    permissoesUsuario.ehAdmin             = dadosPermissoes.ehAdmin             || false;
+>>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
+    permissoesUsuario.setoresPermitidos   = dadosPermissoes.setoresPermitidos   || [];
+    permissoesUsuario.projetosPermitidos  = dadosPermissoes.projetosPermitidos  || [];
+    permissoesUsuario.filtrarPorResponsavel = dadosPermissoes.filtrarPorResponsavel || false;
+    permissoesUsuario.email               = dadosPermissoes.email               || '';
+    permissoesUsuario.ativo               = dadosPermissoes.ativo               !== false;
+  }
+
+  // ── Utilitários de data ───────────────────────────────────────────────────
+
+  /**
+   * Formata uma data ou string de data no padrão dd/mm/aaaa.
+   * @param {Date|string|null} valor
+   * @returns {string}
+   */
+  function formatarDataBR(valor) {
+    if (!valor) return '';
+    var d = (valor instanceof Date) ? valor : new Date(valor);
+    if (isNaN(d.getTime())) return '';
+    var dia  = String(d.getDate()).padStart(2, '0');
+    var mes  = String(d.getMonth() + 1).padStart(2, '0');
+    var ano  = d.getFullYear();
+    return dia + '/' + mes + '/' + ano;
+  }
+
+  /**
+   * Retorna a data atual no formato ISO (aaaa-mm-dd), usando fuso de São Paulo.
+   * @returns {string}
+   */
+  function obterDataAtualISO() {
+    var agora = new Date();
+    var ano  = agora.getFullYear();
+    var mes  = String(agora.getMonth() + 1).padStart(2, '0');
+    var dia  = String(agora.getDate()).padStart(2, '0');
+    return ano + '-' + mes + '-' + dia;
+  }
+
+  /**
+   * Calcula diferença em dias entre duas datas (ou strings de data).
+   * @param {Date|string} inicio
+   * @param {Date|string} fim
+   * @returns {number} dias (negativo se fim < inicio)
+   */
+  function calcularDiasEntreDatas(inicio, fim) {
+    var dInicio = (inicio instanceof Date) ? inicio : new Date(inicio);
+    var dFim    = (fim    instanceof Date) ? fim    : new Date(fim);
+    if (isNaN(dInicio.getTime()) || isNaN(dFim.getTime())) return 0;
+    return Math.round((dFim - dInicio) / (1000 * 60 * 60 * 24));
+  }
+</script>

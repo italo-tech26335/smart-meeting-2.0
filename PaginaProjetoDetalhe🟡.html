@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Meeting - Gestão de Projetos</title>
+  <base target="_top">
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <?!= include('TemaPadrao-CSS'); ?>
+  <script>const MODO_ADMIN_URL = <?= modoAdmin ?>;</script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <?!= include('PaginaProjetoDetalhe-CSS🟡'); ?>
+  <?!= include('TemaAzul-CSS'); ?>
+  <?!= include('Complemento-CSS'); ?>
+</head>
+
+<body>
+
+  <!-- ==================== TELA DE CARREGAMENTO ==================== -->
+  <div class="loading-screen" id="loadingScreen">
+    <div class="loading-content">
+      <div class="loading-logo"><i class="fas fa-project-diagram"></i></div>
+      <h1 class="loading-title">Smart Meeting</h1>
+      <p class="loading-subtitle">Gestão Inteligente de Projetos</p>
+      <div class="loading-icons">
+        <div class="loading-icon-item"><i class="fas fa-layer-group"></i></div>
+        <div class="loading-icon-item"><i class="fas fa-folder-open"></i></div>
+        <div class="loading-icon-item"><i class="fas fa-tasks"></i></div>
+        <div class="loading-icon-item"><i class="fas fa-robot"></i></div>
+      </div>
+      <div class="loading-progress">
+        <div class="loading-progress-bar"></div>
+      </div>
+      <p class="loading-status" id="loadingStatus">Conectando ao servidor...</p>
+    </div>
+  </div>
+
+<!-- ==================== HEADER ==================== -->
+  <header class="header">
+
+    <!-- LINHA 1: Navegação + Título + Ações -->
+    <div class="header-linha1">
+
+      <div class="header-esquerda">
+        <nav class="nav-links-projeto">
+          <a href="#" class="nav-link-proj" data-pagina="reunioes">
+            <i class="fas fa-video"></i><span>Reuniões</span>
+          </a>
+          <a href="#" class="nav-link-proj" data-pagina="relatorios">
+            <i class="fas fa-clipboard-check"></i><span>Relatórios IA</span>
+          </a>
+          <a href="#" class="nav-link-proj ativo" data-pagina="projeto">
+            <i class="fas fa-project-diagram"></i><span>Projetos</span>
+          </a>
+        </nav>
+        <div class="header-divisor-vertical"></div>
+        <h1 id="headerTitulo">Gestão de Projetos</h1>
+      </div>
+
+      <div class="header-direita">
+        <button class="btn-header btn-tema-toggle" id="btnTemaToggle" onclick="abrirModalTema()" title="Mudar tema">
+          <i class="fas fa-palette"></i>
+        </button>
+        <button class="btn-header btn-lixeira" onclick="abrirModalLixeira()" title="Lixeira de Projetos">
+          <i class="fas fa-trash-alt"></i>
+        </button>
+<<<<<<< HEAD
+        <button class="btn-header" id="btnPermissoesCabecalho" onclick="abrirModalPermissoes()" style="display:none;" title="Gerenciar Permissões de Usuários">
+          <i class="fas fa-user-shield"></i>
+          <span>Permissões</span>
+        </button>
+=======
+>>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
+        <button class="btn-header btn-novo-projeto" onclick="abrirModalNovoProjeto()">
+          <i class="fas fa-folder-plus"></i>
+          <span>Novo Projeto</span>
+        </button>
+        <button class="btn-header btn-painel-toggle" id="btnToggleChat" onclick="toggleChat()">
+          <i class="fas fa-columns"></i>
+          <span>Painel</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- LINHA 2: Filtro de Responsáveis -->
+    <div class="header-linha2">
+      <div class="header-filtro">
+        <span class="header-filtro-label">
+          <i class="fas fa-filter"></i> Responsável:
+        </span>
+        <div class="header-filtro-chips" id="headerFiltroChips">
+          <!-- Gerado via JS -->
+        </div>
+      </div>
+    </div>
+
+  </header>
+
+  <!-- ==================== LAYOUT PRINCIPAL ==================== -->
+  <main class="main-layout" id="mainLayout">
+
+    <!-- PAINEL PRINCIPAL (EDITOR) -->
+    <section class="painel-editor">
+
+      <!-- ==================== DASHBOARD GERENCIAL ==================== -->
+      <div class="dashboard-secao" id="secaoDashboard">
+        <div class="dashboard-titulo">
+          <h2><i class="fas fa-chart-line"></i> Dashboard Gerencial</h2>
+        </div>
+
+        <!-- Grid do Dashboard -->
+        <div class="dashboard-grid">
+
+          <!-- Coluna Esquerda: Cards de Métricas -->
+          <div class="dashboard-col-metricas">
+            <div class="dashboard-metricas" id="dashboardMetricas">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+
+          <!-- Coluna Central: Gráfico Donut -->
+          <div class="dashboard-col-grafico">
+            <div class="grafico-container">
+              <div class="grafico-header">
+                <h4><i class="fas fa-chart-pie"></i> Distribuição por Status</h4>
+              </div>
+
+              <!-- Filtros de Status para o Gráfico -->
+              <div class="grafico-filtros" id="graficoFiltrosStatus">
+                <!-- Gerado via JS -->
+              </div>
+
+              <!-- Canvas do Gráfico -->
+              <div class="grafico-wrapper">
+                <canvas id="graficoStatusProjetos"></canvas>
+                <div class="grafico-centro-info" id="graficoCentroInfo">
+                  <span class="grafico-centro-valor" id="graficoCentroValor">0</span>
+                  <span class="grafico-centro-label" id="graficoCentroLabel">Projetos</span>
+                </div>
+              </div>
+
+              <!-- Legenda Customizada -->
+              <div class="grafico-legenda" id="graficoLegenda">
+                <!-- Gerado via JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Coluna Direita: Gráfico por Setor -->
+          <div class="dashboard-col-setor">
+            <div class="grafico-setor-container">
+              <div class="grafico-header">
+                <h4><i class="fas fa-building"></i> Projetos por Setor</h4>
+              </div>
+              <div class="grafico-wrapper-setor">
+                <canvas id="graficoSetorCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Linha Inferior: Barras de Prioridade + Projetos Críticos -->
+        <div class="dashboard-row-inferior">
+
+          <!-- Distribuição por Prioridade -->
+          <div class="dashboard-bloco">
+            <h4><i class="fas fa-signal"></i> Distribuição por Prioridade</h4>
+            <div class="dashboard-prioridade-bars" id="dashboardPrioridadeBars">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+
+          <!-- Projetos Críticos -->
+          <div class="dashboard-bloco">
+            <h4><i class="fas fa-exclamation-triangle"></i> Projetos Críticos</h4>
+            <div class="dashboard-criticos" id="dashboardCriticos">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+
+          <!-- Gráfico por Setor (será inserido via JS após dashboard-row-inferior) -->
+
+        </div>
+
+        <!-- Linha de Gráficos Secundários: Tipo de Projeto + Responsáveis -->
+        <div class="dashboard-row-graficos">
+
+          <!-- Gráfico: Tipo de Projeto -->
+          <div class="dashboard-col-grafico-sec">
+            <div class="grafico-setor-container">
+              <div class="grafico-header">
+                <h4><i class="fas fa-tag"></i> Projetos por Tipo</h4>
+              </div>
+              <div class="grafico-wrapper-setor">
+                <canvas id="graficoTipoCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gráfico: Responsáveis -->
+          <div class="dashboard-col-grafico-sec">
+            <div class="grafico-setor-container">
+              <div class="grafico-header">
+                <h4><i class="fas fa-users"></i> Projetos por Responsável</h4>
+              </div>
+              <div class="grafico-wrapper-setor">
+                <canvas id="graficoResponsaveisCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ==================== ÁREA DE PROJETOS E ESTRUTURA ==================== -->
+      <div class="area-projetos-estrutura">
+
+        <!-- COLUNA: LISTA DE PROJETOS (com busca) -->
+        <div class="coluna-projetos">
+          <div class="coluna-header">
+            <h3>
+              <i class="fas fa-folder-open"></i> Projetos
+              <span class="badge-contador" id="contadorProjetosPriorizacao">0</span>
+            </h3>
+            <div class="coluna-acoes">
+              <button class="btn-salvar-ordem" onclick="salvarOrdemProjetos()" id="btnSalvarOrdemProjetos"
+                style="display:none;" title="Salvar Ordem">
+                <i class="fas fa-save"></i> Salvar Ordem
+              </button>
+            </div>
+          </div>
+          <!-- Campo de busca será inserido via JS (configurarBuscaHeader) -->
+
+          <!-- Lista de Projetos (cards com drag&drop) -->
+          <div class="projetos-cards-lista" id="projetosCardsLista">
+            <div class="empty-state">
+              <i class="fas fa-folder-open"></i>
+              <p>Carregando projetos...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUNA: ESTRUTURA DO PROJETO (Diagrama/Árvore) -->
+        <div class="coluna-estrutura">
+          <div class="coluna-header">
+            <h3><i class="fas fa-sitemap"></i> Estrutura do Projeto</h3>
+            <div class="coluna-acoes">
+              <button class="btn-acao-pequeno btn-modo-foco" onclick="abrirModoFoco()" id="btnModoFoco"
+                title="Modo Foco — visualizar projeto em tela cheia">
+                <i class="fas fa-expand-alt"></i> Foco
+              </button>
+              <button class="btn-acao-pequeno" onclick="novaAtividade()" id="btnNovaAtividadeEstrutura">
+                <i class="fas fa-plus"></i> Nova Atividade
+              </button>
+              <button class="btn-salvar-ordem" onclick="salvarOrdemAtividades()" id="btnSalvarOrdemAtividades"
+                style="display:none;" title="Salvar Ordem das Atividades">
+                <i class="fas fa-save"></i>
+              </button>
+            </div>
+          </div>
+          <div class="diagrama-body" id="diagramaArvore">
+            <div class="empty-state">
+              <i class="fas fa-hand-pointer"></i>
+              <p>Selecione um projeto para visualizar sua estrutura</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ==================== SIDEBAR / PAINEL LATERAL ==================== -->
+    <aside class="painel-chat">
+      <!-- Navegação de Abas -->
+      <div class="sidebar-abas">
+        <button class="sidebar-aba ativa" data-aba="assistente" onclick="trocarAbaSidebar('assistente')">
+          <i class="fas fa-robot"></i>
+          <span>IA</span>
+        </button>
+        <button class="sidebar-aba" data-aba="emails" onclick="trocarAbaSidebar('emails')">
+          <i class="fas fa-envelope"></i>
+          <span>Emails</span>
+        </button>
+      </div>
+
+      <!-- Conteúdo das Abas -->
+      <div class="sidebar-conteudo">
+
+        <!-- ABA: ASSISTENTE IA -->
+        <div class="sidebar-painel ativo" id="painelAssistente">
+          <div class="painel-chat-interno">
+            <div class="chat-header">
+              <span><i class="fas fa-robot"></i> Assistente Gemini</span>
+              <div class="chat-status">Online</div>
+            </div>
+
+            <div class="chat-mensagens" id="chatArea">
+              <div class="balao balao-ai">
+                Olá! Sou seu assistente de projetos. Posso ajudar a estruturar atividades, definir escopo ou
+                transcrever suas ideias por áudio. Como posso ajudar?
+              </div>
+            </div>
+
+            <div class="chat-input-area">
+              <button class="btn-mic" id="btnMic" onmousedown="iniciarGravacao()" onmouseup="pararGravacao()"
+                ontouchstart="iniciarGravacao()" ontouchend="pararGravacao()">
+                <i class="fas fa-microphone"></i>
+              </button>
+              <textarea id="inputChat" rows="1" placeholder="Digite sua mensagem..."
+                onkeydown="checarEnter(event)"></textarea>
+              <button class="btn-send" onclick="enviarTexto()">
+                <i class="fas fa-paper-plane"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA: ENVIO DE EMAILS -->
+        <div class="sidebar-painel" id="painelEmails">
+          <div class="painel-email">
+            <div class="email-header">
+              <h3><i class="fas fa-paper-plane"></i> Enviar Email</h3>
+              <p>Notifique os responsáveis sobre seus projetos e atividades</p>
+            </div>
+
+            <div class="email-corpo" id="emailCorpo">
+              <div class="email-vazio">
+                <i class="fas fa-users"></i>
+                <p>Selecione um projeto para ver os responsáveis</p>
+              </div>
+            </div>
+
+            <div class="email-footer">
+              <button class="btn-acao" onclick="enviarEmailsSelecionados()" id="btnEnviarEmails" disabled>
+                <i class="fas fa-paper-plane"></i> Enviar Emails
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ==================== MODAL DE EDIÇÃO (PROJETO / ATIVIDADE) ==================== -->
+  <div id="modalEdicao" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-edit" id="modalIcon"></i> <span id="modalTitulo">Editar Item</span></h3>
+        <button class="btn-fechar-modal" onclick="fecharModalEdicao()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="itemId">
+        <input type="hidden" id="itemTipoRegistro" value="projeto">
+
+        <!-- Nome (comum) -->
+        <div class="campo-grupo">
+          <label>Nome *</label>
+          <input type="text" id="itemNome" placeholder="Nome do item">
+        </div>
+
+        <!-- ===== Campos específicos de PROJETO ===== -->
+        <div class="campos-projeto">
+
+            <!-- Descrição — apenas para projetos -->
+          <div class="campo-grupo">
+            <label>Descrição</label>
+            <textarea id="itemDescricao" rows="2" placeholder="Descreva o objetivo do projeto..."></textarea>
+          </div>
+
+          <div class="campo-row">
+
+            <div class="campo-grupo">
+              <label>Tipo do Projeto</label>
+              <select id="itemTipoProjeto">
+                <option value="">Selecione...</option>
+                <option value="Melhoria">Melhoria</option>
+                <option value="Correção">Correção</option>
+                <option value="Nova Implementação">Nova Implementação</option>
+              </select>
+            </div>
+            <div class="campo-grupo">
+              <label>Para Quem</label>
+              <select id="itemParaQuem">
+                <option value="">Selecione...</option>
+                <!-- Opções geradas via JS -->
+              </select>
+              <small class="campo-hint" id="hintUrgencia"></small>
+            </div>
+          </div>
+
+          <!-- Gravidade e Urgência -->
+          <div class="campo-row">
+            <div class="campo-grupo">
+              <label>Gravidade</label>
+              <select id="itemGravidade">
+                <option value="">Selecione...</option>
+                <!-- Opções geradas via JS -->
+              </select>
+            </div>
+            <div class="campo-grupo">
+              <label>Urgência</label>
+              <select id="itemUrgenciaSelect">
+                <option value="">Selecione...</option>
+                <!-- Opções geradas via JS -->
+              </select>
+            </div>
+          </div>
+
+          <div class="campo-row">
+            <div class="campo-grupo">
+              <label>Esforço</label>
+              <select id="itemEsforco">
+                <option value="">Selecione...</option>
+              </select>
+              <small class="campo-hint">Tempo de desenvolvimento necessário</small>
+            </div>
+          </div>
+
+          <div class="campo-row">
+            <div class="campo-grupo">
+              <label>Setor</label>
+              <select id="itemSetor">
+                <option value="">Selecione...</option>
+              </select>
+            </div>
+            <div class="campo-grupo">
+              <label>Pilar</label>
+              <input type="text" id="itemPilar" placeholder="Pilar estratégico">
+            </div>
+          </div>
+
+          <div class="campo-row">
+            <div class="campo-grupo">
+              <label><i class="fas fa-calendar-alt" style="margin-right:4px;color:var(--cor-primaria);"></i> Data de Início</label>
+              <input type="date" id="itemDataInicio">
+            </div>
+            <div class="campo-grupo">
+              <label><i class="fas fa-calendar-check" style="margin-right:4px;color:var(--cor-primaria);"></i> Data de Fim</label>
+              <input type="date" id="itemDataFim">
+            </div>
+          </div>
+
+          <!-- Link (Documentos do Projeto) -->
+          <div class="campo-grupo">
+            <label><i class="fas fa-folder-open" style="margin-right:4px;color:var(--cor-primaria);"></i> Documentos do Projeto</label>
+            <input type="url" id="itemLink" placeholder="https://drive.google.com/...">
+            <small class="campo-hint">Link para o diretório do projeto no Drive</small>
+          </div>
+        </div>
+
+        <!-- ===== Campos específicos de ATIVIDADE (antigo "Etapa") ===== -->
+        <div class="campos-etapa" style="display:none;">
+          <div class="campo-grupo">
+            <label><i class="fas fa-list-ul" style="margin-right:4px;color:var(--cor-primaria);"></i> O Que Fazer</label>
+            <textarea id="itemOQueFazer" rows="4" placeholder="Descreva as ações necessárias para concluir esta atividade..."></textarea>
+            <small class="campo-hint">Detalhe os passos, critérios de aceite ou informações importantes</small>
+          </div>
+        </div>
+
+        <!-- ===== Campos comuns ===== -->
+        <div class="campo-row">
+          <div class="campo-grupo">
+            <label>Status</label>
+            <select id="itemStatus">
+              <option value="A Fazer">A Fazer</option>
+              <option value="Em Andamento">Em Andamento</option>
+              <option value="Aguardando Setor">Aguardando Setor</option>
+              <option value="Concluída">Concluída</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Responsáveis -->
+        <div class="campo-grupo">
+          <label>Responsáveis</label>
+          <div class="multi-select-responsaveis" id="itemResponsaveisContainer"></div>
+          <small class="campo-hint">Selecione um ou mais responsáveis</small>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secundario" id="btnExcluirItem" style="display:none;" onclick="confirmarExcluirItem()">
+          <i class="fas fa-trash"></i> Excluir
+        </button>
+        <button class="btn-secundario" onclick="fecharModalEdicao()">Cancelar</button>
+        <button class="btn-acao" onclick="salvarItem()">
+          <i class="fas fa-save"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+<!-- ==================== MODAL NOVO PROJETO ==================== -->
+<div id="modalNovoProjeto" class="modal-overlay">
+  <div class="modal-content" style="max-width:680px;">
+    <div class="modal-header">
+      <h3><i class="fas fa-folder-plus"></i> Novo Projeto</h3>
+      <button class="btn-fechar-modal" onclick="fecharModalNovoProjeto()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Informações Básicas -->
+      <div class="secao-modal">
+        <h4 class="secao-modal-titulo"><i class="fas fa-info-circle"></i> Informações Básicas</h4>
+
+        <div class="campo-grupo">
+          <label>Nome do Projeto *</label>
+          <input type="text" id="novoProjetoNome" placeholder="Ex: Sistema de Marketing Digital">
+        </div>
+
+        <div class="campo-grupo">
+          <label>Descrição</label>
+          <textarea id="novoProjetoDescricao" rows="2"
+            placeholder="Descreva o objetivo do projeto..."></textarea>
+        </div>
+
+        <div class="campo-row">
+          <div class="campo-grupo">
+            <label>Setor</label>
+            <select id="novoProjetoSetor">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div class="campo-grupo">
+            <label>Pilar</label>
+            <input type="text" id="novoProjetoPilar" placeholder="Pilar estratégico">
+          </div>
+        </div>
+
+        <div class="campo-row">
+          <div class="campo-grupo">
+            <label><i class="fas fa-calendar-alt" style="margin-right:4px;color:var(--cor-primaria);"></i> Data de Início</label>
+            <input type="date" id="novoProjetoDataInicio">
+          </div>
+          <div class="campo-grupo">
+            <label><i class="fas fa-calendar-check" style="margin-right:4px;color:var(--cor-primaria);"></i> Data de Fim</label>
+            <input type="date" id="novoProjetoDataFim">
+          </div>
+        </div>
+
+        <div class="campo-grupo">
+          <label><i class="fas fa-folder-open" style="margin-right:4px;color:var(--cor-primaria);"></i> Documentos do Projeto</label>
+          <input type="url" id="novoProjetoLink" placeholder="https://drive.google.com/...">
+          <small class="campo-hint">Link para o diretório do projeto no Drive</small>
+        </div>
+      </div>
+
+      <!-- Cálculo de Prioridade GUT -->
+      <div class="secao-modal">
+        <h4 class="secao-modal-titulo"><i class="fas fa-calculator"></i> Cálculo de Prioridade</h4>
+
+        <div class="indicador-grupo-compact" id="novoProjetoGrupoTipo">
+          <div class="indicador-header-compact">
+            <div class="indicador-icone-compact tipo-projeto"><i class="fas fa-project-diagram"></i></div>
+            <div class="indicador-info-compact">
+              <strong>Tipo de Projeto</strong>
+              <span>Natureza do projeto</span>
+            </div>
+          </div>
+          <div class="indicador-opcoes-horizontal" id="novoProjetoOpcoesTipo"></div>
+        </div>
+
+        <div class="indicador-grupo-compact" id="novoProjetoGrupoParaQuem">
+          <div class="indicador-header-compact">
+            <div class="indicador-icone-compact quem-solicita"><i class="fas fa-building"></i></div>
+            <div class="indicador-info-compact">
+              <strong>Para Quem</strong>
+              <span>Quem solicitou</span>
+            </div>
+          </div>
+          <div class="indicador-opcoes-horizontal" id="novoProjetoOpcoesParaQuem"></div>
+        </div>
+
+        <div class="indicador-grupo-compact" id="novoProjetoGrupoGravidade">
+          <div class="indicador-header-compact">
+            <div class="indicador-icone-compact gravidade"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="indicador-info-compact">
+              <strong>Gravidade</strong>
+              <span>O que acontece se não fizer?</span>
+            </div>
+          </div>
+          <div class="indicador-opcoes-horizontal" id="novoProjetoOpcoesGravidade"></div>
+        </div>
+
+        <div class="indicador-grupo-compact" id="novoProjetoGrupoUrgencia">
+          <div class="indicador-header-compact">
+            <div class="indicador-icone-compact urgencia"><i class="fas fa-clock"></i></div>
+            <div class="indicador-info-compact">
+              <strong>Urgência</strong>
+              <span>Para quando?</span>
+            </div>
+          </div>
+          <div class="indicador-opcoes-horizontal" id="novoProjetoOpcoesUrgencia"></div>
+        </div>
+
+        <div class="indicador-grupo-compact" id="novoProjetoGrupoEsforco">
+          <div class="indicador-header-compact">
+            <div class="indicador-icone-compact" style="background:linear-gradient(135deg,#059669,#047857);">
+              <i class="fas fa-hourglass-half"></i>
+            </div>
+            <div class="indicador-info-compact">
+              <strong>Esforço</strong>
+              <span>Tempo de desenvolvimento necessário</span>
+            </div>
+          </div>
+          <div class="indicador-opcoes-horizontal" id="novoProjetoOpcoesEsforco"></div>
+        </div>
+
+        <div class="calculo-formula-compact">
+          <span id="novoProjetoFormulaT">T</span> ×
+          <span id="novoProjetoFormulaQ">Q</span> ×
+          <span id="novoProjetoFormulaG">G</span> ×
+          <span id="novoProjetoFormulaU">U</span> ×
+          <span id="novoProjetoFormulaE">E</span> =
+          <strong id="novoProjetoFormulaResultado">0</strong>
+        </div>
+        <div class="calculo-resultado-valor-compact">
+          <span id="novoProjetoValorCalculado">0</span>
+          <span class="calculo-resultado-categoria-compact nenhuma" id="novoProjetoCategoriaCalculada">Preencha os indicadores</span>
+        </div>
+      </div>
+
+      <!-- Responsáveis — AGORA DENTRO DO modal-body -->
+      <div class="secao-modal" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">
+        <h4 class="secao-modal-titulo"><i class="fas fa-users"></i> Responsáveis</h4>
+        <div class="multi-select-responsaveis" id="novoProjetoResponsaveisContainer"></div>
+        <small class="campo-hint">Selecione um ou mais responsáveis</small>
+      </div>
+
+    </div><!-- /modal-body -->
+
+    <!-- Footer DENTRO do modal-content -->
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="fecharModalNovoProjeto()">Cancelar</button>
+      <button class="btn-acao" onclick="salvarNovoProjeto()">
+        <i class="fas fa-save"></i> Criar Projeto
+      </button>
+    </div>
+
+  </div><!-- /modal-content -->
+</div><!-- /modalNovoProjeto -->
+
+  <!-- ==================== MODAL CÁLCULO DE PRIORIDADE GUT ==================== -->
+  <div id="modalCalculoPrioridade" class="modal-overlay modal-calculo-prioridade">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-calculator"></i> <span id="tituloModalCalculo">Calcular Prioridade</span></h3>
+        <button class="btn-fechar-modal" onclick="fecharModalCalculoPrioridade()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="calculoProjetoId">
+
+        <div class="calculo-prioridade-container">
+
+          <!-- GRAVIDADE -->
+          <div class="indicador-grupo" id="grupoGravidade">
+            <div class="indicador-header">
+              <div class="indicador-icone gravidade"><i class="fas fa-exclamation-triangle"></i></div>
+              <div class="indicador-info">
+                <h4>Gravidade</h4>
+                <p>O que acontece se eu não fizer?</p>
+              </div>
+            </div>
+            <div class="indicador-opcoes" id="opcoesGravidade">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+
+          <!-- URGÊNCIA -->
+          <div class="indicador-grupo" id="grupoUrgencia">
+            <div class="indicador-header">
+              <div class="indicador-icone urgencia"><i class="fas fa-clock"></i></div>
+              <div class="indicador-info">
+                <h4>Urgência</h4>
+                <p>Para quando?</p>
+              </div>
+            </div>
+            <div class="indicador-opcoes" id="opcoesUrgencia">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+
+          <!-- QUEM SOLICITA -->
+          <div class="indicador-grupo" id="grupoQuemSolicita">
+            <div class="indicador-header">
+              <div class="indicador-icone quem-solicita"><i class="fas fa-building"></i></div>
+              <div class="indicador-info">
+                <h4>Quem Solicita</h4>
+                <p>Área solicitante</p>
+              </div>
+            </div>
+            <div class="indicador-opcoes" id="opcoesQuemSolicita">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+
+          <!-- TIPO DE PROJETO -->
+          <div class="indicador-grupo" id="grupoTipoProjeto">
+            <div class="indicador-header">
+              <div class="indicador-icone tipo-projeto"><i class="fas fa-project-diagram"></i></div>
+              <div class="indicador-info">
+                <h4>Tipo de Projeto</h4>
+                <p>Natureza do projeto</p>
+              </div>
+            </div>
+            <div class="indicador-opcoes" id="opcoesTipoProjeto">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+
+          <!-- ESFORÇO -->
+          <div class="indicador-grupo" id="grupoEsforco">
+            <div class="indicador-header">
+              <div class="indicador-icone" style="background:linear-gradient(135deg,#059669,#047857);">
+                <i class="fas fa-hourglass-half"></i>
+              </div>
+              <div class="indicador-info">
+                <h4>Esforço</h4>
+                <p>Tempo de desenvolvimento necessário</p>
+              </div>
+            </div>
+            <div class="indicador-opcoes" id="opcoesEsforco">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+
+          <!-- RESULTADO -->
+          <div class="calculo-resultado">
+            <div class="calculo-resultado-titulo">Valor Calculado</div>
+            <div class="calculo-resultado-valor" id="valorCalculado">0</div>
+            <div class="calculo-resultado-categoria nenhuma" id="categoriaCalculada">Selecione os indicadores</div>
+            <div class="calculo-formula">
+              <span id="formulaG">G</span> × <span id="formulaU">U</span> × <span id="formulaQ">Q</span> ×
+              <span id="formulaT">T</span> × <span id="formulaE">E</span> = <strong id="formulaResultado">0</strong>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secundario" onclick="fecharModalCalculoPrioridade()">Cancelar</button>
+        <button class="btn-acao" onclick="salvarCalculoPrioridade()" id="btnSalvarCalculo" disabled>
+          <i class="fas fa-save"></i> Salvar Prioridade
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL MENSAGEM COMPLETA ==================== -->
+  <div id="modalMensagemCompleta" class="modal-overlay">
+    <div class="modal-content" style="max-width:700px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-comment-dots"></i> Mensagem Completa</h3>
+        <button class="btn-fechar-modal" onclick="fecharModalMensagemCompleta()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body" id="conteudoMensagemCompleta"></div>
+      <div class="modal-footer">
+        <button class="btn-acao" onclick="fecharModalMensagemCompleta()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL LIXEIRA ==================== -->
+  <div id="modalLixeira" class="modal-overlay">
+    <div class="modal-content" style="max-width:680px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-trash-alt"></i> Lixeira de Projetos</h3>
+        <button class="btn-fechar-modal" onclick="fecharModalLixeira()">
+              <i class="fas fa-times"></i>
+            </button>
+      </div>
+      <div class="modal-body" id="lixeiraCorpo">
+        <div class="empty-state">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Carregando...</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secundario" onclick="fecharModalLixeira()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL CONFIRMAR EXCLUSÃO ==================== -->
+  <div id="modalConfirmarExclusao" class="modal-overlay">
+    <div class="modal-content" style="max-width:420px;">
+      <div class="modal-header" style="border-bottom-color:rgba(166,61,64,0.3);">
+        <h3 style="color:var(--cor-perigo);">
+          <i class="fas fa-trash-alt"></i> Mover para Lixeira
+        </h3>
+        <button class="btn-fechar-modal" onclick="fecharModalConfirmarExclusao()">
+        <i class="fas fa-times"></i>
+      </button>
+      </div>
+      <div class="modal-body" style="text-align:center;padding:28px 24px;">
+        <div id="exclusaoIcone" style="
+        width:64px;height:64px;margin:0 auto 16px;
+        background:rgba(166,61,64,0.1);border:2px solid rgba(166,61,64,0.25);
+        border-radius:50%;display:flex;align-items:center;justify-content:center;">
+          <i class="fas fa-trash-alt" style="font-size:1.6rem;color:var(--cor-perigo);"></i>
+        </div>
+        <div style="font-size:0.82rem;color:var(--cor-texto-secundario);margin-bottom:6px;">Você está prestes a excluir
+          o projeto</div>
+        <div id="exclusaoNomeProjeto" style="
+        font-size:1rem;font-weight:700;color:var(--cor-texto);
+        margin:8px 0 16px;padding:10px 14px;
+        background:var(--cor-fundo);border:1px solid var(--cor-borda-clara);
+        border-radius:var(--raio);"></div>
+        <p style="font-size:0.8rem;color:var(--cor-texto-secundario);margin:0;">
+          O projeto será movido para a <strong>Lixeira</strong>.<br>
+        Você poderá restaurá-lo quando quiser.
+        </p>
+      </div>
+      <div class="modal-footer" style="gap:10px;">
+        <button class="btn-secundario" onclick="fecharModalConfirmarExclusao()">
+        <i class="fas fa-times"></i> Cancelar
+      </button>
+        <button id="btnConfirmarExclusao" style="
+        background:var(--cor-perigo);color:#faf6ee;border:none;
+        padding:9px 18px;border-radius:var(--raio);cursor:pointer;
+        font-size:0.82rem;font-weight:600;display:flex;align-items:center;
+        gap:7px;transition:var(--transicao);"
+        onmouseover="this.style.filter='brightness(1.15)'"
+        onmouseout="this.style.filter=''"
+        onclick="executarExclusaoProjeto()">
+        <i class="fas fa-trash-alt"></i> Mover para Lixeira
+      </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL MODO FOCO ==================== -->
+  <div id="modalModoFoco" class="modal-modo-foco-overlay">
+    <div class="modal-modo-foco-conteudo">
+      <div class="modal-modo-foco-header">
+        <div class="modal-modo-foco-titulo">
+          <i class="fas fa-expand-alt"></i>
+          <span id="modoFocoTitulo">Estrutura do Projeto</span>
+        </div>
+        <div class="modal-modo-foco-acoes">
+          <button class="btn-acao-pequeno" onclick="novaAtividadeModoFoco()">
+            <i class="fas fa-plus"></i> Nova Atividade
+          </button>
+          <button class="btn-fechar-foco" onclick="fecharModoFoco()" title="Fechar Modo Foco">
+            <i class="fas fa-compress-alt"></i> Sair do Foco
+          </button>
+        </div>
+      </div>
+
+      <!-- CORPO SPLIT: esquerda = estrutura, direita = documentos -->
+      <div class="modal-modo-foco-split">
+
+        <!-- Esquerda: diagrama/atividades (conteúdo original) -->
+        <div class="modo-foco-esquerda" id="modoFocoBody">
+          <!-- Conteúdo injetado via JS (renderizarDiagrama / sincronizarModoFoco) -->
+        </div>
+
+        <!-- Direita: painel de documentos (atas, transcrições) -->
+        <div class="modo-foco-documentos" id="modoFocoDocumentos">
+          <div class="modo-foco-doc-header">
+            <i class="fas fa-book-open" style="color:var(--cor-destaque);"></i>
+            <span>Documentos do Projeto</span>
+            <span class="badge-contador" id="modoFocoDocBadge">0</span>
+          </div>
+          <div class="modo-foco-doc-tabs">
+            <button class="atas-tab ativo" data-tab="atas" onclick="trocarTabDocFoco(this, 'atas')">
+              <i class="fas fa-file-lines"></i> Atas
+            </button>
+            <button class="atas-tab" data-tab="transcricoes" onclick="trocarTabDocFoco(this, 'transcricoes')">
+              <i class="fas fa-microphone"></i> Transcrições
+            </button>
+          </div>
+          <div class="modo-foco-doc-lista" id="modoFocoDocLista">
+            <div class="empty-state" style="font-size:0.8rem;">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Carregando documentos...</p>
+            </div>
+          </div>
+          <div class="modo-foco-doc-viewer" id="modoFocoDocViewer" style="display:none;">
+            <div class="modo-foco-doc-viewer-header">
+              <button class="btn-voltar-lista" onclick="voltarParaListaDocFoco()">
+                <i class="fas fa-arrow-left"></i> Voltar
+              </button>
+              <span id="modoFocoDocViewerTitulo" style="font-size:0.82rem;font-weight:600;"></span>
+            </div>
+            <div class="modo-foco-doc-viewer-conteudo" id="modoFocoDocViewerConteudo"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <!-- ==================== MODAL TEMA: CLÁSSICO → AZUL ==================== -->
+<div id="modalTemaParaAzul" class="modal-overlay">
+  <div class="modal-content" style="max-width:460px;">
+    <div class="modal-header">
+      <h3><i class="fas fa-exclamation-triangle" style="color:var(--cor-aviso);"></i> Aviso Importante!</h3>
+      <button class="btn-fechar-modal" onclick="fecharModal('modalTemaParaAzul')">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:28px 24px;">
+
+      <div style="font-size:3rem;margin-bottom:16px;line-height:1;">
+        🎨😤👩‍💻
+      </div>
+
+      <h4 style="font-size:1.1rem;color:var(--cor-primaria-escura);margin-bottom:12px;font-family:var(--font-titulo);">
+        Você realmente vai fazer isso?
+      </h4>
+
+      <p style="font-size:0.85rem;color:var(--cor-texto);line-height:1.7;margin-bottom:10px;">
+        Eu <strong>passei horas</strong> escolhendo esse tema <em>Vintage Creme</em> 
+        com muito amor, carinho e várias xícaras de café ☕
+      </p>
+
+      <div style="background:rgba(184,134,11,0.08);border:1px solid rgba(184,134,11,0.25);border-radius:var(--raio);padding:12px 16px;margin:14px 0;font-size:0.82rem;color:var(--cor-texto);">
+        <i class="fas fa-quote-left" style="color:var(--cor-destaque);margin-right:4px;"></i>
+        <em>"A beleza está nos olhos de quem vê... mas aparentemente vocês precisam de oftalmologista."</em>
+        <i class="fas fa-quote-right" style="color:var(--cor-destaque);margin-left:4px;"></i>
+      </div>
+
+      <p style="font-size:0.82rem;color:var(--cor-texto-secundario);margin-bottom:4px;">
+        Se clicar em <strong>"Mudar"</strong>, saiba que eu nunca vou esquecer isso. 
+        <br>Mas tudo bem... eu aguento. 😢
+      </p>
+
+      <div style="font-size:1.5rem;margin-top:10px;">🙄💙🫡</div>
+
+    </div>
+    <div class="modal-footer" style="justify-content:center;gap:12px;">
+      <button class="btn-secundario" onclick="fecharModal('modalTemaParaAzul')" style="min-width:130px;">
+        <i class="fas fa-heart"></i> Manter o Original
+      </button>
+      <button class="btn-acao" onclick="aplicarTemaAzul()" style="min-width:130px;">
+        <i class="fas fa-palette"></i> Mudar (coitado)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL TEMA: AZUL → CLÁSSICO ==================== -->
+<div id="modalTemaParaClassico" class="modal-overlay">
+  <div class="modal-content" style="max-width:460px;">
+    <div class="modal-header">
+      <h3><i class="fas fa-star" style="color:var(--cor-destaque);"></i> Voltando ao Bom Gosto!</h3>
+      <button class="btn-fechar-modal" onclick="fecharModal('modalTemaParaClassico')">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:28px 24px;">
+
+      <div style="font-size:3rem;margin-bottom:16px;line-height:1;">
+        🎉☕✨
+      </div>
+
+      <h4 style="font-size:1.1rem;color:var(--cor-primaria-escura);margin-bottom:12px;font-family:var(--font-titulo);">
+        Percebeu que o original era melhor?
+      </h4>
+
+      <p style="font-size:0.85rem;color:var(--cor-texto);line-height:1.7;margin-bottom:10px;">
+        Que surpresa... <strong>NENHUMA.</strong> 🤷‍♂️
+        <br>O tema Vintage Creme estava esperando por você.
+        <br>Sempre soube que você voltaria. 😌
+      </p>
+
+      <div style="background:rgba(107,76,59,0.08);border:1px solid rgba(107,76,59,0.25);border-radius:var(--raio);padding:12px 16px;margin:14px 0;font-size:0.82rem;color:var(--cor-texto);">
+        <i class="fas fa-quote-left" style="color:var(--cor-primaria);margin-right:4px;"></i>
+        <em>"Alguns precisam se perder no azul para encontrar o bege que carregam no coração."</em>
+        <i class="fas fa-quote-right" style="color:var(--cor-primaria);margin-left:4px;"></i>
+      </div>
+
+      <div style="font-size:1.5rem;margin-top:10px;">🫶😤☕</div>
+
+    </div>
+    <div class="modal-footer" style="justify-content:center;gap:12px;">
+      <button class="btn-secundario" onclick="fecharModal('modalTemaParaClassico')" style="min-width:130px;">
+        <i class="fas fa-times"></i> Ficar no Azul
+      </button>
+      <button class="btn-acao" onclick="aplicarTemaClassico()" style="min-width:130px;">
+        <i class="fas fa-coffee"></i> Voltar ao Bom Gosto
+      </button>
+    </div>
+  </div>
+</div>
+  <!-- ==================== MODAL ATAS DO PROJETO ==================== -->
+  <div id="modalAtasProjeto" class="modal-overlay">
+    <div class="modal-content modal-atas-content">
+      <div class="modal-header">
+        <h3>
+          <i class="fas fa-book-open" style="color:var(--cor-destaque);"></i>
+          <span id="modalAtasProjetoTitulo">Atas do Projeto</span>
+        </h3>
+        <button class="btn-fechar-modal" onclick="fecharModalAtasProjeto()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-atas-body">
+
+        <!-- COLUNA ESQUERDA: catálogo de reuniões -->
+        <div class="modal-atas-catalogo">
+          <div class="modal-atas-catalogo-header">
+            <i class="fas fa-list" style="color:var(--cor-destaque);"></i>
+            <span>Reuniões vinculadas</span>
+            <span class="badge-contador" id="badgeContadorAtasProjeto">0</span>
+          </div>
+          <div class="modal-atas-catalogo-lista" id="catalogoAtasProjetoLista">
+            <div class="empty-state">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Carregando...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUNA DIREITA: visualizador -->
+        <div class="modal-atas-visualizador">
+          <div class="modal-atas-viewer-header" id="atasViewerHeader">
+            <div class="modal-atas-viewer-titulo">
+              <i class="fas fa-file-lines" style="color:var(--cor-destaque);"></i>
+              <span id="atasViewerTitulo">Nenhuma reunião selecionada</span>
+            </div>
+            <div class="modal-atas-viewer-tabs" id="atasViewerTabs" style="display:none;">
+              <button class="atas-tab ativo" data-tab="ata" onclick="trocarTabAtasViewer(this, 'ata')">
+                <i class="fas fa-file-lines"></i> Ata
+              </button>
+              <button class="atas-tab" data-tab="transcricao" onclick="trocarTabAtasViewer(this, 'transcricao')">
+                <i class="fas fa-microphone"></i> Transcrição
+              </button>
+            </div>
+          </div>
+          <div class="modal-atas-viewer-corpo" id="atasViewerCorpo">
+            <div class="ata-vazia-viewer">
+              <i class="fas fa-book-open"></i>
+              <p>Selecione uma reunião no catálogo ao lado para visualizar a ata</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+<<<<<<< HEAD
+  <!-- ==================== MODAL GERENCIAR PERMISSÕES ==================== -->
+  <div class="modal-overlay" id="modalPermissoes">
+    <div class="modal-content" style="max-width:620px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-user-shield"></i> Gerenciar Permissões</h3>
+        <button class="btn-fechar-modal" onclick="fecharModal('modalPermissoes')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:16px;">
+          <button class="btn-acao" onclick="abrirFormNovaPermissao()">
+            <i class="fas fa-plus"></i> Nova Permissão
+          </button>
+        </div>
+        <div id="listaPermissoes"><!-- Renderizado via JS --></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL EDITAR PERMISSÃO ==================== -->
+  <div class="modal-overlay" id="modalEditarPermissao">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-user-cog"></i> <span id="tituloModalPermissao">Nova Permissão</span></h3>
+        <button class="btn-fechar-modal" onclick="fecharModal('modalEditarPermissao')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="permissaoId">
+
+        <div class="campo-grupo">
+          <label>Email do Usuário *</label>
+          <input type="email" id="permissaoEmail" placeholder="usuario@exemplo.com">
+        </div>
+
+        <div class="campo-grupo">
+          <label>Nível de Acesso</label>
+          <select id="permissaoNivel" onchange="atualizarCamposPermissao()">
+            <option value="colaborador">Colaborador</option>
+            <option value="gestor">Gestor de Setor</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+
+        <div class="campo-grupo" id="campoSetoresPermitidos">
+          <label>Setores Permitidos</label>
+          <div id="setoresPermitidosContainer" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"></div>
+          <small class="campo-hint">Deixe vazio para acesso a todos os setores (apenas admin)</small>
+        </div>
+
+        <div class="campo-grupo" id="campoProjetosPermitidos">
+          <label>Projetos Específicos (opcional)</label>
+          <div id="projetosPermitidosContainer" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;max-height:140px;overflow-y:auto;"></div>
+          <small class="campo-hint">Deixe vazio para herdar permissões do setor</small>
+        </div>
+
+        <div class="campo-grupo">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="permissaoPodeCriarProjeto">
+            Pode criar novos projetos
+          </label>
+        </div>
+
+        <div class="campo-grupo">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="permissaoPodeCriarEtapa" checked>
+            Pode criar novas atividades
+          </label>
+        </div>
+
+        <div class="campo-grupo">
+          <label>Visibilidade dos projetos</label>
+          <select id="permissaoFiltrarResponsavel">
+            <option value="false">Todos os projetos permitidos</option>
+            <option value="true">Apenas projetos onde é responsável</option>
+          </select>
+        </div>
+
+        <div class="campo-grupo">
+          <label>Status do usuário</label>
+          <select id="permissaoAtivo">
+            <option value="true">Ativo</option>
+            <option value="false">Inativo</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secundario" id="btnRemoverPermissao" onclick="removerPermissaoAtual()" style="display:none;color:var(--cor-perigo,#dc2626);">
+          <i class="fas fa-trash"></i> Remover
+        </button>
+        <button class="btn-secundario" onclick="fecharModal('modalEditarPermissao')">Cancelar</button>
+        <button class="btn-acao" onclick="salvarPermissaoModal()"><i class="fas fa-save"></i> Salvar</button>
+      </div>
+    </div>
+  </div>
+
+=======
+>>>>>>> e4f1b2a9e86d855feeee91b0d435eb114c4c561e
+  <!-- ==================== SCRIPTS ==================== -->
+  <?!= include('Compartilhado-Utilidades🔧'); ?>
+  <?!= include('PaginaProjetoDetalhe-JS🟡'); ?>
+
+</body>
+
+</html>
