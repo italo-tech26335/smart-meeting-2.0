@@ -677,6 +677,43 @@ function processarAudioReuniao(dadosAudio) {
     }
     adicionarLog('SUCESSO', '✅ ATA gerada com sucesso!');
 
+    // ========== ESTILOS DE ATA ADICIONAIS ==========
+    const estilosAtaSolicitados = dadosAudio.estilosAta || [];
+    const atasPorEstilo = {};
+    if (estilosAtaSolicitados.length > 0) {
+      const instrucaoExtra = dadosAudio.instrucaoExtra || '';
+      const tituloReuniao = dadosAudio.titulo || '';
+      const participantesReuniao = dadosAudio.participantes || '';
+      const dataFormatada = new Date().toLocaleDateString('pt-BR');
+      const cfgEstilos = CONFIG_PROMPTS_REUNIAO.ATA_ESTILOS;
+      const urlApiEstilos = 'https://generativelanguage.googleapis.com/v1beta/models/' + cfgEstilos.modelo + ':generateContent?key=' + chaveGemini;
+      for (let e = 0; e < estilosAtaSolicitados.length; e++) {
+        const estilo = estilosAtaSolicitados[e];
+        adicionarLog('INFO', '📋 Gerando ata estilo: ' + estilo + '...');
+        try {
+          const prompt = montarPromptAtaEstilo(estilo, tituloReuniao, participantesReuniao, dataFormatada, instrucaoExtra, resultadoTranscricao.transcricao);
+          const configGeracao = montarConfigGeracao(cfgEstilos, 'ATA-' + estilo);
+          const respostaHttp = UrlFetchApp.fetch(urlApiEstilos, {
+            method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+            payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: configGeracao })
+          });
+          if (respostaHttp.getResponseCode() === 200) {
+            const ataGerada = extrairTextoRespostaGemini(JSON.parse(respostaHttp.getContentText()));
+            if (ataGerada && ataGerada.length > 10) {
+              atasPorEstilo[estilo] = ataGerada;
+              adicionarLog('SUCESSO', '✅ Ata ' + estilo + ' gerada!');
+            } else {
+              adicionarLog('ALERTA', '⚠️ Ata ' + estilo + ' retornou texto vazio.');
+            }
+          } else {
+            adicionarLog('ALERTA', '⚠️ Ata ' + estilo + ': HTTP ' + respostaHttp.getResponseCode());
+          }
+        } catch (eAta) {
+          adicionarLog('ALERTA', '⚠️ Erro gerando ata ' + estilo + ': ' + eAta.message);
+        }
+      }
+    }
+
     // ========== ETAPA 3: RELATÓRIO ==========
     adicionarLog('INFO', '🔍 [ETAPA 3/3] Gerando relatório de identificações...');
     const contexto = obterContextoProjetosParaGemini();
@@ -715,7 +752,8 @@ function processarAudioReuniao(dadosAudio) {
       linkAudio: resultadoDrive.linkArquivo,
       projetosImpactados: '',
       etapasImpactadas: '',
-      departamentoId: dadosAudio.departamentoId || ''
+      departamentoId: dadosAudio.departamentoId || '',
+      ataEstilos: atasPorEstilo
     });
     adicionarLog('SUCESSO', `✅ Reunião salva com ID: ${reuniaoId}`);
     adicionarLog('SUCESSO', '🎉 Processamento concluído com sucesso!');
@@ -2168,15 +2206,57 @@ function obterContextoProjetosParaGemini() {
 function salvarReuniaoNaPlanilha(dadosReuniao) {
   try {
     const aba = obterAba(NOME_ABA_REUNIOES);
+
+    // ── MODO UPDATE: atualiza linha existente por reuniaoId ──
+    if (dadosReuniao.reuniaoId) {
+      const dados = aba.getDataRange().getValues();
+      for (let i = 1; i < dados.length; i++) {
+        if (dados[i][COLUNAS_REUNIOES.ID] === dadosReuniao.reuniaoId) {
+          const linhaReal = i + 1;
+          const campos = {
+            [COLUNAS_REUNIOES.TITULO]:              dadosReuniao.titulo,
+            [COLUNAS_REUNIOES.DATA_INICIO]:         dadosReuniao.dataInicio,
+            [COLUNAS_REUNIOES.DATA_FIM]:            dadosReuniao.dataFim,
+            [COLUNAS_REUNIOES.DURACAO]:             dadosReuniao.duracao,
+            [COLUNAS_REUNIOES.STATUS]:              dadosReuniao.status || STATUS_REUNIAO.PROCESSADA,
+            [COLUNAS_REUNIOES.PARTICIPANTES]:       dadosReuniao.participantes,
+            [COLUNAS_REUNIOES.TRANSCRICAO]:         dadosReuniao.transcricao,
+            [COLUNAS_REUNIOES.ATA]:                 dadosReuniao.ata,
+            [COLUNAS_REUNIOES.SUGESTOES_IA]:        dadosReuniao.sugestoesIA,
+            [COLUNAS_REUNIOES.LINK_AUDIO]:          dadosReuniao.linkAudio,
+            [COLUNAS_REUNIOES.PROJETOS_IMPACTADOS]: dadosReuniao.projetosImpactados,
+            [COLUNAS_REUNIOES.ETAPAS_IMPACTADAS]:   dadosReuniao.etapasImpactadas,
+            [COLUNAS_REUNIOES.DEPARTAMENTO_ID]:     dadosReuniao.departamentoId
+          };
+          for (const col in campos) {
+            if (campos[col] !== undefined && campos[col] !== null) {
+              aba.getRange(linhaReal, parseInt(col) + 1).setValue(campos[col]);
+            }
+          }
+          limparCacheAba(NOME_ABA_REUNIOES);
+          return dadosReuniao.reuniaoId;
+        }
+      }
+      throw new Error('Reunião não encontrada para atualização: ' + dadosReuniao.reuniaoId);
+    }
+
+    // ── MODO INSERT: insere nova linha ──
     const reuniaoId = gerarId();
+    const estilosInserir = dadosReuniao.ataEstilos || {};
     const linha = [
       reuniaoId, dadosReuniao.titulo, dadosReuniao.dataInicio, dadosReuniao.dataFim,
-      dadosReuniao.duracao, 'Processada', dadosReuniao.participantes,
-      dadosReuniao.transcricao, dadosReuniao.ata, dadosReuniao.sugestoesIA,
-      dadosReuniao.linkAudio, '', '', dadosReuniao.projetosImpactados,
-      dadosReuniao.etapasImpactadas, dadosReuniao.departamentoId || ''
+      dadosReuniao.duracao, dadosReuniao.status || STATUS_REUNIAO.PROCESSADA,
+      dadosReuniao.participantes, dadosReuniao.transcricao, dadosReuniao.ata,
+      dadosReuniao.sugestoesIA, dadosReuniao.linkAudio, '', '',
+      dadosReuniao.projetosImpactados, dadosReuniao.etapasImpactadas,
+      dadosReuniao.departamentoId || '',
+      estilosInserir['executiva'] || '',      // col 16: ATA_EXECUTIVA
+      estilosInserir['detalhada'] || '',      // col 17: ATA_DETALHADA
+      estilosInserir['por_responsavel'] || '',// col 18: ATA_RESPONSAVEL
+      estilosInserir['alinhamento'] || ''     // col 19: ATA_ALINHAMENTO
     ];
     aba.appendRow(linha);
+    limparCacheAba(NOME_ABA_REUNIOES);
     return reuniaoId;
   } catch (erro) {
     Logger.log('ERRO salvarReuniaoNaPlanilha: ' + erro.toString());
@@ -2434,6 +2514,10 @@ function listarReunioesRecentes(token, limite) {
       const idCelula = dados[i][colunas.ID];
       if (idCelula === null || idCelula === undefined || idCelula.toString().trim() === '') continue;
 
+      // Excluir áudios aguardando processamento (aparecem na seção própria)
+      const statusCelula = dados[i][colunas.STATUS] ? dados[i][colunas.STATUS].toString() : '';
+      if (statusCelula === STATUS_REUNIAO.AGUARDANDO) continue;
+
       // Filtro de departamento: usa dados frescos da planilha (não sessão que pode estar desatualizada)
       if (depsUsuario !== null && depsUsuario.length > 0) {
         const depReuniao = (dados[i][colunas.DEPARTAMENTO_ID] || '').toString().trim();
@@ -2444,18 +2528,26 @@ function listarReunioesRecentes(token, limite) {
       const ataTexto = dados[i][colunas.ATA] ? dados[i][colunas.ATA].toString().trim() : '';
       const transcricaoTexto = dados[i][colunas.TRANSCRICAO] ? dados[i][colunas.TRANSCRICAO].toString().trim() : '';
 
+      // Detectar estilos de ata gerados (colunas 16-19)
+      const estilosGerados = [];
+      if ((dados[i][COLUNAS_REUNIOES.ATA_EXECUTIVA] || '').toString().trim().length > 10) estilosGerados.push('executiva');
+      if ((dados[i][COLUNAS_REUNIOES.ATA_DETALHADA] || '').toString().trim().length > 10) estilosGerados.push('detalhada');
+      if ((dados[i][COLUNAS_REUNIOES.ATA_RESPONSAVEL] || '').toString().trim().length > 10) estilosGerados.push('por_responsavel');
+      if ((dados[i][COLUNAS_REUNIOES.ATA_ALINHAMENTO] || '').toString().trim().length > 10) estilosGerados.push('alinhamento');
+
       reunioes.push({
         id:             idCelula.toString().trim(),
         titulo:         dados[i][colunas.TITULO] ? dados[i][colunas.TITULO].toString() : '',
         dataInicio:     dados[i][colunas.DATA_INICIO],
         duracao:        dados[i][colunas.DURACAO],
-        status:         dados[i][colunas.STATUS] ? dados[i][colunas.STATUS].toString() : '',
+        status:         statusCelula,
         participantes:  dados[i][colunas.PARTICIPANTES] ? dados[i][colunas.PARTICIPANTES].toString() : '',
         linkAudio:      dados[i][colunas.LINK_AUDIO] ? dados[i][colunas.LINK_AUDIO].toString() : '',
         temAta:         ataTexto.length > 10,
         temTranscricao: transcricaoTexto.length > 10,
         emailsEnviados: dados[i][colunas.EMAILS_ENVIADOS] ? dados[i][colunas.EMAILS_ENVIADOS].toString() : '',
-        departamentoId: (dados[i][colunas.DEPARTAMENTO_ID] || '').toString()
+        departamentoId: (dados[i][colunas.DEPARTAMENTO_ID] || '').toString(),
+        estilosGerados: estilosGerados
       });
     }
 
@@ -2574,6 +2666,41 @@ function obterConteudoReuniao(reuniaoId, campo) {
 
   } catch (erro) {
     Logger.log('ERRO obterConteudoReuniao: ' + erro.toString());
+    return { sucesso: false, mensagem: erro.message };
+  }
+}
+
+function salvarEdicaoAta(token, reuniaoId, novoTexto) {
+  try {
+    const sessao = verificarSessao(token);
+    if (!sessao || !sessao.valida) return { sucesso: false, mensagem: 'Sessão inválida' };
+    if (!reuniaoId || novoTexto === undefined || novoTexto === null) return { sucesso: false, mensagem: 'Parâmetros inválidos' };
+
+    const aba = obterAba(NOME_ABA_REUNIOES);
+    const ultimaLinha = aba.getLastRow();
+    if (ultimaLinha <= 1) return { sucesso: false, mensagem: 'Sem dados' };
+
+    const idBuscado = String(reuniaoId).trim();
+    const idsColuna = aba.getRange(2, COLUNAS_REUNIOES.ID + 1, ultimaLinha - 1, 1).getValues();
+
+    let linhaEncontrada = -1;
+    for (let i = 0; i < idsColuna.length; i++) {
+      if (String(idsColuna[i][0]).trim() === idBuscado) {
+        linhaEncontrada = i + 2;
+        break;
+      }
+    }
+
+    if (linhaEncontrada === -1) return { sucesso: false, mensagem: 'Reunião não encontrada' };
+
+    aba.getRange(linhaEncontrada, COLUNAS_REUNIOES.ATA + 1).setValue(novoTexto);
+    SpreadsheetApp.flush();
+
+    Logger.log('salvarEdicaoAta: reunião ' + reuniaoId + ' atualizada por ' + sessao.nome);
+    return { sucesso: true };
+
+  } catch (erro) {
+    Logger.log('ERRO salvarEdicaoAta: ' + erro.toString());
     return { sucesso: false, mensagem: erro.message };
   }
 }
@@ -2906,6 +3033,10 @@ function obterReunioesCatalogadas(token) {
       const idCelula = dados[i][COLUNAS_REUNIOES.ID];
       if (!idCelula || idCelula.toString().trim() === '') continue;
 
+      // Excluir áudios aguardando processamento (aparecem na seção própria)
+      const statusCelula = dados[i][COLUNAS_REUNIOES.STATUS] ? dados[i][COLUNAS_REUNIOES.STATUS].toString() : '';
+      if (statusCelula === STATUS_REUNIAO.AGUARDANDO) continue;
+
       // Filtro de departamento: usa dados frescos da planilha (não sessão desatualizada)
       if (depsUsuario !== null && depsUsuario.length > 0) {
         const depReuniao = (dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString().trim();
@@ -2919,18 +3050,26 @@ function obterReunioesCatalogadas(token) {
         ? dados[i][COLUNAS_REUNIOES.PROJETOS_IMPACTADOS].toString().trim()
         : '';
 
+      // Detectar estilos de ata gerados (colunas 16-19)
+      const estilosGerados = [];
+      if ((dados[i][COLUNAS_REUNIOES.ATA_EXECUTIVA]   || '').toString().trim().length > 10) estilosGerados.push('executiva');
+      if ((dados[i][COLUNAS_REUNIOES.ATA_DETALHADA]   || '').toString().trim().length > 10) estilosGerados.push('detalhada');
+      if ((dados[i][COLUNAS_REUNIOES.ATA_RESPONSAVEL] || '').toString().trim().length > 10) estilosGerados.push('por_responsavel');
+      if ((dados[i][COLUNAS_REUNIOES.ATA_ALINHAMENTO] || '').toString().trim().length > 10) estilosGerados.push('alinhamento');
+
       reunioesTodas.push({
         id: idCelula.toString().trim(),
         titulo: dados[i][COLUNAS_REUNIOES.TITULO] ? dados[i][COLUNAS_REUNIOES.TITULO].toString() : '',
         dataInicio: dados[i][COLUNAS_REUNIOES.DATA_INICIO],
         duracao: dados[i][COLUNAS_REUNIOES.DURACAO],
-        status: dados[i][COLUNAS_REUNIOES.STATUS] ? dados[i][COLUNAS_REUNIOES.STATUS].toString() : '',
+        status: statusCelula,
         participantes: dados[i][COLUNAS_REUNIOES.PARTICIPANTES] ? dados[i][COLUNAS_REUNIOES.PARTICIPANTES].toString() : '',
         linkAudio: dados[i][COLUNAS_REUNIOES.LINK_AUDIO] ? dados[i][COLUNAS_REUNIOES.LINK_AUDIO].toString() : '',
         emailsEnviados: dados[i][COLUNAS_REUNIOES.EMAILS_ENVIADOS] ? dados[i][COLUNAS_REUNIOES.EMAILS_ENVIADOS].toString() : '',
         temAta: ataTexto.length > 10,
         temTranscricao: transcricaoTexto.length > 10,
-        projetoId: projetoId
+        projetoId: projetoId,
+        estilosGerados: estilosGerados
       });
     }
 
@@ -3604,4 +3743,545 @@ function calcularTamanhoBinarioExato(infoChunks) {
     tamBin += Math.floor(tamBase64 * 3 / 4) - (i === totalChunks - 1 ? paddingUltimoChunk : 0);
   }
   return tamBin;
+}
+
+// ============================================================================
+//  NOVAS FUNÇÕES: MÚLTIPLOS ÁUDIOS + ESTILOS DE ATA
+// ============================================================================
+
+/**
+ * Salva um áudio no Drive sem processar, criando uma linha na planilha com
+ * STATUS = 'Aguardando Processamento'. Retorna o ID da reunião para rastreamento.
+ */
+function salvarAudioNaoProcessado(token, dadosAudio) {
+  const logs = [];
+  const log = (tipo, msg) => {
+    logs.push({ tipo, mensagem: msg, timestamp: new Date().toLocaleTimeString('pt-BR') });
+    Logger.log(`[salvarAudioNaoProcessado][${tipo}] ${msg}`);
+  };
+
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+
+    if (!dadosAudio || !dadosAudio.audioBase64) {
+      return { sucesso: false, mensagem: 'Dados do áudio não fornecidos.' };
+    }
+
+    log('INFO', '💾 Salvando áudio no Drive...');
+    const pasta = DriveApp.getFolderById(ID_PASTA_DRIVE_REUNIOES);
+    const audioBase64 = dadosAudio.audioBase64.split(',')[1] || dadosAudio.audioBase64;
+    const tipoMime = dadosAudio.tipoMime || 'audio/webm';
+    const extensao = obterExtensaoDoMime(tipoMime);
+
+    // Nomenclatura: AAAA-MM-DD_Departamento_HHmmss.ext
+    const agora = new Date();
+    const dataStr = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
+    const horaStr = Utilities.formatDate(agora, 'America/Sao_Paulo', 'HHmmss');
+    const deptNome = (dadosAudio.departamentoNome || 'SemDepto').replace(/[^a-zA-Z0-9À-ÿ]/g, '_');
+    const nomeArquivo = dataStr + '_' + deptNome + '_' + horaStr + extensao;
+
+    const audioBlob = Utilities.newBlob(Utilities.base64Decode(audioBase64), tipoMime, nomeArquivo);
+    const arquivo = pasta.createFile(audioBlob);
+    arquivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const linkAudio = arquivo.getUrl();
+    log('SUCESSO', '✅ Áudio salvo: ' + nomeArquivo);
+
+    // Inserir linha na planilha com status "Aguardando Processamento"
+    log('INFO', '📊 Registrando na planilha...');
+    const aba = obterAba(NOME_ABA_REUNIOES);
+    const reuniaoId = gerarId();
+    const dataInicio = agora;
+    const linha = [
+      reuniaoId, nomeArquivo, dataInicio, '', '', STATUS_REUNIAO.AGUARDANDO,
+      dadosAudio.participantes || '', '', '', '', linkAudio, '', '',
+      '', '', dadosAudio.departamentoId || '',
+      '', '', '', ''  // colunas 16-19: atas ainda não geradas
+    ];
+    aba.appendRow(linha);
+    limparCacheAba(NOME_ABA_REUNIOES);
+    log('SUCESSO', '✅ Registro criado: ' + reuniaoId);
+
+    return {
+      sucesso: true, logs, reuniaoId, linkAudio, nomeArquivo,
+      dataUpload: dataInicio.toISOString(),
+      departamentoId: dadosAudio.departamentoId || '',
+      departamentoNome: dadosAudio.departamentoNome || ''
+    };
+
+  } catch (erro) {
+    Logger.log('ERRO salvarAudioNaoProcessado: ' + erro.toString());
+    return { sucesso: false, mensagem: erro.message, logs };
+  }
+}
+
+/**
+ * Lista os áudios com STATUS = 'Aguardando Processamento', filtrados por
+ * departamento do usuário autenticado.
+ */
+function listarAudiosNaoProcessados(token) {
+  try {
+    const sessao = token ? _obterSessao(token) : null;
+    const isAdmin = sessao && sessao.perfil === 'admin';
+    const depsUsuario = (sessao && !isAdmin) ? _obterDepsAtualizadosUsuario(sessao) : null;
+
+    const aba = obterAba(NOME_ABA_REUNIOES);
+    if (!aba || aba.getLastRow() <= 1) return { sucesso: true, audios: [] };
+
+    // Mapa id→nome de departamentos
+    const deptMap = {};
+    try {
+      const abaDepts = obterAba(NOME_ABA_DEPARTAMENTOS);
+      if (abaDepts) {
+        abaDepts.getDataRange().getValues().forEach((row, idx) => {
+          if (idx === 0) return;
+          const dId = row[COLUNAS_DEPARTAMENTOS.ID];
+          if (dId) deptMap[dId.toString()] = (row[COLUNAS_DEPARTAMENTOS.NOME] || '').toString();
+        });
+      }
+    } catch (eDepts) { /* ignora erro de lookup */ }
+
+    const dados = aba.getDataRange().getValues();
+    const agora = new Date();
+    const audios = [];
+
+    for (let i = dados.length - 1; i >= 1; i--) {
+      const idCelula = dados[i][COLUNAS_REUNIOES.ID];
+      if (!idCelula || idCelula.toString().trim() === '') continue;
+
+      const statusCelula = dados[i][COLUNAS_REUNIOES.STATUS] ? dados[i][COLUNAS_REUNIOES.STATUS].toString() : '';
+      if (statusCelula !== STATUS_REUNIAO.AGUARDANDO) continue;
+
+      if (depsUsuario !== null && depsUsuario.length > 0) {
+        const depReuniao = (dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString().trim();
+        if (depReuniao && !depsUsuario.includes(depReuniao)) continue;
+      }
+
+      const dataUpload = dados[i][COLUNAS_REUNIOES.DATA_INICIO];
+      let diasDesdeUpload = 0;
+      if (dataUpload) {
+        const dtUpload = dataUpload instanceof Date ? dataUpload : new Date(dataUpload);
+        diasDesdeUpload = Math.floor((agora - dtUpload) / (1000 * 60 * 60 * 24));
+      }
+
+      audios.push({
+        id:               idCelula.toString().trim(),
+        nomeArquivo:      dados[i][COLUNAS_REUNIOES.TITULO] ? dados[i][COLUNAS_REUNIOES.TITULO].toString() : '',
+        dataUpload:       dataUpload,
+        diasDesdeUpload:  diasDesdeUpload,
+        linkAudio:        dados[i][COLUNAS_REUNIOES.LINK_AUDIO] ? dados[i][COLUNAS_REUNIOES.LINK_AUDIO].toString() : '',
+        participantes:    dados[i][COLUNAS_REUNIOES.PARTICIPANTES] ? dados[i][COLUNAS_REUNIOES.PARTICIPANTES].toString() : '',
+        departamentoId:   (dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString(),
+        departamentoNome: deptMap[(dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString()] || ''
+      });
+    }
+
+    return { sucesso: true, audios };
+  } catch (e) {
+    Logger.log('ERRO listarAudiosNaoProcessados: ' + e.toString());
+    return { sucesso: false, mensagem: e.message, audios: [] };
+  }
+}
+
+/**
+ * Processa um áudio previamente salvo: executa transcrição, gera estilos de ata
+ * selecionados e opcionalmente gera relatório. Atualiza a linha existente na planilha.
+ * Parâmetros de dadosProcessamento:
+ *   reuniaoId, titulo, participantes, departamentoId, departamentoNome,
+ *   estilosAta: ['executiva', 'detalhada', 'por_responsavel', 'alinhamento'],
+ *   gerarRelatorio: bool, instrucaoExtra: string
+ */
+function processarReuniaoSalva(token, dadosProcessamento) {
+  const logs = [];
+  const log = (tipo, msg) => {
+    logs.push({ tipo, mensagem: msg, timestamp: new Date().toLocaleTimeString('pt-BR') });
+    Logger.log(`[processarReuniaoSalva][${tipo}] ${msg}`);
+  };
+
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.', logs };
+
+    const reuniaoId = dadosProcessamento.reuniaoId;
+    if (!reuniaoId) return { sucesso: false, mensagem: 'ID da reunião não fornecido.', logs };
+
+    const chaveApi = obterChaveGeminiProjeto();
+    if (!chaveApi) return { sucesso: false, mensagem: 'Chave API do Gemini não configurada.', logs };
+
+    // Localizar linha da reunião
+    const aba = obterAba(NOME_ABA_REUNIOES);
+    const dados = aba.getDataRange().getValues();
+    let linhaReal = -1, linkAudio = '', transcricaoExistente = '';
+
+    for (let i = 1; i < dados.length; i++) {
+      if (dados[i][COLUNAS_REUNIOES.ID] === reuniaoId) {
+        linhaReal = i + 1;
+        linkAudio = dados[i][COLUNAS_REUNIOES.LINK_AUDIO] ? dados[i][COLUNAS_REUNIOES.LINK_AUDIO].toString() : '';
+        transcricaoExistente = dados[i][COLUNAS_REUNIOES.TRANSCRICAO] ? dados[i][COLUNAS_REUNIOES.TRANSCRICAO].toString() : '';
+        break;
+      }
+    }
+
+    if (linhaReal === -1) return { sucesso: false, mensagem: 'Reunião não encontrada.', logs };
+    if (!linkAudio) return { sucesso: false, mensagem: 'Áudio não encontrado na reunião.', logs };
+
+    // Marcar como Processando
+    aba.getRange(linhaReal, COLUNAS_REUNIOES.STATUS + 1).setValue(STATUS_REUNIAO.PROCESSANDO);
+    limparCacheAba(NOME_ABA_REUNIOES);
+
+    // ── ETAPA 1: Transcrição ──
+    let transcricao = transcricaoExistente;
+    if (!transcricao || transcricao.length < 10) {
+      log('INFO', '🎙️ Baixando áudio do Drive para transcrição...');
+
+      // Obter ID do arquivo Drive a partir da URL do link
+      let arquivoDrive = null;
+      try {
+        // Extrair fileId da URL do Drive
+        const matchId = linkAudio.match(/\/d\/([^\/\?]+)/);
+        if (matchId) {
+          arquivoDrive = DriveApp.getFileById(matchId[1]);
+        }
+      } catch (eDrive) {
+        log('ALERTA', '⚠️ Erro ao acessar arquivo: ' + eDrive.message);
+      }
+
+      if (!arquivoDrive) {
+        aba.getRange(linhaReal, COLUNAS_REUNIOES.STATUS + 1).setValue(STATUS_REUNIAO.ERRO);
+        limparCacheAba(NOME_ABA_REUNIOES);
+        return { sucesso: false, mensagem: 'Não foi possível acessar o arquivo de áudio no Drive.', logs };
+      }
+
+      const tipoMimeArq = arquivoDrive.getMimeType() || 'audio/webm';
+      const tamanhoMB = arquivoDrive.getSize() / 1024 / 1024;
+      log('INFO', '📦 Tamanho do áudio: ' + tamanhoMB.toFixed(2) + ' MB');
+
+      const vocabulario = carregarVocabularioCompleto();
+      let resultadoTranscricao;
+
+      if (tamanhoMB > 15) {
+        log('INFO', '📤 Áudio grande — usando File API do Gemini...');
+        const resultadoUpload = uploadParaFileApiGemini(arquivoDrive.getId(), tipoMimeArq, chaveApi);
+        if (!resultadoUpload.sucesso) {
+          aba.getRange(linhaReal, COLUNAS_REUNIOES.STATUS + 1).setValue(STATUS_REUNIAO.ERRO);
+          limparCacheAba(NOME_ABA_REUNIOES);
+          return { sucesso: false, mensagem: 'Falha no upload para Gemini: ' + resultadoUpload.mensagem, logs };
+        }
+        resultadoTranscricao = executarTranscricaoViaFileUri(resultadoUpload.fileUri, tipoMimeArq, chaveApi, vocabulario);
+        try { limparArquivoGemini(resultadoUpload.fileName, chaveApi); } catch (e) {}
+      } else {
+        log('INFO', '📦 Áudio pequeno — usando inline_data...');
+        const audioBlob = arquivoDrive.getBlob();
+        const audioBase64 = Utilities.base64Encode(audioBlob.getBytes());
+        const dadosAudioInline = {
+          audioBase64: audioBase64,
+          tipoMime: tipoMimeArq,
+          titulo: dadosProcessamento.titulo || '',
+          dataInicio: new Date().toLocaleDateString('pt-BR')
+        };
+        resultadoTranscricao = executarEtapaTranscricao(dadosAudioInline, chaveApi, vocabulario);
+      }
+
+      if (!resultadoTranscricao.sucesso) {
+        aba.getRange(linhaReal, COLUNAS_REUNIOES.STATUS + 1).setValue(STATUS_REUNIAO.ERRO);
+        limparCacheAba(NOME_ABA_REUNIOES);
+        return { sucesso: false, mensagem: 'Falha na transcrição: ' + resultadoTranscricao.mensagem, logs };
+      }
+      transcricao = resultadoTranscricao.transcricao;
+      log('SUCESSO', '✅ Transcrição concluída (' + transcricao.length + ' chars)');
+
+      // Salvar transcrição no Drive
+      try { salvarTranscricaoNoDrive(transcricao, dadosProcessamento.titulo || ''); } catch (e) {}
+
+      aba.getRange(linhaReal, COLUNAS_REUNIOES.TRANSCRICAO + 1).setValue(transcricao);
+      limparCacheAba(NOME_ABA_REUNIOES);
+    } else {
+      log('INFO', '✅ Transcrição já existente — reutilizando.');
+    }
+
+    // ── ETAPA 2: Gerar estilos de ata solicitados ──
+    const estilosAta = dadosProcessamento.estilosAta || [];
+    const atasPorEstilo = {};
+    const instrucaoExtra = dadosProcessamento.instrucaoExtra || '';
+    const titulo = dadosProcessamento.titulo || '';
+    const participantes = dadosProcessamento.participantes || '';
+    const dataFormatada = new Date().toLocaleDateString('pt-BR');
+    const mapaColuna = {
+      'executiva':      COLUNAS_REUNIOES.ATA_EXECUTIVA,
+      'detalhada':      COLUNAS_REUNIOES.ATA_DETALHADA,
+      'por_responsavel':COLUNAS_REUNIOES.ATA_RESPONSAVEL,
+      'alinhamento':    COLUNAS_REUNIOES.ATA_ALINHAMENTO
+    };
+
+    for (let e = 0; e < estilosAta.length; e++) {
+      const estilo = estilosAta[e];
+      log('INFO', '📋 Gerando ata estilo: ' + estilo + '...');
+
+      try {
+        const prompt = montarPromptAtaEstilo(estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
+        const cfg = CONFIG_PROMPTS_REUNIAO.ATA_ESTILOS;
+        const urlApi = 'https://generativelanguage.googleapis.com/v1beta/models/' + cfg.modelo + ':generateContent?key=' + chaveApi;
+        const configGeracao = montarConfigGeracao(cfg, 'ATA-' + estilo);
+        const respostaHttp = UrlFetchApp.fetch(urlApi, {
+          method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+          payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: configGeracao })
+        });
+
+        if (respostaHttp.getResponseCode() === 200) {
+          const ataGerada = extrairTextoRespostaGemini(JSON.parse(respostaHttp.getContentText()));
+          if (ataGerada && ataGerada.length > 10) {
+            atasPorEstilo[estilo] = ataGerada;
+            const colAtaEstilo = mapaColuna[estilo];
+            if (colAtaEstilo !== undefined) {
+              aba.getRange(linhaReal, colAtaEstilo + 1).setValue(ataGerada);
+            }
+            log('SUCESSO', '✅ Ata ' + estilo + ' gerada!');
+          } else {
+            log('ALERTA', '⚠️ Ata ' + estilo + ' retornou texto vazio.');
+          }
+        } else {
+          log('ALERTA', '⚠️ Falha na ata ' + estilo + ': HTTP ' + respostaHttp.getResponseCode());
+        }
+      } catch (eAta) {
+        log('ALERTA', '⚠️ Erro gerando ata ' + estilo + ': ' + eAta.message);
+      }
+    }
+
+    // ── ETAPA 3: Relatório (opcional) ──
+    let relatorioTexto = '', linkRelatorio = '';
+    if (dadosProcessamento.gerarRelatorio) {
+      log('INFO', '🔍 Gerando relatório de identificações...');
+      try {
+        const contexto = obterContextoProjetosParaGemini();
+        const rRel = executarEtapaIdentificacaoAlteracoes(
+          transcricao, contexto, chaveApi, titulo, dadosProcessamento.departamentoNome || ''
+        );
+        if (rRel.sucesso) {
+          relatorioTexto = rRel.relatorio || '';
+          linkRelatorio = rRel.linkRelatorio || '';
+          log('SUCESSO', '✅ Relatório gerado!');
+        } else {
+          log('ALERTA', '⚠️ Relatório: ' + rRel.mensagem);
+        }
+      } catch (eRel) {
+        log('ALERTA', '⚠️ Erro no relatório: ' + eRel.message);
+      }
+    }
+
+    // ── Atualizar status, título, participantes e data ──
+    const dataFim = new Date();
+    aba.getRange(linhaReal, COLUNAS_REUNIOES.STATUS + 1).setValue(STATUS_REUNIAO.PROCESSADA);
+    if (titulo) aba.getRange(linhaReal, COLUNAS_REUNIOES.TITULO + 1).setValue(titulo);
+    if (participantes) aba.getRange(linhaReal, COLUNAS_REUNIOES.PARTICIPANTES + 1).setValue(participantes);
+    aba.getRange(linhaReal, COLUNAS_REUNIOES.DATA_FIM + 1).setValue(dataFim);
+    limparCacheAba(NOME_ABA_REUNIOES);
+
+    log('SUCESSO', '🎉 Processamento concluído!');
+
+    return {
+      sucesso: true, logs, reuniaoId, transcricao,
+      atas: atasPorEstilo, relatorio: relatorioTexto, linkRelatorio
+    };
+
+  } catch (erro) {
+    Logger.log('ERRO processarReuniaoSalva: ' + erro.toString());
+    // Tentar atualizar status para erro
+    try {
+      const aba = obterAba(NOME_ABA_REUNIOES);
+      const dados = aba.getDataRange().getValues();
+      for (let i = 1; i < dados.length; i++) {
+        if (dados[i][COLUNAS_REUNIOES.ID] === dadosProcessamento.reuniaoId) {
+          aba.getRange(i + 1, COLUNAS_REUNIOES.STATUS + 1).setValue(STATUS_REUNIAO.ERRO);
+          limparCacheAba(NOME_ABA_REUNIOES);
+          break;
+        }
+      }
+    } catch (e2) {}
+    return { sucesso: false, mensagem: erro.message, logs };
+  }
+}
+
+/**
+ * Gera um estilo de ata para uma reunião já transcrita.
+ * Útil para adicionar estilos adicionais após o processamento inicial.
+ */
+function gerarAtaEstiloParaReuniao(token, reuniaoId, estilo, instrucaoExtra) {
+  const logs = [];
+  const log = (tipo, msg) => {
+    logs.push({ tipo, mensagem: msg, timestamp: new Date().toLocaleTimeString('pt-BR') });
+    Logger.log(`[gerarAtaEstiloParaReuniao][${tipo}] ${msg}`);
+  };
+
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.', logs };
+
+    const estilosValidos = ['executiva', 'detalhada', 'por_responsavel', 'alinhamento'];
+    if (!estilo || !estilosValidos.includes(estilo)) {
+      return { sucesso: false, mensagem: 'Estilo inválido: ' + estilo, logs };
+    }
+
+    const chaveApi = obterChaveGeminiProjeto();
+    if (!chaveApi) return { sucesso: false, mensagem: 'Chave API não configurada.', logs };
+
+    const aba = obterAba(NOME_ABA_REUNIOES);
+    const dados = aba.getDataRange().getValues();
+    let linhaReal = -1, transcricao = '', titulo = '', participantes = '';
+
+    for (let i = 1; i < dados.length; i++) {
+      if (dados[i][COLUNAS_REUNIOES.ID] === reuniaoId) {
+        linhaReal = i + 1;
+        transcricao = dados[i][COLUNAS_REUNIOES.TRANSCRICAO] ? dados[i][COLUNAS_REUNIOES.TRANSCRICAO].toString() : '';
+        titulo = dados[i][COLUNAS_REUNIOES.TITULO] ? dados[i][COLUNAS_REUNIOES.TITULO].toString() : '';
+        participantes = dados[i][COLUNAS_REUNIOES.PARTICIPANTES] ? dados[i][COLUNAS_REUNIOES.PARTICIPANTES].toString() : '';
+        break;
+      }
+    }
+
+    if (linhaReal === -1) return { sucesso: false, mensagem: 'Reunião não encontrada.', logs };
+    if (!transcricao || transcricao.length < 10) {
+      return { sucesso: false, mensagem: 'Esta reunião ainda não tem transcrição. Processe o áudio primeiro.', logs };
+    }
+
+    const dataFormatada = new Date().toLocaleDateString('pt-BR');
+    const prompt = montarPromptAtaEstilo(estilo, titulo, participantes, dataFormatada, instrucaoExtra || '', transcricao);
+    const cfg = CONFIG_PROMPTS_REUNIAO.ATA_ESTILOS;
+
+    log('INFO', '📋 Gerando ata estilo: ' + estilo + '...');
+    const urlApi = 'https://generativelanguage.googleapis.com/v1beta/models/' + cfg.modelo + ':generateContent?key=' + chaveApi;
+    const configGeracao = montarConfigGeracao(cfg, 'ATA-estilo-' + estilo);
+    const respostaHttp = UrlFetchApp.fetch(urlApi, {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: configGeracao })
+    });
+
+    if (respostaHttp.getResponseCode() !== 200) {
+      return { sucesso: false, mensagem: 'Erro da API Gemini: HTTP ' + respostaHttp.getResponseCode(), logs };
+    }
+
+    const ataGerada = extrairTextoRespostaGemini(JSON.parse(respostaHttp.getContentText()));
+    if (!ataGerada || ataGerada.length < 10) {
+      return { sucesso: false, mensagem: 'Resposta da ata vazia.', logs };
+    }
+
+    const mapaColuna = {
+      'executiva':      COLUNAS_REUNIOES.ATA_EXECUTIVA,
+      'detalhada':      COLUNAS_REUNIOES.ATA_DETALHADA,
+      'por_responsavel':COLUNAS_REUNIOES.ATA_RESPONSAVEL,
+      'alinhamento':    COLUNAS_REUNIOES.ATA_ALINHAMENTO
+    };
+    const col = mapaColuna[estilo];
+    if (col !== undefined) {
+      aba.getRange(linhaReal, col + 1).setValue(ataGerada);
+      limparCacheAba(NOME_ABA_REUNIOES);
+    }
+
+    log('SUCESSO', '✅ Ata ' + estilo + ' salva!');
+    return { sucesso: true, logs, ata: ataGerada, estilo, reuniaoId };
+
+  } catch (erro) {
+    Logger.log('ERRO gerarAtaEstiloParaReuniao: ' + erro.toString());
+    return { sucesso: false, mensagem: erro.message, logs };
+  }
+}
+
+/**
+ * Retorna o prompt completo de um estilo de ata para visualizacao no frontend.
+ * Nao chama IA; apenas monta o texto final do prompt.
+ */
+function obterPreviewPromptAta(token, opcoes) {
+  try {
+    if (!_obterSessao(token)) return { sucesso: false, mensagem: 'Sessao invalida.' };
+
+    opcoes = opcoes || {};
+    const estilo = (opcoes.estilo || 'executiva').toString();
+    const estilosValidos = ['executiva', 'detalhada', 'por_responsavel', 'alinhamento'];
+    if (!estilosValidos.includes(estilo)) {
+      return { sucesso: false, mensagem: 'Estilo invalido: ' + estilo };
+    }
+
+    const titulo = (opcoes.titulo || '').toString().trim();
+    const participantes = (opcoes.participantes || '').toString().trim();
+    const instrucaoExtra = (opcoes.instrucaoExtra || '').toString();
+    const incluirTranscricao = !!opcoes.incluirTranscricao;
+    const reuniaoId = (opcoes.reuniaoId || '').toString().trim();
+
+    let transcricao = '[PREVIEW] Transcricao omitida. Marque "Incluir transcricao real" para carregar o texto da reuniao.';
+    let usouTranscricaoReal = false;
+
+    if (incluirTranscricao && reuniaoId) {
+      const aba = obterAba(NOME_ABA_REUNIOES);
+      const dados = aba.getDataRange().getValues();
+      for (let i = 1; i < dados.length; i++) {
+        if (dados[i][COLUNAS_REUNIOES.ID] === reuniaoId) {
+          transcricao = dados[i][COLUNAS_REUNIOES.TRANSCRICAO]
+            ? dados[i][COLUNAS_REUNIOES.TRANSCRICAO].toString()
+            : '[PREVIEW] A reuniao ainda nao tem transcricao salva.';
+          usouTranscricaoReal = !!(dados[i][COLUNAS_REUNIOES.TRANSCRICAO] && dados[i][COLUNAS_REUNIOES.TRANSCRICAO].toString().trim());
+          break;
+        }
+      }
+    }
+
+    const dataFormatada = new Date().toLocaleDateString('pt-BR');
+    const prompt = montarPromptAtaEstilo(estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
+    return { sucesso: true, estilo, prompt, usouTranscricaoReal };
+  } catch (e) {
+    Logger.log('ERRO obterPreviewPromptAta: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Retorna dados de uso de armazenamento do Google Drive da conta.
+ */
+function verificarCotaDrive(token) {
+  try {
+    if (token && !_obterSessao(token)) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    const usado = DriveApp.getStorageUsed();
+    const total = DriveApp.getStorageLimit();
+    const percentual = total > 0 ? Math.round((usado / total) * 100) : 0;
+    return {
+      sucesso: true,
+      usado:      usado,
+      total:      total,
+      percentual: percentual,
+      usadoGB:    (usado / 1024 / 1024 / 1024).toFixed(2),
+      totalGB:    (total / 1024 / 1024 / 1024).toFixed(2)
+    };
+  } catch (e) {
+    Logger.log('ERRO verificarCotaDrive: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Retorna os dados de uma ata específica de uma reunião.
+ * estilo: 'executiva' | 'detalhada' | 'por_responsavel' | 'alinhamento' | 'padrao'
+ */
+function obterAtaReuniao(token, reuniaoId, estilo) {
+  try {
+    if (!_obterSessao(token)) return { sucesso: false, mensagem: 'Sessão inválida.' };
+
+    const aba = obterAba(NOME_ABA_REUNIOES);
+    const dados = aba.getDataRange().getValues();
+    const mapaColuna = {
+      'executiva':      COLUNAS_REUNIOES.ATA_EXECUTIVA,
+      'detalhada':      COLUNAS_REUNIOES.ATA_DETALHADA,
+      'por_responsavel':COLUNAS_REUNIOES.ATA_RESPONSAVEL,
+      'alinhamento':    COLUNAS_REUNIOES.ATA_ALINHAMENTO,
+      'padrao':         COLUNAS_REUNIOES.ATA
+    };
+    const col = mapaColuna[estilo] !== undefined ? mapaColuna[estilo] : COLUNAS_REUNIOES.ATA;
+
+    for (let i = 1; i < dados.length; i++) {
+      if (dados[i][COLUNAS_REUNIOES.ID] === reuniaoId) {
+        const ataTexto = dados[i][col] ? dados[i][col].toString() : '';
+        return { sucesso: true, ata: ataTexto, estilo, reuniaoId };
+      }
+    }
+    return { sucesso: false, mensagem: 'Reunião não encontrada.' };
+  } catch (e) {
+    return { sucesso: false, mensagem: e.message };
+  }
 }

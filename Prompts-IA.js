@@ -24,6 +24,12 @@ const CONFIG_PROMPTS_REUNIAO = {
     pensamento: 0,
     maxTokensPorSecao: 20000
   },
+  ATA_ESTILOS: {
+    modelo: 'gemini-2.5-flash',
+    temperatura: 0.3,
+    maxTokens: 20000,
+    pensamento: 0
+  },
   EXTRACAO: {
     modelo: 'gemini-2.5-flash',
     temperatura: 0.2,
@@ -415,3 +421,148 @@ function montarPromptRelatorio(setoresExistentes, projetosExistentes, etapasExis
     'Gere o relatório completo em Markdown:'
   );
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PROMPT 6: ATA POR ESTILO
+//  Gera uma ata com foco e formato específicos conforme o estilo escolhido.
+//  Parâmetros:
+//    estilo         – 'executiva' | 'detalhada' | 'por_responsavel' | 'alinhamento'
+//    titulo         – título da reunião
+//    participantes  – lista de participantes (texto livre)
+//    data           – data da reunião (string formatada)
+//    instrucaoExtra – instruções adicionais opcionais
+//    transcricao    – transcrição completa da reunião
+// ─────────────────────────────────────────────────────────────────────────────
+function montarPromptAtaEstilo(estilo, titulo, participantes, data, instrucaoExtra, transcricao) {
+  titulo         = titulo         || 'Não informado';
+  participantes  = participantes  || 'Não informados';
+  data           = data           || new Date().toLocaleDateString('pt-BR');
+  instrucaoExtra = instrucaoExtra ? '\n**Instruções adicionais:** ' + instrucaoExtra + '\n' : '';
+  transcricao    = transcricao    || '';
+
+  var cabecalhoComum =
+    '## DADOS DA REUNIÃO:\n' +
+    '- **Título:** ' + titulo + '\n' +
+    '- **Participantes:** ' + participantes + '\n' +
+    '- **Data:** ' + data + '\n' +
+    instrucaoExtra + '\n' +
+    '## TRANSCRIÇÃO:\n' +
+    transcricao + '\n\n';
+
+  if (estilo === 'executiva') {
+    return (
+      'Você é um secretário executivo especializado em atas de alto nível para diretores e gestores.\n\n' +
+      cabecalhoComum +
+      '## SUA TAREFA — ATA EXECUTIVA:\n' +
+      'Redija uma ata focada em DECISÕES e ENCAMINHAMENTOS. Texto enxuto e direto, sem transcrever debates.\n\n' +
+      '## ESTRUTURA OBRIGATÓRIA:\n\n' +
+      '### 1. CABEÇALHO\n' +
+      '- Reunião, Data, Participantes Presentes, Pauta\n\n' +
+      '### 2. DECISÕES TOMADAS\n' +
+      'Lista numerada com cada decisão firmada, quem decidiu e o racional resumido em 1 frase.\n\n' +
+      '### 3. ENCAMINHAMENTOS\n' +
+      'Tabela: Nº | Ação | Responsável | Prazo\n\n' +
+      '### 4. PRÓXIMA REUNIÃO / PRÓXIMOS PASSOS\n' +
+      'Data ou prazo da próxima revisão, se mencionado.\n\n' +
+      '## REGRAS:\n' +
+      '- Seja CONCISO. Cada decisão em no máximo 2-3 linhas.\n' +
+      '- Não transcreva discussões, apenas o resultado.\n' +
+      '- Use linguagem formal e objetiva.\n' +
+      '- Se não houver decisão formal, indique "Nenhuma decisão formal registrada".\n\n' +
+      'Gere a Ata Executiva em formato Markdown:'
+    );
+  }
+
+  if (estilo === 'detalhada') {
+    return (
+      'Persona e Missão\n' +
+      'Aja como uma Assistente Executiva Sênior e Especialista em Governança Corporativa. Sua missão é processar transcrições de reuniões de um grupo educacional e veterinário em Fortaleza. Você deve gerar três produtos: uma Ata de Reunião Profissional, um Log Operacional Detalhado (com tudo o que acontece nos bastidores) e um Relatório de Shadowing/Feedback privado para o gestor Murilo.\n\n' +
+      cabecalhoComum +
+      '1. DIRETRIZES DE MINERAÇÃO DE DADOS (Obrigatório)\n' +
+      'Ao processar a transcrição, você deve realizar uma varredura profunda para extrair:\n' +
+      '- Entraves Técnicos e Manutenção: Problemas de infraestrutura (pisos, grades, vazamentos), TI (ataques, bugs de sistema) e insumos (lavanderia, oxigênio).\n' +
+      '- Logística de Bastidor: Detalhes operacionais que não são pauta principal, mas afetam o dia a dia (ex: comportamento de animais específicos, logística de aulas).\n' +
+      '- Incidentes e Riscos: Menções a crises de imagem, problemas com fornecedores ou falhas recorrentes de processos.\n' +
+      '- Dicionário de Nomenclatura: Utilize a lista abaixo para corrigir erros fonéticos:\n' +
+      '  - Nomes: Murilo, Adeline, Ana, Anne, Bráulio, Dr. André, Cristina, Cymara, Dânia, David, Dayanne, Diana, Diógenes, Elisa, Fernando, Filipe, Gil, Ítalo, Jaiane, Josi, Kauã, Luzia, Dr. Marcos, Mayra, Monalisa, Melissa, Priscila, Ramon, Raquel, Rayanne, Rayssa, Rebecca, Renan, Sânia, Saskia, Silvaney, Thaís, Torquato, Werysson, Wesley.\n' +
+      '  - Unidades: Christus, Unichristus, CESIU, LabVet, CVU, CES, LEAC.\n\n' +
+      '2. ESTRUTURA DA ATA DE REUNIÃO (Documento Oficial)\n' +
+      '- Cabeçalho: Nome da Reunião, Data/Hora, Local e Participantes.\n' +
+      '- Pauta e Síntese: Resumo executivo (3-4 linhas).\n' +
+      '- Tópicos de Gestão: Para cada assunto estratégico:\n' +
+      '  - Pontos-chave: Bullet points com dados e argumentos.\n' +
+      '  - Decisões Tomadas: O que foi formalizado.\n' +
+      '- Matriz de Ação (Tabela):\n' +
+      '| Ação | Responsável | Prazo | Unidade | Status |\n' +
+      '| :--- | :--- | :--- | :--- | :--- |\n' +
+      '- Log Operacional e Infraestrutura: Liste todos os itens técnicos, reparos e logísticas mencionados (mesmo os informais).\n\n' +
+      '3. FILTRO DE COMPLIANCE E RISCO (Anexo Consultivo)\n' +
+      '- Identifique falas ou decisões com risco jurídico (Trabalhista, LGPD, Ético).\n' +
+      '- Instrução: Descreva de forma técnica, neutra e puramente factual como um alerta para a diretoria.\n\n' +
+      '4. RELATÓRIO DE FEEDBACK (Privado para Murilo)\n' +
+      '- Analise a dinâmica da reunião sob a ótica de liderança:\n' +
+      '  - Clareza e Direcionamento: O foco foi mantido ou houve dispersão em detalhes técnicos?\n' +
+      '  - Equilíbrio de Voz: Murilo deu espaço ou monopolizou? A equipe foi proativa ou passiva?\n' +
+      '  - Gestão de Conflitos e Tom: Como reagiu a tensões? O tom foi assertivo, autoritário ou colaborativo?\n' +
+      '  - Oportunidades de Melhoria: Aponte 2 comportamentos específicos para ajustar a eficiência da gestão.\n\n' +
+      '5. INTEGRAÇÃO DE INTELIGÊNCIA ARTIFICIAL (Contexto Adicional)\n' +
+      '- Sempre que houver menção ao uso de IAs (como Gemini) para análise de dados ou processos educacionais, descreva a metodologia discutida, as dificuldades citadas (vieses, integração de planilhas) e os níveis de acesso sugeridos.\n\n' +
+      'Gere a Ata Murilo em formato Markdown:'
+    );
+  }
+  if (estilo === 'por_responsavel') {
+    return (
+      'Você é um secretário especializado em atas organizadas por pessoa, para reuniões com muitos envolvidos.\n\n' +
+      cabecalhoComum +
+      '## SUA TAREFA — ATA POR RESPONSÁVEL:\n' +
+      'Redija uma ata AGRUPADA POR PESSOA. Para cada participante relevante, liste o que disse, decidiu ou ficou responsável.\n\n' +
+      '## ESTRUTURA OBRIGATÓRIA:\n\n' +
+      '### 1. CABEÇALHO\n' +
+      '- Reunião, Data, Participantes Presentes, Pauta\n\n' +
+      '### 2. PARTICIPAÇÃO POR PESSOA\n' +
+      'Para cada participante que contribuiu ativamente:\n' +
+      '**[Nome do Participante]**\n' +
+      '- Posicionamentos e declarações relevantes\n' +
+      '- Decisões que tomou ou co-participou\n' +
+      '- Tarefas ou responsabilidades assumidas (com prazo, se mencionado)\n\n' +
+      '### 3. RESPONSABILIDADES CONSOLIDADAS\n' +
+      'Tabela: Responsável | Tarefa | Prazo | Status\n\n' +
+      '### 4. PONTOS SEM RESPONSÁVEL DEFINIDO\n' +
+      'Pendências levantadas mas sem atribuição clara.\n\n' +
+      '## REGRAS:\n' +
+      '- Inclua apenas participantes que tiveram contribuição identificável.\n' +
+      '- Para participantes sem contribuição clara, omita ou agrupe em "Participantes sem ação registrada".\n' +
+      '- Use linguagem formal.\n\n' +
+      'Gere a Ata por Responsável em formato Markdown:'
+    );
+  }
+
+  if (estilo === 'alinhamento') {
+    return (
+      'Você é um secretário especializado em atas de alinhamento rápido para dailies, syncs e reuniões informais.\n\n' +
+      cabecalhoComum +
+      '## SUA TAREFA — ATA DE ALINHAMENTO RÁPIDO:\n' +
+      'Redija uma ata em TÓPICOS CURTOS. Foco em: o que foi alinhado, próximos passos e prazos. Sem detalhes de debate.\n\n' +
+      '## ESTRUTURA OBRIGATÓRIA:\n\n' +
+      '### 1. CABEÇALHO\n' +
+      '- Reunião, Data, Participantes, Duração estimada\n\n' +
+      '### 2. O QUE FOI ALINHADO\n' +
+      'Lista de bullet points com cada alinhamento ou acordo estabelecido. Máximo 2 linhas por item.\n\n' +
+      '### 3. PRÓXIMOS PASSOS\n' +
+      'Lista: ✅ [Ação] — [Responsável] — [Prazo]\n\n' +
+      '### 4. PONTOS DE ATENÇÃO\n' +
+      'Riscos, bloqueios ou dúvidas levantadas (se houver). Máximo 3 itens.\n\n' +
+      '## REGRAS:\n' +
+      '- Seja MUITO conciso. A ata inteira não deve ultrapassar 1 página.\n' +
+      '- Priorize ação e clareza sobre completude.\n' +
+      '- Use linguagem direta e informal quando adequado.\n' +
+      '- Se não há próximos passos definidos, escreva "Nenhum próximo passo definido".\n\n' +
+      'Gere a Ata de Alinhamento Rápido em formato Markdown:'
+    );
+  }
+
+  // fallback: usa a ata padrão
+  return montarPromptAta(titulo, participantes, data, instrucaoExtra, 'TRANSCRIÇÃO', transcricao);
+}
+

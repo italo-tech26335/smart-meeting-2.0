@@ -112,7 +112,18 @@ const COLUNAS_REUNIOES = {
   EMAILS_ENVIADOS: 12,
   PROJETOS_IMPACTADOS: 13,
   ETAPAS_IMPACTADAS: 14,
-  DEPARTAMENTO_ID: 15
+  DEPARTAMENTO_ID: 15,
+  ATA_EXECUTIVA: 16,
+  ATA_DETALHADA: 17,
+  ATA_RESPONSAVEL: 18,
+  ATA_ALINHAMENTO: 19
+};
+
+const STATUS_REUNIAO = {
+  AGUARDANDO:  'Aguardando Processamento',
+  PROCESSANDO: 'Processando',
+  PROCESSADA:  'Processada',
+  ERRO:        'Erro'
 };
 
 /** =====================================================================
@@ -289,7 +300,7 @@ function verificarEstruturaPlanilha() {
     [NOME_ABA_RESPONSAVEIS]:  ['ID', 'Nome', 'Email', 'Cargo'],
     [NOME_ABA_ETAPAS]:        ['ID', 'ProjetoId', 'ResponsaveisIds', 'Nome', 'OQueFazer', 'Status'],
     [NOME_ABA_DEPENDENCIAS]:  ['ID', 'EtapaOrigemId', 'OrigemAnchor', 'EtapaDestinoId', 'DestinoAnchor'],
-    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId'],
+    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId', 'AtaExecutiva', 'AtaDetalhada', 'AtaResponsavel', 'AtaAlinhamento'],
     [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
     [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
     [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
@@ -397,7 +408,7 @@ function corrigirEstruturaPlanilha() {
     [NOME_ABA_RESPONSAVEIS]:  ['ID', 'Nome', 'Email', 'Cargo'],
     [NOME_ABA_ETAPAS]:        ['ID', 'ProjetoId', 'ResponsaveisIds', 'Nome', 'OQueFazer', 'Status'],
     [NOME_ABA_DEPENDENCIAS]:  ['ID', 'EtapaOrigemId', 'OrigemAnchor', 'EtapaDestinoId', 'DestinoAnchor'],
-    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId'],
+    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId', 'AtaExecutiva', 'AtaDetalhada', 'AtaResponsavel', 'AtaAlinhamento'],
     [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
     [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
     [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
@@ -638,7 +649,7 @@ function inicializarCabecalhoAba(aba, nomeAba) {
     [NOME_ABA_RESPONSAVEIS]:  ['ID', 'Nome', 'Email', 'Cargo'],
     [NOME_ABA_ETAPAS]:        ['ID', 'ProjetoId', 'ResponsaveisIds', 'Nome', 'OQueFazer', 'Status'],
     [NOME_ABA_DEPENDENCIAS]:  ['ID', 'EtapaOrigemId', 'OrigemAnchor', 'EtapaDestinoId', 'DestinoAnchor'],
-    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId'],
+    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId', 'AtaExecutiva', 'AtaDetalhada', 'AtaResponsavel', 'AtaAlinhamento'],
     [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
     [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
     [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
