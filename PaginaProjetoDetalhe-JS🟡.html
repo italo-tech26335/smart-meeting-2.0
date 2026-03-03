@@ -59,6 +59,8 @@ let ESTADO = {
   historicoChat: [],
   pessoasParaQuem: {},
   configCalculoPrioridade: null,
+  permissoes: {},
+  departamentos: [],
   prioridadesProjetos: [],
   responsaveisEmail: [],
   emailsCcSelecionados: [],
@@ -171,7 +173,7 @@ function carregarTudo() {
         esconderTelaCarregamento();
         mostrarToast('Erro: ' + erro, 'erro');
       })
-      .carregarDadosEditorProjeto();
+      .carregarDadosEditorProjeto(SESSAO_TOKEN);
   } else {
     setTimeout(function() {
       esconderTelaCarregamento();
@@ -191,6 +193,8 @@ function preencherEstado(dados) {
   ESTADO.prioridadesProjetos = dados.prioridadesProjetos || [];
   ESTADO.pessoasParaQuem = dados.pessoasParaQuem || {};
   ESTADO.configCalculoPrioridade = dados.configCalculoPrioridade || null;
+  ESTADO.permissoes = dados.permissoes || {};
+  ESTADO.departamentos = dados.departamentos || [];
 
   // ← Aplicar tema vindo do servidor
   if (dados.tema === 'azul') {
@@ -225,7 +229,7 @@ function recarregarDadosSemTela() {
       }
     })
     .withFailureHandler(function() { /* silencioso */ })
-    .carregarDadosEditorProjeto();
+    .carregarDadosEditorProjeto(SESSAO_TOKEN);
 }
 
 /** Renderiza toda a interface */
@@ -451,7 +455,7 @@ function fecharModal(idModal) {
   if (modal) modal.classList.remove('visible');
 }
 
-/** Popula os selects dos modais (Setor, Para Quem, Gravidade, Urgência) */
+/** Popula os selects dos modais (Setor, Para Quem, Gravidade, Urgência, Departamento) */
 function popularSelectsModais() {
   // Setor
   ['itemSetor', 'novoProjetoSetor'].forEach(function(selId) {
@@ -463,9 +467,44 @@ function popularSelectsModais() {
     sel.appendChild(frag);
   });
 
+  // Departamento
+  ['itemDepartamento', 'novoProjetoDepartamento'].forEach(function(selId) {
+    popularSelectDepartamentos(selId);
+  });
+
   popularSelectParaQuem();
   popularSelectGravidadeUrgencia();
-  popularSelectEsforco();   // ← novo
+  popularSelectEsforco();
+}
+
+/** Popula um select de departamento com base no perfil do usuário */
+function popularSelectDepartamentos(selectId) {
+  var sel = document.getElementById(selectId);
+  if (!sel) return;
+
+  var ehAdmin = ESTADO.permissoes && ESTADO.permissoes.modoAdmin;
+  var depsFiltro = (ESTADO.permissoes && ESTADO.permissoes.departamentosIds) ? ESTADO.permissoes.departamentosIds : [];
+  var todosDepts = ESTADO.departamentos || [];
+
+  // Admin vê todos; não-admin vê só os seus
+  var depsMostrar = ehAdmin ? todosDepts : todosDepts.filter(function(d) {
+    return depsFiltro.length === 0 || depsFiltro.includes(d.id);
+  });
+
+  sel.innerHTML = '<option value="">Selecione...</option>';
+  var frag = document.createDocumentFragment();
+  depsMostrar.forEach(function(d) {
+    var opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.nome || d.id;
+    frag.appendChild(opt);
+  });
+  sel.appendChild(frag);
+
+  // Se não-admin com apenas 1 departamento, pré-seleciona
+  if (!ehAdmin && depsMostrar.length === 1) {
+    sel.value = depsMostrar[0].id;
+  }
 }
 
 function selecionarSelectPorLabel(selectEl, labelSalvo) {
@@ -1729,7 +1768,7 @@ function executarExclusaoProjeto() {
         fecharModalConfirmarExclusao();
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .excluirProjeto(projetoId);
+      .excluirProjeto(projetoId, SESSAO_TOKEN);
   } else {
     // Demo
     setTimeout(function() {
@@ -1759,7 +1798,7 @@ function abrirModalLixeira() {
       .withFailureHandler(function(e) {
         corpo.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Erro: ' + e + '</p></div>';
       })
-      .listarLixeira();
+      .listarLixeira(SESSAO_TOKEN);
   } else {
     // Demo
     setTimeout(function() { renderizarLixeira([]); }, 500);
@@ -1834,7 +1873,7 @@ function restaurarProjeto(projetoId) {
         esconderSpinner(corpo);
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .restaurarDaLixeira(projetoId);
+      .restaurarDaLixeira(projetoId, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
       esconderSpinner(corpo);
@@ -1866,7 +1905,7 @@ function excluirPermanente(projetoId, nomeProjeto) {
         esconderSpinner(corpo);
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .excluirDefinitivamente(projetoId);
+      .excluirDefinitivamente(projetoId, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
       esconderSpinner(corpo);
@@ -2573,7 +2612,7 @@ function alternarConclusaoAtividade(atividadeId, event) {
         rollbackChecklist(atividade, atividadeId, statusAnterior, novoStatus);
         mostrarToast('Erro de conexão: ' + erro, 'erro');
       })
-      .salvarEtapaCompleta(dadosParaSalvar);
+      .salvarEtapaCompleta(dadosParaSalvar, SESSAO_TOKEN);
   }
 }
 
@@ -2728,7 +2767,7 @@ function salvarOrdemAtividades() {
         }
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .salvarOrdemAtividades(ESTADO.projeto.id, idsOrdenados);
+      .salvarOrdemAtividades(ESTADO.projeto.id, idsOrdenados, SESSAO_TOKEN);
   } else {
     // Demo / ambiente sem Google
     setTimeout(function() {
@@ -2832,7 +2871,7 @@ function ciclarStatusAtividade(atividadeId, event) {
         renderizarDiagrama();
         mostrarToast('Erro ao salvar status', 'erro');
       })
-      .salvarEtapaCompleta(dadosParaSalvar);
+      .salvarEtapaCompleta(dadosParaSalvar, SESSAO_TOKEN);
   }
 }
 
@@ -2979,6 +3018,10 @@ function abrirModalEdicao(tipo, id) {
     var selSetor = document.getElementById('itemSetor');
     if (selSetor) { garantirOptionExiste(selSetor, proj.setor); selSetor.value = proj.setor || ''; }
 
+    // Preenche o departamento atual do projeto
+    var selDep = document.getElementById('itemDepartamento');
+    if (selDep) selDep.value = proj.departamentoId || '';
+
     popularCheckboxesResponsaveis('itemResponsaveisContainer', proj.responsaveisIds || []);
     document.getElementById('btnExcluirItem').style.display = 'none';
 
@@ -3061,7 +3104,8 @@ function salvarProjeto() {
     responsaveisIds: obterResponsaveisSelecionados('itemResponsaveisContainer'),
     valorPrioridade: valorPrioridade,
     dataInicio:      document.getElementById('itemDataInicio').value || '',
-    dataFim:         document.getElementById('itemDataFim').value    || ''
+    dataFim:         document.getElementById('itemDataFim').value    || '',
+    departamentoId:  (document.getElementById('itemDepartamento') ? document.getElementById('itemDepartamento').value : '') || (projetoExistente.departamentoId || '')
   };
 
   var modalBody = document.querySelector('#modalEdicao .modal-body');
@@ -3086,7 +3130,7 @@ function salvarProjeto() {
         esconderSpinner(modalBody);
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .salvarProjetoCompleto(dados);
+      .salvarProjetoCompleto(dados, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
       esconderSpinner(modalBody);
@@ -3133,7 +3177,7 @@ function salvarAtividade() {
         esconderSpinner(modalBody);
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .salvarEtapaCompleta(dados);
+      .salvarEtapaCompleta(dados, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
       esconderSpinner(modalBody);
@@ -3212,7 +3256,7 @@ function confirmarExcluirAtividade(atividadeId) {
         esconderSpinner(containerDiagrama);
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .excluirEtapaCompleta(atividadeId);
+      .excluirEtapaCompleta(atividadeId, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
       esconderSpinner(containerDiagrama);
@@ -3343,6 +3387,16 @@ function salvarNovoProjeto() {
   var nome = document.getElementById('novoProjetoNome').value.trim();
   if (!nome) { mostrarToast('Nome é obrigatório', 'erro'); return; }
 
+  // Lê o departamento selecionado no select (adicionado ao modal)
+  var selDep = document.getElementById('novoProjetoDepartamento');
+  var departamentoPadrao = selDep ? selDep.value : '';
+
+  // Fallback: usa primeiro departamento do usuário se select não tiver valor
+  if (!departamentoPadrao) {
+    var depsUsuario = (ESTADO.permissoes && Array.isArray(ESTADO.permissoes.departamentosIds))
+      ? ESTADO.permissoes.departamentosIds : [];
+    departamentoPadrao = depsUsuario.length > 0 ? depsUsuario[0] : '';
+  }
   var c = ESTADO.novoProjetoCalculo;
   var valorPrioridade = c.tipoProjeto * c.paraQuem * c.gravidade * c.urgencia * c.esforco; // ← atualizado
   var catPrio   = obterCategoriaPrioridade(valorPrioridade);
@@ -3364,7 +3418,8 @@ function salvarNovoProjeto() {
     valorPrioridade: valorPrioridade,
     responsaveisIds: obterResponsaveisSelecionados('novoProjetoResponsaveisContainer'),
     dataInicio:      document.getElementById('novoProjetoDataInicio')?.value || '',
-    dataFim:         document.getElementById('novoProjetoDataFim')?.value    || ''
+    dataFim:         document.getElementById('novoProjetoDataFim')?.value    || '',
+    departamentoId:  departamentoPadrao
   };
 
   var modalBody = document.querySelector('#modalNovoProjeto .modal-body');
@@ -3389,7 +3444,7 @@ function salvarNovoProjeto() {
         esconderSpinner(modalBody);
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .salvarProjetoCompleto(dados);
+      .salvarProjetoCompleto(dados, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
       esconderSpinner(modalBody);
@@ -3615,7 +3670,7 @@ function salvarCalculoPrioridade() {
         esconderSpinner(modalBody);
         mostrarToast('Erro: ' + e, 'erro');
       })
-      .salvarValorPrioridadeProjeto(c.projetoId, valorCalculado, dadosCalculo);
+      .salvarValorPrioridadeProjeto(c.projetoId, valorCalculado, dadosCalculo, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
       esconderSpinner(modalBody);

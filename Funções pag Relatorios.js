@@ -1,8 +1,45 @@
 const PREFIXO_ARQUIVO_RELATORIO = 'Relatorio_Identificacoes_';
 const EXTENSAO_RELATORIO = '.md';
+const MARCADOR_DEP_RELATORIO = '_DEP-'; // separador de departamento no nome do arquivo
 
-function listarRelatoriosIdentificacao() {
+/**
+ * Monta os slugs de departamento do usuário para uso no filtro de relatórios.
+ * Retorna null para admin (vê tudo) ou sessão inexistente.
+ */
+function _obterSlugsDepsUsuarioParaRelatorio(token) {
+  if (!token) return null;
   try {
+    var sessao = _obterSessao(token);
+    if (!sessao) return null;
+    if (sessao.perfil === 'admin') return null; // admin vê tudo
+
+    var depsIds = _obterDepsAtualizadosUsuario(sessao);
+    if (!depsIds || depsIds.length === 0) return null; // sem restrição (retrocompat)
+
+    // Busca nomes na aba de departamentos
+    var resDeps = listarDepartamentos(null);
+    var todosDeps = (resDeps && resDeps.sucesso) ? (resDeps.departamentos || []) : [];
+
+    // Para cada ID do usuário, encontra o nome e gera o slug
+    var slugs = [];
+    depsIds.forEach(function(id) {
+      var dep = todosDeps.find(function(d) { return d.id === id || d.nome === id; });
+      var nome = dep ? dep.nome : id;
+      var slug = _slugificarNomeDep(nome);
+      if (slug) slugs.push(slug);
+    });
+    return slugs.length > 0 ? slugs : null;
+  } catch (e) {
+    Logger.log('AVISO _obterSlugsDepsUsuarioParaRelatorio: ' + e.toString());
+    return null;
+  }
+}
+
+function listarRelatoriosIdentificacao(token) {
+  try {
+    // Filtro por departamento (null = sem restrição)
+    var slugsUsuario = _obterSlugsDepsUsuarioParaRelatorio(token);
+
     const pasta = DriveApp.getFolderById(ID_PASTA_DRIVE_REUNIOES);
     const arquivos = pasta.getFiles();
     const relatorios = [];
@@ -14,12 +51,32 @@ function listarRelatoriosIdentificacao() {
       // Filtrar apenas arquivos de relatório
       if (nomeArquivo.startsWith(PREFIXO_ARQUIVO_RELATORIO) && nomeArquivo.endsWith(EXTENSAO_RELATORIO)) {
 
-        // Extrair data do nome do arquivo (Relatorio_Identificacoes_YYYYMMDD_HHMMSS.md)
-        const partes = nomeArquivo
-          .replace(PREFIXO_ARQUIVO_RELATORIO, '')
-          .replace(EXTENSAO_RELATORIO, '')
-          .split('_');
+        // ─── Filtro de departamento ───────────────────────────────────────
+        if (slugsUsuario !== null) {
+          var temDep = nomeArquivo.indexOf(MARCADOR_DEP_RELATORIO) !== -1;
+          if (temDep) {
+            // Arquivo tem marcação de departamento: verifica se pertence ao usuário
+            var pertence = slugsUsuario.some(function(slug) {
+              return nomeArquivo.indexOf(MARCADOR_DEP_RELATORIO + slug + '_') !== -1;
+            });
+            if (!pertence) continue; // pula arquivo de outro departamento
+          }
+          // Arquivo sem marcação de departamento (legado): visível a todos
+        }
+        // ─────────────────────────────────────────────────────────────────
 
+        // Extrair data do nome do arquivo
+        // Formato novo: Relatorio_Identificacoes_DEP-SLUG_YYYYMMDD_HHMMSS.md
+        // Formato antigo: Relatorio_Identificacoes_YYYYMMDD_HHMMSS.md
+        var nomeBase = nomeArquivo
+          .replace(PREFIXO_ARQUIVO_RELATORIO, '')
+          .replace(EXTENSAO_RELATORIO, '');
+
+        // Remove o segmento _DEP-SLUG se existir
+        var matchDep = nomeBase.match(/^DEP-[^_]+_/);
+        if (matchDep) nomeBase = nomeBase.substring(matchDep[0].length);
+
+        const partes = nomeBase.split('_');
         let dataFormatada = '-';
         let dataCriacaoMs = 0;
 
@@ -1199,34 +1256,29 @@ function extrairProjetosDoRelatorioV2(conteudo) {
 
 
 
-function salvarRelatorioNoDrive(conteudoRelatorio, tituloReuniao) {
+function salvarRelatorioNoDrive(conteudoRelatorio, tituloReuniao, nomeDepartamento) {
   try {
-    var tituloLimpo = limparTituloParaNomeArquivo(tituloReuniao || '');
-
-    // Fallback: extrair do conteúdo se título vazio
-    if (!tituloLimpo || tituloLimpo === 'Reuniao') {
-      var temaExtraido = extrairTemaParaNomeArquivo(conteudoRelatorio);
-      if (temaExtraido) {
-        tituloLimpo = temaExtraido.replace(/-/g, ' ');
-      }
-    }
-
-    var nomeArquivo = PREFIXO_ARQUIVO_RELATORIO + tituloLimpo + EXTENSAO_RELATORIO;
-
-    var pasta = DriveApp.getFolderById(ID_PASTA_DRIVE_REUNIOES);
+    const pasta = DriveApp.getFolderById(ID_PASTA_DRIVE_REUNIOES);
+    const timestamp = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyyMMdd_HHmmss');
+    // Embute o departamento no nome do arquivo para filtragem por permissão
+    var slugDep = _slugificarNomeDep(nomeDepartamento || '');
+    var sufixoDep = slugDep ? (MARCADOR_DEP_RELATORIO + slugDep) : '';
+    const nomeArquivo = PREFIXO_ARQUIVO_RELATORIO + sufixoDep.replace(/^_/, '') + (sufixoDep ? '_' : '') + timestamp + EXTENSAO_RELATORIO;
     var arquivo = pasta.createFile(nomeArquivo, conteudoRelatorio, MimeType.PLAIN_TEXT);
+    arquivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     Logger.log('Relatório salvo: ' + nomeArquivo);
 
     return {
       nomeArquivo: nomeArquivo,
       idArquivo: arquivo.getId(),
-      linkArquivo: arquivo.getUrl()
+      linkArquivo: arquivo.getUrl(),
+      sucesso: true
     };
 
   } catch (erro) {
     Logger.log('ERRO salvarRelatorioNoDrive: ' + erro.toString());
-    throw erro;
+    return { sucesso: false, nomeArquivo: '', linkArquivo: '' };
   }
 }
 

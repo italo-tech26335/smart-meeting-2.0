@@ -10,9 +10,21 @@ document.addEventListener('DOMContentLoaded', function() {
   if (elNome && typeof USUARIO_NOME !== 'undefined') elNome.textContent = USUARIO_NOME;
 
   verificarSessaoCliente(function() {
-    carregarUsuarios();
+    // Carrega departamentos primeiro (necessário para exibir nomes na tabela de usuários)
+    google.script.run
+      .withSuccessHandler(function(r) {
+        _todosDepartamentos = (r && r.departamentos) ? r.departamentos : [];
+        carregarUsuarios();
+      })
+      .withFailureHandler(function() { carregarUsuarios(); })
+      .listarDepartamentos(SESSAO_TOKEN);
   });
 });
+
+// ── Estado global ─────────────────────────────────────────────────────
+var _todosDepartamentos = [];
+var _mapaUsuarios = {};
+var _mapaDepartamentos = {};
 
 // ── Navegação entre seções ────────────────────────────────────────────
 function mostrarSecao(id) {
@@ -21,11 +33,12 @@ function mostrarSecao(id) {
   var sec = document.getElementById(id);
   if (sec) sec.classList.add('ativa');
 
-  var tabMap = { secUsuarios: 'tabUsuarios', secLogs: 'tabLogs' };
+  var tabMap = { secUsuarios: 'tabUsuarios', secDepartamentos: 'tabDepartamentos', secLogs: 'tabLogs' };
   var tab = document.getElementById(tabMap[id]);
   if (tab) tab.classList.add('ativo');
 
   if (id === 'secLogs') carregarLogs();
+  if (id === 'secDepartamentos') carregarDepartamentos();
 }
 
 // ── Carregar usuários ─────────────────────────────────────────────────
@@ -50,7 +63,9 @@ function _renderizarUsuarios(lista) {
     return;
   }
 
+  _mapaUsuarios = {};
   var html = lista.map(function(u) {
+    _mapaUsuarios[u.id] = u;
     var perfilBadge = {
       admin:        '<span class="badge badge-admin">Admin</span>',
       usuario:      '<span class="badge badge-usuario">Usuário</span>',
@@ -63,15 +78,19 @@ function _renderizarUsuarios(lista) {
         ? '<span class="badge badge-ativo">Ativo</span>'
         : '<span class="badge badge-inativo">Inativo</span>';
 
-    var ultimoLogin = u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString('pt-BR') : '—';
+    var ultimoLogin = u.ultimoLogin || '—';
+    var depNomes = (u.departamentosIds || []).map(function(depId) {
+      var dep = _todosDepartamentos.find(function(d) { return d.id === depId; });
+      return dep ? dep.nome : depId;
+    }).join(', ') || '—';
 
     return '<tr>'
-      + '<td><div style="font-weight:600;">' + _esc(u.nome) + '</div><div style="color:#64748b;font-size:.78rem;">' + _esc(u.email) + '</div></td>'
+      + '<td><div style="font-weight:600;">' + _esc(u.nome) + '</div><div style="color:var(--cor-primaria);font-size:.78rem;">' + _esc(u.email) + '</div><div style="color:var(--cor-primaria);font-size:.75rem;margin-top:2px;"><i class="fas fa-building" style="font-size:.7rem;"></i> ' + _esc(depNomes) + '</div></td>'
       + '<td>' + perfilBadge + '</td>'
       + '<td>' + statusBadge + '</td>'
       + '<td style="color:#64748b;">' + ultimoLogin + '</td>'
       + '<td>'
-      + '<button class="btn btn-ghost btn-sm" onclick="abrirModalEditarUsuario(' + JSON.stringify(u) + ')" title="Editar"><i class="fas fa-edit"></i></button> '
+      + '<button class="btn btn-ghost btn-sm" onclick="abrirModalEditarUsuario(_mapaUsuarios[\'' + u.id + '\'])" title="Editar"><i class="fas fa-edit"></i></button> '
       + (u.bloqueado ? '<button class="btn btn-ghost btn-sm" onclick="desbloquear(\'' + _esc(u.id) + '\')" title="Desbloquear"><i class="fas fa-unlock"></i></button> ' : '')
       + '<button class="btn btn-ghost btn-sm" onclick="resetarSenhaAdmin(\'' + _esc(u.id) + '\')" title="Resetar senha"><i class="fas fa-key"></i></button>'
       + '</td>'
@@ -120,28 +139,160 @@ function _renderizarLogs(lista) {
   }
 
   var corEvento = {
-    login_sucesso:    '#86efac',
-    login_falha:      '#fca5a5',
-    logout:           '#94a3b8',
-    reset_senha:      '#fcd34d',
-    acesso_negado:    '#fca5a5',
-    sessao_expirada:  '#94a3b8',
-    usuario_bloqueado:'#fcd34d'
+    login_sucesso:    '#3a6030',
+    login_falha:      '#8b2e2e',
+    logout:           '#8b6347',
+    reset_senha:      '#a06820',
+    acesso_negado:    '#8b2e2e',
+    sessao_expirada:  '#8b6347',
+    usuario_bloqueado:'#a06820'
   };
 
   var html = lista.map(function(log) {
-    var ts = log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '—';
-    var cor = corEvento[log.evento] || '#94a3b8';
+    var ts = log.timestamp || '—';
+    var cor = corEvento[log.evento] || '#8b6347';
     return '<tr>'
-      + '<td style="color:#64748b;font-size:.78rem;white-space:nowrap;">' + ts + '</td>'
+      + '<td style="color:var(--cor-primaria);font-size:.78rem;white-space:nowrap;">' + _esc(ts) + '</td>'
       + '<td><span style="color:' + cor + ';font-size:.78rem;font-weight:600;">' + _esc(log.evento || '') + '</span></td>'
       + '<td style="font-size:.82rem;">' + _esc(log.usuario || '—') + '</td>'
-      + '<td style="color:#64748b;font-size:.78rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(log.detalhes || '') + '">' + _esc(log.detalhes || '—') + '</td>'
-      + '<td><span style="font-size:.75rem;color:' + (log.resultado === 'sucesso' ? '#86efac' : '#fca5a5') + ';">' + _esc(log.resultado || '') + '</span></td>'
+      + '<td style="color:var(--cor-primaria);font-size:.78rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + _esc(log.detalhes || '') + '">' + _esc(log.detalhes || '—') + '</td>'
+      + '<td><span style="font-size:.75rem;color:' + (log.resultado === 'sucesso' ? '#3a6030' : '#8b2e2e') + ';">' + _esc(log.resultado || '') + '</span></td>'
       + '</tr>';
   }).join('');
 
   tbody.innerHTML = html;
+}
+
+// ── Departamentos ──────────────────────────────────────────────────────
+function carregarDepartamentos() {
+  var tbody = document.getElementById('tbodyDepartamentos');
+  tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:32px;"><span class="spinner-inline"></span> Carregando...</td></tr>';
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r.sucesso) { toast(r.mensagem || 'Erro ao carregar', 'err'); return; }
+      _todosDepartamentos = r.departamentos || [];
+      _renderizarDepartamentos(_todosDepartamentos);
+    })
+    .withFailureHandler(function(e) { toast('Erro: ' + e.message, 'err'); })
+    .listarDepartamentos(SESSAO_TOKEN);
+}
+
+function _renderizarDepartamentos(lista) {
+  var tbody = document.getElementById('tbodyDepartamentos');
+  if (lista.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3"><div class="empty-state"><i class="fas fa-building"></i><p>Nenhum departamento cadastrado</p></div></td></tr>';
+    return;
+  }
+  _mapaDepartamentos = {};
+  var html = lista.map(function(d) {
+    _mapaDepartamentos[d.id] = d;
+    return '<tr>'
+      + '<td style="font-weight:600;">' + _esc(d.nome) + '</td>'
+      + '<td style="color:var(--cor-primaria);">' + _esc(d.descricao || '—') + '</td>'
+      + '<td>'
+      + '<button class="btn btn-ghost btn-sm" onclick="abrirModalEditarDepartamento(_mapaDepartamentos[\'' + d.id + '\'])" title="Editar"><i class="fas fa-edit"></i></button> '
+      + '<button class="btn btn-danger btn-sm" onclick="removerDepartamento(\'' + d.id + '\')" title="Remover"><i class="fas fa-trash"></i></button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+  tbody.innerHTML = html;
+}
+
+function abrirModalNovoDepartamento() {
+  _txt('modalDepTitulo', 'Novo Departamento');
+  _val('editDepId', '');
+  _val('editDepNome', '');
+  _val('editDepDescricao', '');
+  document.getElementById('modalDepartamento').classList.add('aberto');
+}
+
+function abrirModalEditarDepartamento(d) {
+  _txt('modalDepTitulo', 'Editar Departamento');
+  _val('editDepId', d.id);
+  _val('editDepNome', d.nome);
+  _val('editDepDescricao', d.descricao || '');
+  document.getElementById('modalDepartamento').classList.add('aberto');
+}
+
+function fecharModalDepartamento() {
+  document.getElementById('modalDepartamento').classList.remove('aberto');
+}
+
+function salvarDepartamento() {
+  var id   = document.getElementById('editDepId').value;
+  var nome = document.getElementById('editDepNome').value.trim();
+  var desc = document.getElementById('editDepDescricao').value.trim();
+  if (!nome) { toast('Nome obrigatório', 'err'); return; }
+
+  var btn = document.getElementById('btnSalvarDepartamento');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-inline"></span> Salvando...';
+
+  var fn = id ? 'atualizarDepartamento' : 'criarDepartamento';
+  var dadosDep = id ? { id: id, nome: nome, descricao: desc } : { nome: nome, descricao: desc };
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-save"></i> Salvar';
+      if (r.sucesso) {
+        toast(r.mensagem || 'Salvo!', 'ok');
+        fecharModalDepartamento();
+        carregarDepartamentos();
+      } else {
+        toast(r.mensagem || 'Erro', 'err');
+      }
+    })
+    .withFailureHandler(function(e) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-save"></i> Salvar';
+      toast('Erro: ' + e.message, 'err');
+    })
+    [fn](SESSAO_TOKEN, dadosDep);
+}
+
+function removerDepartamento(id) {
+  if (!confirm('Remover este departamento? Esta ação não pode ser desfeita.')) return;
+  google.script.run
+    .withSuccessHandler(function(r) {
+      toast(r.sucesso ? 'Departamento removido!' : (r.mensagem || 'Erro'), r.sucesso ? 'ok' : 'err');
+      if (r.sucesso) carregarDepartamentos();
+    })
+    .withFailureHandler(function(e) { toast('Erro: ' + e.message, 'err'); })
+    .removerDepartamento(SESSAO_TOKEN, id);
+}
+
+function _carregarDepsParaModal(depsSelecionadas) {
+  var container = document.getElementById('listaDepartamentosUsuario');
+  if (!container) return;
+  if (_todosDepartamentos.length === 0) {
+    // Carrega da API se ainda não tiver
+    google.script.run
+      .withSuccessHandler(function(r) {
+        _todosDepartamentos = (r && r.departamentos) ? r.departamentos : [];
+        _renderizarChecksDeps(container, depsSelecionadas);
+      })
+      .withFailureHandler(function() { container.innerHTML = '<span style="color:var(--cor-primaria);">Não foi possível carregar</span>'; })
+      .listarDepartamentos(SESSAO_TOKEN);
+  } else {
+    _renderizarChecksDeps(container, depsSelecionadas);
+  }
+}
+
+function _renderizarChecksDeps(container, depsSelecionadas) {
+  var sels = depsSelecionadas || [];
+  if (_todosDepartamentos.length === 0) {
+    container.innerHTML = '<span style="color:var(--cor-primaria);font-size:.82rem;">Nenhum departamento cadastrado</span>';
+    return;
+  }
+  container.innerHTML = _todosDepartamentos.map(function(d) {
+    var checked = sels.includes(d.id) ? 'checked' : '';
+    return '<label style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid var(--cor-borda);border-radius:20px;cursor:pointer;font-size:.82rem;background:var(--cor-fundo-card);">'
+      + '<input type="checkbox" value="' + _esc(d.id) + '" ' + checked + ' style="accent-color:var(--cor-destaque);">'
+      + ' ' + _esc(d.nome)
+      + '</label>';
+  }).join('');
 }
 
 // ── Modal novo usuário ────────────────────────────────────────────────
@@ -156,6 +307,7 @@ function abrirModalNovoUsuario() {
   document.getElementById('campoSenhaModal').style.display = '';
   document.getElementById('senhaGerada').style.display = 'none';
   document.getElementById('editEmail').readOnly = false;
+  _carregarDepsParaModal([]);
   document.getElementById('modalUsuario').classList.add('aberto');
 }
 
@@ -170,6 +322,7 @@ function abrirModalEditarUsuario(u) {
   document.getElementById('campoSenhaModal').style.display = 'none';
   document.getElementById('senhaGerada').style.display = 'none';
   document.getElementById('editEmail').readOnly = true;
+  _carregarDepsParaModal(u.departamentosIds || []);
   document.getElementById('modalUsuario').classList.add('aberto');
 }
 
@@ -189,10 +342,14 @@ function salvarUsuario() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-inline"></span> Salvando...';
 
+  // Coletar departamentos selecionados
+  var depChecks = document.querySelectorAll('#listaDepartamentosUsuario input[type="checkbox"]:checked');
+  var depIds = Array.prototype.map.call(depChecks, function(c) { return c.value; });
+
   if (!id) {
     // Criar novo usuário
     var senha = document.getElementById('editSenha').value;
-    var dados = { nome: nome, email: email, perfil: perfil, senha: senha };
+    var dados = { nome: nome, email: email, perfil: perfil, senha: senha, departamentosIds: depIds };
 
     google.script.run
       .withSuccessHandler(function(r) {
@@ -219,7 +376,7 @@ function salvarUsuario() {
   } else {
     // Atualizar usuário existente
     var ativo = document.getElementById('editAtivo').value === 'true';
-    var dadosUpd = { id: id, nome: nome, perfil: perfil, ativo: ativo };
+    var dadosUpd = { id: id, nome: nome, perfil: perfil, ativo: ativo, departamentosIds: depIds };
 
     google.script.run
       .withSuccessHandler(function(r) {

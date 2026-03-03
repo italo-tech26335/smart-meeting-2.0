@@ -9,17 +9,18 @@ const NOME_ABA_USUARIOS = 'Usuarios';
 const NOME_ABA_LOGS     = 'Logs';
 
 const COLUNAS_USUARIOS = {
-  ID:               0,
-  EMAIL:            1,
-  SENHA_HASH:       2,
-  SALT:             3,
-  NOME:             4,
-  PERFIL:           5,   // admin | usuario | visualizador
-  ATIVO:            6,
-  CRIADO_EM:        7,
-  ULTIMO_LOGIN:     8,
-  TENTATIVAS_LOGIN: 9,
-  BLOQUEADO_ATE:    10
+  ID:                0,
+  EMAIL:             1,
+  SENHA_HASH:        2,
+  SALT:              3,
+  NOME:              4,
+  PERFIL:            5,   // admin | usuario | visualizador
+  ATIVO:             6,
+  CRIADO_EM:         7,
+  ULTIMO_LOGIN:      8,
+  TENTATIVAS_LOGIN:  9,
+  BLOQUEADO_ATE:     10,
+  DEPARTAMENTOS_IDS: 11  // IDs separados por vírgula; vazio = sem restrição (admin)
 };
 
 const COLUNAS_LOGS = {
@@ -114,7 +115,7 @@ function fazerLogin(email, senha) {
 
     // Criar nova sessão
     var token = _criarToken();
-    _salvarSessao(token, email, usuario.perfil, usuario.nome);
+    _salvarSessao(token, email, usuario.perfil, usuario.nome, usuario.departamentosIds);
 
     _registrarLog('login_sucesso', email, '', 'login realizado', 'sucesso');
 
@@ -292,16 +293,18 @@ function listarUsuarios(token) {
       if (dados[i][COLUNAS_USUARIOS.ID]) {
         var bloqueadoAte = dados[i][COLUNAS_USUARIOS.BLOQUEADO_ATE];
         var estaBloqueado = bloqueadoAte && new Date(bloqueadoAte).getTime() > Date.now();
+        var rawDeps = (dados[i][COLUNAS_USUARIOS.DEPARTAMENTOS_IDS] || '').toString();
         usuarios.push({
-          id:            dados[i][COLUNAS_USUARIOS.ID],
-          email:         dados[i][COLUNAS_USUARIOS.EMAIL],
-          nome:          dados[i][COLUNAS_USUARIOS.NOME],
-          perfil:        dados[i][COLUNAS_USUARIOS.PERFIL],
-          ativo:         dados[i][COLUNAS_USUARIOS.ATIVO] === true || dados[i][COLUNAS_USUARIOS.ATIVO] === 'true',
-          criadoEm:      dados[i][COLUNAS_USUARIOS.CRIADO_EM] ? new Date(dados[i][COLUNAS_USUARIOS.CRIADO_EM]).toLocaleString('pt-BR') : '',
-          ultimoLogin:   dados[i][COLUNAS_USUARIOS.ULTIMO_LOGIN] ? new Date(dados[i][COLUNAS_USUARIOS.ULTIMO_LOGIN]).toLocaleString('pt-BR') : 'Nunca',
-          bloqueado:     estaBloqueado,
-          bloqueadoAte:  estaBloqueado ? new Date(bloqueadoAte).toLocaleString('pt-BR') : null
+          id:                dados[i][COLUNAS_USUARIOS.ID],
+          email:             dados[i][COLUNAS_USUARIOS.EMAIL],
+          nome:              dados[i][COLUNAS_USUARIOS.NOME],
+          perfil:            dados[i][COLUNAS_USUARIOS.PERFIL],
+          ativo:             dados[i][COLUNAS_USUARIOS.ATIVO] === true || dados[i][COLUNAS_USUARIOS.ATIVO] === 'true',
+          criadoEm:          dados[i][COLUNAS_USUARIOS.CRIADO_EM] ? new Date(dados[i][COLUNAS_USUARIOS.CRIADO_EM]).toLocaleString('pt-BR') : '',
+          ultimoLogin:       dados[i][COLUNAS_USUARIOS.ULTIMO_LOGIN] ? new Date(dados[i][COLUNAS_USUARIOS.ULTIMO_LOGIN]).toLocaleString('pt-BR') : 'Nunca',
+          bloqueado:         estaBloqueado,
+          bloqueadoAte:      estaBloqueado ? new Date(bloqueadoAte).toLocaleString('pt-BR') : null,
+          departamentosIds:  rawDeps ? rawDeps.split(',').map(function(d) { return d.trim(); }).filter(function(d) { return d !== ''; }) : []
         });
       }
     }
@@ -335,6 +338,12 @@ function criarUsuario(token, dados) {
     var salt = _gerarSalt();
     var hash = _hashSenha(dados.senha.toString(), salt);
     var id = gerarId();
+    var depIds = '';
+    if (dados.departamentosIds) {
+      depIds = Array.isArray(dados.departamentosIds)
+        ? dados.departamentosIds.join(',')
+        : dados.departamentosIds.toString();
+    }
 
     var aba = obterAba(NOME_ABA_USUARIOS);
     aba.appendRow([
@@ -348,7 +357,8 @@ function criarUsuario(token, dados) {
       new Date(),
       '',
       0,
-      ''
+      '',
+      depIds
     ]);
     limparCacheAba(NOME_ABA_USUARIOS);
 
@@ -393,9 +403,15 @@ function atualizarUsuario(token, dados) {
     for (var i = 1; i < rows.length; i++) {
       if (rows[i][COLUNAS_USUARIOS.ID] === dados.id) {
         var linha = i + 1;
-        if (dados.nome  !== undefined) aba.getRange(linha, COLUNAS_USUARIOS.NOME   + 1).setValue(dados.nome);
-        if (dados.perfil !== undefined) aba.getRange(linha, COLUNAS_USUARIOS.PERFIL + 1).setValue(dados.perfil);
-        if (dados.ativo  !== undefined) aba.getRange(linha, COLUNAS_USUARIOS.ATIVO  + 1).setValue(dados.ativo);
+        if (dados.nome             !== undefined) aba.getRange(linha, COLUNAS_USUARIOS.NOME              + 1).setValue(dados.nome);
+        if (dados.perfil           !== undefined) aba.getRange(linha, COLUNAS_USUARIOS.PERFIL            + 1).setValue(dados.perfil);
+        if (dados.ativo            !== undefined) aba.getRange(linha, COLUNAS_USUARIOS.ATIVO             + 1).setValue(dados.ativo);
+        if (dados.departamentosIds !== undefined) {
+          var depStr = Array.isArray(dados.departamentosIds)
+            ? dados.departamentosIds.join(',')
+            : dados.departamentosIds.toString();
+          aba.getRange(linha, COLUNAS_USUARIOS.DEPARTAMENTOS_IDS + 1).setValue(depStr);
+        }
         limparCacheAba(NOME_ABA_USUARIOS);
         _registrarLog('atualizar_usuario', sessao.email, '', 'usuário atualizado: ' + rows[i][COLUNAS_USUARIOS.EMAIL], 'sucesso');
         return { sucesso: true, mensagem: 'Usuário atualizado!' };
@@ -529,6 +545,39 @@ function obterLogs(token, filtros) {
   }
 }
 
+function setupAdminInicial() {
+  repararHeaderUsuarios();
+  inicializarAdmin('napa13@christus.com.br', 'A@a12345678', 'Italo');
+}
+
+/**
+ * Verifica se a aba Usuarios possui cabeçalho na linha 1.
+ * Se não possuir (primeira célula não é 'ID'), insere o cabeçalho.
+ * EXECUTAR no editor caso o admin já tenha sido criado sem header.
+ */
+function repararHeaderUsuarios() {
+  var aba = obterAba(NOME_ABA_USUARIOS);
+  var dados = aba.getDataRange().getValues();
+
+  // Se a primeira linha já é o cabeçalho correto, não faz nada
+  if (dados.length > 0 && dados[0][0] === 'ID') {
+    Logger.log('Header da aba Usuarios já está correto.');
+    return;
+  }
+
+  // Insere uma linha no topo com o cabeçalho
+  aba.insertRowBefore(1);
+  aba.getRange(1, 1, 1, 11).setValues([[
+    'ID', 'Email', 'SenhaHash', 'Salt', 'Nome',
+    'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin',
+    'TentativasLogin', 'BloqueadoAte'
+  ]]);
+  aba.getRange(1, 1, 1, 11).setFontWeight('bold');
+  limparCacheAba(NOME_ABA_USUARIOS);
+  Logger.log('✅ Header da aba Usuarios inserido com sucesso.');
+}
+
+
 // ============================================================================
 //  SETUP — executar uma vez no editor do Apps Script
 // ============================================================================
@@ -600,13 +649,22 @@ function _encodarEmail(email) {
   return Utilities.base64Encode(email.toLowerCase()).replace(/=/g, '');
 }
 
-function _salvarSessao(token, email, perfil, nome) {
+function _salvarSessao(token, email, perfil, nome, departamentosIds) {
+  var deps = [];
+  if (departamentosIds) {
+    if (Array.isArray(departamentosIds)) {
+      deps = departamentosIds;
+    } else {
+      deps = departamentosIds.toString().split(',').map(function(d) { return d.trim(); }).filter(function(d) { return d !== ''; });
+    }
+  }
   var dados = JSON.stringify({
-    email:  email,
-    perfil: perfil,
-    nome:   nome || email,
-    expiry: Date.now() + SESSAO_TTL_MS,
-    criadoEm: Date.now()
+    email:            email,
+    perfil:           perfil,
+    nome:             nome || email,
+    departamentosIds: deps,
+    expiry:           Date.now() + SESSAO_TTL_MS,
+    criadoEm:         Date.now()
   });
   PropertiesService.getScriptProperties().setProperty(PFX_SESSAO + token, dados);
 }
@@ -756,14 +814,16 @@ function _buscarUsuarioPorEmail(email) {
 
   for (var i = 1; i < dados.length; i++) {
     if ((dados[i][COLUNAS_USUARIOS.EMAIL] || '').toLowerCase() === emailLower) {
+      var rawDeps = (dados[i][COLUNAS_USUARIOS.DEPARTAMENTOS_IDS] || '').toString();
       return {
-        id:        dados[i][COLUNAS_USUARIOS.ID],
-        email:     dados[i][COLUNAS_USUARIOS.EMAIL],
-        senhaHash: dados[i][COLUNAS_USUARIOS.SENHA_HASH],
-        salt:      dados[i][COLUNAS_USUARIOS.SALT],
-        nome:      dados[i][COLUNAS_USUARIOS.NOME],
-        perfil:    dados[i][COLUNAS_USUARIOS.PERFIL],
-        ativo:     dados[i][COLUNAS_USUARIOS.ATIVO] === true || dados[i][COLUNAS_USUARIOS.ATIVO] === 'true'
+        id:               dados[i][COLUNAS_USUARIOS.ID],
+        email:            dados[i][COLUNAS_USUARIOS.EMAIL],
+        senhaHash:        dados[i][COLUNAS_USUARIOS.SENHA_HASH],
+        salt:             dados[i][COLUNAS_USUARIOS.SALT],
+        nome:             dados[i][COLUNAS_USUARIOS.NOME],
+        perfil:           dados[i][COLUNAS_USUARIOS.PERFIL],
+        ativo:            dados[i][COLUNAS_USUARIOS.ATIVO] === true || dados[i][COLUNAS_USUARIOS.ATIVO] === 'true',
+        departamentosIds: rawDeps ? rawDeps.split(',').map(function(d) { return d.trim(); }).filter(function(d) { return d !== ''; }) : []
       };
     }
   }

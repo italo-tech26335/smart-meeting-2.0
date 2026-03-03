@@ -1,30 +1,5 @@
-const CONFIG_PROMPTS_REUNIAO = {
-  TRANSCRICAO: {
-    modelo: 'gemini-2.5-pro',
-    temperatura: 0.0,
-    maxTokens: 200000,       
-    pensamento: 1        
-  },
-  ATA: {
-    modelo: 'gemini-2.5-flash',
-    temperatura: 0.3,
-    maxTokens: 20000,        
-    pensamento: 0,           
-    maxTokensPorSecao: 20000  
-  },
-  EXTRACAO: {
-    modelo: 'gemini-2.5-flash',
-    temperatura: 0.2,
-    maxTokens: 100000,
-    pensamento: 0
-  },
-  ALTERACOES: {
-    modelo: 'gemini-2.5-flash',
-    temperatura: 0.1,
-    maxTokens: 100000,
-    pensamento: 0 
-  }
-};
+// CONFIG_PROMPTS_REUNIAO e funções montarPrompt* foram movidos para Prompts-IA.js
+// Para editar modelos, temperaturas ou textos dos prompts, edite Prompts-IA.js
 
 /**
  * Interpreta uma célula de IDs de responsáveis,
@@ -706,7 +681,7 @@ function processarAudioReuniao(dadosAudio) {
     adicionarLog('INFO', '🔍 [ETAPA 3/3] Gerando relatório de identificações...');
     const contexto = obterContextoProjetosParaGemini();
     const resultadoRelatorio = executarEtapaIdentificacaoAlteracoes(
-      resultadoTranscricao.transcricao, contexto, chaveGemini, dadosAudio.titulo
+      resultadoTranscricao.transcricao, contexto, chaveGemini, dadosAudio.titulo, dadosAudio.departamentoNome || ''
     );
 
     let linkRelatorio = '', nomeArquivoRelatorio = '';
@@ -739,7 +714,8 @@ function processarAudioReuniao(dadosAudio) {
       sugestoesIA: resultadoAta.sugestoes || '',
       linkAudio: resultadoDrive.linkArquivo,
       projetosImpactados: '',
-      etapasImpactadas: ''
+      etapasImpactadas: '',
+      departamentoId: dadosAudio.departamentoId || ''
     });
     adicionarLog('SUCESSO', `✅ Reunião salva com ID: ${reuniaoId}`);
     adicionarLog('SUCESSO', '🎉 Processamento concluído com sucesso!');
@@ -777,34 +753,7 @@ function executarEtapaTranscricao(dadosAudio, chaveApi, vocabulario) {
 
     var audioBase64 = dadosAudio.audioBase64.split(',')[1] || dadosAudio.audioBase64;
 
-    var promptTranscricao = 'Você é um transcritor profissional especializado em reuniões corporativas em português brasileiro.\n\n' +
-      '## SUA TAREFA:\n' +
-      'Transcreva o áudio da reunião de forma completa e precisa.\n\n' +
-      '## INSTRUÇÕES:\n' +
-      '1. Transcreva TODO o conteúdo falado no áudio\n' +
-      '2. Identifique diferentes falantes quando possível (Participante 1, Participante 2, etc.)\n' +
-      '3. Inclua marcações de tempo aproximadas a cada mudança significativa de tópico [MM:SS]\n' +
-      '4. Preserve termos técnicos, nomes de projetos, pessoas e sistemas mencionados\n' +
-      '5. Indique pausas longas com [pausa] e trechos inaudíveis com [inaudível]\n' +
-      '6. Quando dois ou mais participantes falarem SIMULTANEAMENTE:\n' +
-      '   - NÃO tente combinar ou interpretar os áudios sobrepostos\n' +
-      '   - NÃO invente palavras que "pareçam fazer sentido" com o ruído resultante\n' +
-      '   - Use exatamente: [falas simultâneas — trecho inaudível]\n' +
-      '   - Retome a transcrição assim que um único falante estiver claro\n' +
-      '   - Exemplo correto: [00:14] Participante 1: Com certeza, [falas simultâneas — trecho inaudível] [00:17] Kauã: ...então vamos seguir assim.\n' +
-      '7. Mantenha interjeições e expressões que indiquem concordância/discordância\n\n' +
-      '## FORMATO DE SAÍDA:\n' +
-      'Retorne APENAS a transcrição em texto corrido, com identificação de falantes e marcações de tempo.\n' +
-      'Exemplo:\n' +
-      '[00:00] Participante 1: Bom dia a todos, vamos começar a reunião...\n' +
-      '[00:15] Participante 2: Bom dia! Sobre o projeto X...\n\n' +
-      '## IMPORTANTE:\n' +
-      '- NÃO resuma ou interprete, apenas transcreva fielmente\n' +
-      '- NÃO adicione formatação markdown além da identificação de falantes\n' +
-      '- NÃO inclua comentários ou análises\n\n' +
-      blocoGlossario +
-      blocoAnchoring +
-      'Transcreva o áudio a seguir:';
+    var promptTranscricao = montarPromptTranscricaoInline(blocoGlossario, blocoAnchoring);
 
     var urlApi = 'https://generativelanguage.googleapis.com/v1beta/models/' + CONFIG_PROMPTS_REUNIAO.TRANSCRICAO.modelo + ':generateContent?key=' + chaveApi;
 
@@ -872,25 +821,7 @@ function executarTranscricaoViaFileUri(fileUri, tipoMime, chaveApi, vocabulario)
       Logger.log('[executarTranscricaoViaFileUri] Glossário: ' + vocab.totalTermos + ' termos → injetando no prompt');
     }
 
-    var promptTranscricao = 'Você é um transcritor profissional especializado em reuniões corporativas em português brasileiro.\n\n' +
-      '## SUA TAREFA:\n' +
-      'Transcreva o áudio da reunião de forma completa e precisa.\n\n' +
-      '## INSTRUÇÕES:\n' +
-      '1. Transcreva TODO o conteúdo falado no áudio\n' +
-      '2. Identifique diferentes falantes quando possível (Participante 1, Participante 2, etc.)\n' +
-      '3. Inclua marcações de tempo aproximadas a cada mudança significativa de tópico [MM:SS]\n' +
-      '4. Preserve termos técnicos, nomes de projetos, pessoas e sistemas mencionados\n' +
-      '5. Indique pausas longas com [pausa] e trechos inaudíveis com [inaudível]\n' +
-      '6. Mantenha interjeições e expressões que indiquem concordância/discordância\n\n' +
-      '## FORMATO DE SAÍDA:\n' +
-      'Retorne APENAS a transcrição em texto corrido, com identificação de falantes e marcações de tempo.\n\n' +
-      '## IMPORTANTE:\n' +
-      '- NÃO resuma ou interprete, apenas transcreva fielmente\n' +
-      '- NÃO adicione formatação markdown além da identificação de falantes\n' +
-      '- NÃO inclua comentários ou análises\n\n' +
-      blocoGlossario +
-      blocoAnchoring +
-      'Transcreva o áudio a seguir:';
+    var promptTranscricao = montarPromptTranscricaoFileUri(blocoGlossario, blocoAnchoring);
 
     var urlApi = 'https://generativelanguage.googleapis.com/v1beta/models/' + CONFIG_PROMPTS_REUNIAO.TRANSCRICAO.modelo + ':generateContent?key=' + chaveApi;
 
@@ -1027,36 +958,7 @@ function dividirTranscricaoEmSegmentos(texto, tamanhoMaximo) {
 /** ✅ NOVO: Extrai pontos-chave de um segmento da transcrição */
 function extrairPontosChaveSegmento(segmento, numSegmento, totalSegmentos, chaveApi) {
   try {
-    const promptExtracao = `Você é um analista especializado em extrair informações estruturadas de transcrições de reunião.
-
-## CONTEXTO:
-Esta é a PARTE ${numSegmento} de ${totalSegmentos} de uma transcrição de reunião.
-
-## SUA TAREFA:
-Extraia TODOS os pontos importantes desta parte da transcrição, sem omitir nada.
-
-## EXTRAIA OBRIGATORIAMENTE:
-1. **TÓPICOS DISCUTIDOS**: Liste cada tema/assunto abordado com detalhes
-2. **DECISÕES TOMADAS**: Qualquer decisão ou resolução mencionada
-3. **AÇÕES DELEGADAS**: Quem ficou responsável por quê (nome → tarefa → prazo)
-4. **PROBLEMAS/DIFICULDADES**: Bloqueios, reclamações, pendências mencionadas
-5. **PROCESSOS DESCRITOS**: Fluxos de trabalho, procedimentos, regras explicadas
-6. **MUDANÇAS ORGANIZACIONAIS**: Alterações em equipe, estrutura, responsabilidades
-7. **PRAZOS E DATAS**: Qualquer menção a prazos, deadlines, datas
-8. **NOMES E FUNÇÕES**: Pessoas mencionadas e seus papéis
-9. **NÚMEROS E DADOS**: Valores, métricas, quantidades mencionadas
-
-## REGRAS:
-- Seja EXAUSTIVO, extraia TUDO, não resuma demais
-- Mantenha detalhes específicos (nomes, números, datas)
-- Use citações diretas quando relevante
-- Não invente informações
-- Organize por tópico
-
-## TRANSCRIÇÃO (PARTE ${numSegmento}/${totalSegmentos}):
-${segmento}
-
-Extraia todos os pontos-chave:`;
+    const promptExtracao = montarPromptExtracao(numSegmento, totalSegmentos, segmento);
 
     const urlApi = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG_PROMPTS_REUNIAO.EXTRACAO.modelo}:generateContent?key=${chaveApi}`;
 
@@ -1113,65 +1015,14 @@ Você DEVE incluir informações de TODOS os segmentos na ATA final.
 NÃO omita nenhum segmento. A ATA deve cobrir 100% dos tópicos discutidos.`
       : '';
 
-    const promptAta = `Você é um secretário executivo especializado em redigir atas de reunião profissionais e COMPLETAS.
-
-## DADOS DA REUNIÃO:
-- **Título informado:** ${dadosAudio.titulo || 'Não informado'}
-- **Participantes informados:** ${dadosAudio.participantes || 'Não informados'}
-- **Data:** ${new Date().toLocaleDateString('pt-BR')}
-${instrucaoExtra}
-
-## ${tipoFonte}:
-${textoParaAta}
-
-## SUA TAREFA:
-Analise o conteúdo acima e redija uma ATA DE REUNIÃO completa e profissional.
-Você DEVE preencher TODAS as seções abaixo. NÃO deixe nenhuma seção em branco ou incompleta.
-
-## ESTRUTURA OBRIGATÓRIA DA ATA:
-
-### 1. CABEÇALHO
-- Nome da Reunião (extraia do contexto ou use o título informado)
-- Data e Hora (Início/Término estimados)
-- Duração aproximada
-- Local (presencial/virtual)
-- Participantes Presentes
-- Outros Funcionários Citados
-- Pauta Principal
-
-### 2. TEMA PRINCIPAL E OBJETIVOS
-Um parágrafo resumindo o propósito central da reunião.
-
-### 3. DETALHES DA DISCUSSÃO POR TÓPICO
-Liste os principais pontos debatidos de forma numerada:
-- Decisões tomadas
-- Processos mencionados ou mapeados
-- Mudanças organizacionais
-- Dificuldades ou limitações declaradas
-
-### 4. MATRIZ DE AÇÃO (PLANO DE AÇÃO)
-Tabela com: Nº | Ação | Responsável | Prazo | Status
-Liste Principais Pendências e Próximos Passos.
-
-### 5. OUTROS PONTOS LEVANTADOS
-Observações secundárias, avisos, prazos futuros.
-
-### 6. CONSIDERAÇÕES FINAIS
-Fechamento sintetizando o clima da reunião e principais pendências.
-
-## FORMATO DE SAÍDA:
-Retorne a ATA em formato Markdown bem estruturado.
-Use tabelas markdown para a Matriz de Ação.
-NÃO inclua JSON, apenas a ATA formatada.
-NÃO repita separadores, traços ou qualquer padrão.
-
-## ⚠️ REGRA CRÍTICA:
-- PREENCHA TODAS AS 6 SEÇÕES COMPLETAMENTE
-- Se uma seção não tem informação, escreva "Não identificado na reunião" em vez de deixar em branco
-- Seja objetivo e profissional
-- Não invente informações que não estejam no conteúdo fornecido
-- Use linguagem formal e clara
-- Destaque decisões importantes em negrito`;
+    const promptAta = montarPromptAta(
+      dadosAudio.titulo,
+      dadosAudio.participantes,
+      new Date().toLocaleDateString('pt-BR'),
+      instrucaoExtra,
+      tipoFonte,
+      textoParaAta
+    );
 
     Logger.log('[gerarAtaDireta] Tamanho prompt: ' + promptAta.length + ' chars');
 
@@ -1648,36 +1499,7 @@ function extrairPontosSegmentoServidor(dados) {
     const tempoInicio = Date.now();
     const chaveApi = obterChaveGeminiProjeto();
 
-    const promptExtracao = `Você é um analista especializado em extrair informações estruturadas de transcrições de reunião.
-
-## CONTEXTO:
-Esta é a PARTE ${numSegmento} de ${totalSegmentos} de uma transcrição de reunião.
-
-## SUA TAREFA:
-Extraia TODOS os pontos importantes desta parte da transcrição, sem omitir nada.
-
-## EXTRAIA OBRIGATORIAMENTE:
-1. **TÓPICOS DISCUTIDOS**: Liste cada tema/assunto abordado com detalhes
-2. **DECISÕES TOMADAS**: Qualquer decisão ou resolução mencionada
-3. **AÇÕES DELEGADAS**: Quem ficou responsável por quê (nome → tarefa → prazo)
-4. **PROBLEMAS/DIFICULDADES**: Bloqueios, reclamações, pendências mencionadas
-5. **PROCESSOS DESCRITOS**: Fluxos de trabalho, procedimentos, regras explicadas
-6. **MUDANÇAS ORGANIZACIONAIS**: Alterações em equipe, estrutura, responsabilidades
-7. **PRAZOS E DATAS**: Qualquer menção a prazos, deadlines, datas
-8. **NOMES E FUNÇÕES**: Pessoas mencionadas e seus papéis
-9. **NÚMEROS E DADOS**: Valores, métricas, quantidades mencionadas
-
-## REGRAS:
-- Seja EXAUSTIVO, extraia TUDO, não resuma demais
-- Mantenha detalhes específicos (nomes, números, datas)
-- Use citações diretas quando relevante
-- Não invente informações
-- Organize por tópico
-
-## TRANSCRIÇÃO (PARTE ${numSegmento}/${totalSegmentos}):
-${segmento}
-
-Extraia todos os pontos-chave:`;
+    const promptExtracao = montarPromptExtracao(numSegmento, totalSegmentos, segmento);
 
     const urlApi = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG_PROMPTS_REUNIAO.EXTRACAO.modelo}:generateContent?key=${chaveApi}`;
 
@@ -1778,7 +1600,7 @@ function extrairSugestoesDoContexto(transcricao) {
 }
 
 
-function executarEtapaIdentificacaoAlteracoes(transcricao, contexto, chaveApi, tituloReuniao) {
+function executarEtapaIdentificacaoAlteracoes(transcricao, contexto, chaveApi, tituloReuniao, nomeDepartamento) {
   try {
     const setoresExistentes = obterSetoresParaContexto();
 
@@ -1792,6 +1614,7 @@ function executarEtapaIdentificacaoAlteracoes(transcricao, contexto, chaveApi, t
       Logger.log(`Relatório: transcrição truncada de ${transcricao.length} para ${transcricaoParaRelatorio.length} chars`);
     }
 
+    // ⚠️ Para editar este prompt, veja também montarPromptRelatorio() em Prompts-IA.js
     const promptRelatorio = `Você é um analista de processos especializado em identificar projetos e atividades a partir de reuniões.
 
 ## ⚠️ REGRA ABSOLUTA — PROJETO ÚNICO:
@@ -2063,8 +1886,8 @@ Gere o relatório completo em Markdown:`;
     // ✅ usa helper que ignora thinking tokens
     const relatorioGerado = extrairTextoRespostaGemini(respostaJson);
 
-    // ✅ salvarRelatorioNoDrive agora usa o título da reunião
-    const arquivoRelatorio = salvarRelatorioNoDrive(relatorioGerado, tituloReuniao);
+    // ✅ salvarRelatorioNoDrive usa título e departamento para nomear o arquivo
+    const arquivoRelatorio = salvarRelatorioNoDrive(relatorioGerado, tituloReuniao, nomeDepartamento || '');
     const contagens = extrairContagensDoRelatorio(relatorioGerado);
 
     return {
@@ -2113,7 +1936,7 @@ function etapa_SoRelatorioIdentificacoes(dados) {
     const contexto = obterContextoProjetosParaGemini();
     log('INFO', `📊 Contexto: ${contexto.totalProjetos} projetos, ${contexto.totalEtapas} etapas`);
 
-    const resultado = executarEtapaIdentificacaoAlteracoes(dados.transcricao, contexto, chaveApi, dados.titulo || '');
+    const resultado = executarEtapaIdentificacaoAlteracoes(dados.transcricao, contexto, chaveApi, dados.titulo || '', dados.departamentoNome || '');
 
     const tempoSeg = ((Date.now() - tempoInicio) / 1000).toFixed(1);
 
@@ -2182,7 +2005,8 @@ function etapa_SalvarReuniao(dados) {
       sugestoesIA: dados.sugestoes || '',
       linkAudio: linkAudioFinal,
       projetosImpactados: '',
-      etapasImpactadas: ''
+      etapasImpactadas: '',
+      departamentoId: dados.departamentoId || ''
     });
 
     log('SUCESSO', `✅ Reunião salva com ID: ${reuniaoId}`);
@@ -2350,7 +2174,7 @@ function salvarReuniaoNaPlanilha(dadosReuniao) {
       dadosReuniao.duracao, 'Processada', dadosReuniao.participantes,
       dadosReuniao.transcricao, dadosReuniao.ata, dadosReuniao.sugestoesIA,
       dadosReuniao.linkAudio, '', '', dadosReuniao.projetosImpactados,
-      dadosReuniao.etapasImpactadas
+      dadosReuniao.etapasImpactadas, dadosReuniao.departamentoId || ''
     ];
     aba.appendRow(linha);
     return reuniaoId;
@@ -2566,63 +2390,75 @@ function verificarConfiguracaoReunioes() {
       }
     } catch (e) { temPasta = false; }
 
+    const resDeps = listarDepartamentos(null);
+    const departamentos = resDeps && resDeps.sucesso ? (resDeps.departamentos || []) : [];
+
     return {
       sucesso: true, temChaveApi: temChave, temPastaDrive: temPasta,
       nomePastaDrive: nomePasta,
       modeloGemini: typeof MODELO_GEMINI !== 'undefined' ? MODELO_GEMINI : 'gemini-2.5-flash',
-      participantesCadastrados: typeof PARTICIPANTES_CADASTRADOS !== 'undefined' ? PARTICIPANTES_CADASTRADOS : []
+      participantesCadastrados: typeof PARTICIPANTES_CADASTRADOS !== 'undefined' ? PARTICIPANTES_CADASTRADOS : [],
+      departamentos: departamentos
     };
   } catch (erro) {
-    return { sucesso: false, mensagem: erro.message, temChaveApi: false, temPastaDrive: false, nomePastaDrive: '', modeloGemini: '', participantesCadastrados: [] };
+    return { sucesso: false, mensagem: erro.message, temChaveApi: false, temPastaDrive: false, nomePastaDrive: '', modeloGemini: '', participantesCadastrados: [], departamentos: [] };
   }
 }
 
-function listarReunioesRecentes(limite) {
+function listarReunioesRecentes(token, limite) {
+  // Compatibilidade: se token for número, trata como limite (chamada antiga sem token)
+  if (typeof token === 'number') { limite = token; token = null; }
   limite = limite || 20;
   try {
     if (typeof obterAba !== 'function') return { sucesso: true, reunioes: [] };
-    
+
+    const sessao = token ? _obterSessao(token) : null;
+    const isAdmin = sessao && sessao.perfil === 'admin';
+    const depsUsuario = (sessao && !isAdmin) ? _obterDepsAtualizadosUsuario(sessao) : null;
+
     const nomeAba = typeof NOME_ABA_REUNIOES !== 'undefined' ? NOME_ABA_REUNIOES : 'Reuniões';
     const colunas = typeof COLUNAS_REUNIOES !== 'undefined' ? COLUNAS_REUNIOES : {
       ID: 0, TITULO: 1, DATA_INICIO: 2, DATA_FIM: 3, DURACAO: 4, STATUS: 5,
       PARTICIPANTES: 6, TRANSCRICAO: 7, ATA: 8, SUGESTOES_IA: 9, LINK_AUDIO: 10,
-      LINK_ATA: 11, EMAILS_ENVIADOS: 12
+      LINK_ATA: 11, EMAILS_ENVIADOS: 12, PROJETOS_IMPACTADOS: 13, ETAPAS_IMPACTADAS: 14,
+      DEPARTAMENTO_ID: 15
     };
-    
+
     const aba = obterAba(nomeAba);
     if (!aba || aba.getLastRow() <= 1) return { sucesso: true, reunioes: [] };
-    
+
     const dados = aba.getDataRange().getValues();
     const reunioes = [];
-    
+
     for (let i = dados.length - 1; i >= 1 && reunioes.length < limite; i--) {
       const idCelula = dados[i][colunas.ID];
-      
-      // ✅ FIX: Verifica se tem ID válido (qualquer tipo)
-      if (idCelula !== null && idCelula !== undefined && idCelula.toString().trim() !== '') {
-        
-        // ✅ FIX: Converte para string antes de verificar
-        const ataTexto = dados[i][colunas.ATA] ? dados[i][colunas.ATA].toString().trim() : '';
-        const transcricaoTexto = dados[i][colunas.TRANSCRICAO] ? dados[i][colunas.TRANSCRICAO].toString().trim() : '';
-        
-        const temAta = ataTexto.length > 10;
-        const temTranscricao = transcricaoTexto.length > 10;
-        
-        reunioes.push({
-          id: idCelula.toString().trim(),
-          titulo: dados[i][colunas.TITULO] ? dados[i][colunas.TITULO].toString() : '',
-          dataInicio: dados[i][colunas.DATA_INICIO],
-          duracao: dados[i][colunas.DURACAO],
-          status: dados[i][colunas.STATUS] ? dados[i][colunas.STATUS].toString() : '',
-          participantes: dados[i][colunas.PARTICIPANTES] ? dados[i][colunas.PARTICIPANTES].toString() : '',
-          linkAudio: dados[i][colunas.LINK_AUDIO] ? dados[i][colunas.LINK_AUDIO].toString() : '',
-          temAta: temAta,
-          temTranscricao: temTranscricao,
-          emailsEnviados: dados[i][colunas.EMAILS_ENVIADOS] ? dados[i][colunas.EMAILS_ENVIADOS].toString() : ''
-        });
+      if (idCelula === null || idCelula === undefined || idCelula.toString().trim() === '') continue;
+
+      // Filtro de departamento: usa dados frescos da planilha (não sessão que pode estar desatualizada)
+      if (depsUsuario !== null && depsUsuario.length > 0) {
+        const depReuniao = (dados[i][colunas.DEPARTAMENTO_ID] || '').toString().trim();
+        // Reuniões sem departamento são visíveis a todos (retrocompat)
+        if (depReuniao && !depsUsuario.includes(depReuniao)) continue;
       }
+
+      const ataTexto = dados[i][colunas.ATA] ? dados[i][colunas.ATA].toString().trim() : '';
+      const transcricaoTexto = dados[i][colunas.TRANSCRICAO] ? dados[i][colunas.TRANSCRICAO].toString().trim() : '';
+
+      reunioes.push({
+        id:             idCelula.toString().trim(),
+        titulo:         dados[i][colunas.TITULO] ? dados[i][colunas.TITULO].toString() : '',
+        dataInicio:     dados[i][colunas.DATA_INICIO],
+        duracao:        dados[i][colunas.DURACAO],
+        status:         dados[i][colunas.STATUS] ? dados[i][colunas.STATUS].toString() : '',
+        participantes:  dados[i][colunas.PARTICIPANTES] ? dados[i][colunas.PARTICIPANTES].toString() : '',
+        linkAudio:      dados[i][colunas.LINK_AUDIO] ? dados[i][colunas.LINK_AUDIO].toString() : '',
+        temAta:         ataTexto.length > 10,
+        temTranscricao: transcricaoTexto.length > 10,
+        emailsEnviados: dados[i][colunas.EMAILS_ENVIADOS] ? dados[i][colunas.EMAILS_ENVIADOS].toString() : '',
+        departamentoId: (dados[i][colunas.DEPARTAMENTO_ID] || '').toString()
+      });
     }
-    
+
     return { sucesso: true, reunioes: reunioes };
     
   } catch (erro) {
@@ -2823,11 +2659,28 @@ function extrairContagensDoRelatorio(relatorio) {
   return contagens;
 }
 
-function salvarRelatorioNoDrive(conteudoRelatorio) {
+/**
+ * Converte o nome de um departamento em um slug seguro para usar em nomes de arquivo.
+ * Ex: "Tecnologia da Informação" → "TECNOLOGIADAINFORMAC"
+ */
+function _slugificarNomeDep(nome) {
+  if (!nome) return '';
+  return nome.toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .replace(/[^a-zA-Z0-9]/g, '')    // remove não-alfanuméricos
+    .toUpperCase()
+    .substring(0, 20);
+}
+
+function salvarRelatorioNoDrive(conteudoRelatorio, tituloReuniao, nomeDepartamento) {
   try {
     const pasta = DriveApp.getFolderById(ID_PASTA_DRIVE_REUNIOES);
     const timestamp = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyyMMdd_HHmmss');
-    const nomeArquivo = `Relatorio_Identificacoes_${timestamp}.md`;
+    // Embute o departamento no nome do arquivo para filtragem por permissão
+    var slugDep = _slugificarNomeDep(nomeDepartamento || '');
+    var sufixoDep = slugDep ? ('_DEP-' + slugDep) : '';
+    const nomeArquivo = `Relatorio_Identificacoes${sufixoDep}_${timestamp}.md`;
     const arquivo = pasta.createFile(nomeArquivo, conteudoRelatorio, MimeType.PLAIN_TEXT);
     arquivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     return { sucesso: true, arquivoId: arquivo.getId(), nomeArquivo, linkArquivo: arquivo.getUrl() };
@@ -3034,8 +2887,12 @@ function obterProjetosParaAssociacao() {
   }
 }
 
-function obterReunioesCatalogadas() {
+function obterReunioesCatalogadas(token) {
   try {
+    const sessao = token ? _obterSessao(token) : null;
+    const isAdmin = sessao && sessao.perfil === 'admin';
+    const depsUsuario = (sessao && !isAdmin) ? _obterDepsAtualizadosUsuario(sessao) : null;
+
     const nomeAba = typeof NOME_ABA_REUNIOES !== 'undefined' ? NOME_ABA_REUNIOES : 'Reuniões';
     const aba = obterAba(nomeAba);
     if (!aba || aba.getLastRow() <= 1) {
@@ -3048,6 +2905,13 @@ function obterReunioesCatalogadas() {
     for (let i = dados.length - 1; i >= 1; i--) {
       const idCelula = dados[i][COLUNAS_REUNIOES.ID];
       if (!idCelula || idCelula.toString().trim() === '') continue;
+
+      // Filtro de departamento: usa dados frescos da planilha (não sessão desatualizada)
+      if (depsUsuario !== null && depsUsuario.length > 0) {
+        const depReuniao = (dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString().trim();
+        // Reuniões sem departamento são visíveis a todos (retrocompat)
+        if (depReuniao && !depsUsuario.includes(depReuniao)) continue;
+      }
 
       const ataTexto = dados[i][COLUNAS_REUNIOES.ATA] ? dados[i][COLUNAS_REUNIOES.ATA].toString().trim() : '';
       const transcricaoTexto = dados[i][COLUNAS_REUNIOES.TRANSCRICAO] ? dados[i][COLUNAS_REUNIOES.TRANSCRICAO].toString().trim() : '';
@@ -3624,7 +3488,7 @@ function etapa4_GerarRelatorioESalvar(dados) {
 
     log('INFO', '🔍 Gerando relatório...');
     const contexto = obterContextoProjetosParaGemini();
-    const rRelatorio = executarEtapaIdentificacaoAlteracoes(dados.transcricao, contexto, chaveApi, dados.titulo || '');
+    const rRelatorio = executarEtapaIdentificacaoAlteracoes(dados.transcricao, contexto, chaveApi, dados.titulo || '', dados.departamentoNome || '');
 
     let linkRelatorio = '', nomeArquivoRelatorio = '', relatorioTexto = '';
     let totalProj = 0, totalEtp = 0, novosProj = 0, novasEtp = 0;
@@ -3649,7 +3513,8 @@ function etapa4_GerarRelatorioESalvar(dados) {
       duracao: dados.duracaoMinutos || 0, participantes: dados.participantes || '',
       transcricao: dados.transcricao || '', ata: dados.ata || '',
       sugestoesIA: dados.sugestoes || '', linkAudio: linkAudioFinal,
-      projetosImpactados: '', etapasImpactadas: ''
+      projetosImpactados: '', etapasImpactadas: '',
+      departamentoId: dados.departamentoId || ''
     });
     log('SUCESSO', `✅ Reunião salva: ${reuniaoId}`);
 

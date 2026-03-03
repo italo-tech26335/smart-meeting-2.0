@@ -4,19 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Smart Meeting — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <?!= include('TemaPadrao-CSS'); ?>
+  <base target="_top">
   <script>
     var SESSAO_TOKEN   = '<?= sessaoToken ?>';
     var USUARIO_NOME   = '<?= usuarioNome ?>';
     var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
+    var BASE_URL       = '<?= baseUrl ?>';
   </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #0f1117;
-      color: #e2e8f0;
+      font-family: var(--font-corpo);
+      background: var(--cor-fundo);
+      color: var(--cor-texto);
       min-height: 100vh;
       font-size: 14px;
     }
@@ -24,28 +28,29 @@
     /* ── Header ─────────────────────────────────────────────────── */
     .adm-header {
       position: sticky; top: 0; z-index: 100;
-      background: #1a1d27;
-      border-bottom: 1px solid rgba(255,255,255,.07);
+      background: var(--cor-fundo-card);
+      border-bottom: 1px solid var(--cor-borda-clara);
       padding: 0 24px;
       height: 56px;
       display: flex; align-items: center; gap: 16px;
+      box-shadow: 0 2px 8px rgba(44,24,16,.06);
     }
-    .adm-logo { font-size: 1rem; font-weight: 700; color: #fff; letter-spacing: -.01em; }
-    .adm-logo span { color: #6366f1; }
+    .adm-logo { font-size: 1rem; font-weight: 700; color: var(--cor-texto); letter-spacing: -.01em; font-family: var(--font-titulo); }
+    .adm-logo span { color: var(--cor-destaque); }
     .adm-nav { display: flex; gap: 4px; flex: 1; }
     .adm-nav a {
       padding: 6px 14px; border-radius: 8px;
-      color: #94a3b8; text-decoration: none; font-size: .85rem; font-weight: 500;
+      color: var(--cor-primaria); text-decoration: none; font-size: .85rem; font-weight: 500;
       cursor: pointer; transition: background .15s, color .15s;
     }
-    .adm-nav a:hover, .adm-nav a.ativo { background: rgba(99,102,241,.15); color: #818cf8; }
-    .adm-user { display: flex; align-items: center; gap: 10px; color: #64748b; font-size: .82rem; }
+    .adm-nav a:hover, .adm-nav a.ativo { background: var(--cor-destaque-bg); color: var(--cor-destaque); }
+    .adm-user { display: flex; align-items: center; gap: 10px; color: var(--cor-primaria); font-size: .82rem; }
     .btn-logout {
-      padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1);
-      background: none; color: #94a3b8; cursor: pointer; font-size: .82rem;
+      padding: 6px 12px; border-radius: 8px; border: 1px solid var(--cor-borda-clara);
+      background: none; color: var(--cor-primaria); cursor: pointer; font-size: .82rem;
       transition: background .15s, color .15s;
     }
-    .btn-logout:hover { background: rgba(239,68,68,.1); color: #fca5a5; border-color: rgba(239,68,68,.3); }
+    .btn-logout:hover { background: rgba(139,46,46,.08); color: var(--cor-perigo); border-color: rgba(139,46,46,.3); }
 
     /* ── Layout ──────────────────────────────────────────────────── */
     .adm-main { padding: 24px; max-width: 1200px; margin: 0 auto; }
@@ -57,86 +62,87 @@
     /* ── Cards métricas ──────────────────────────────────────────── */
     .cards-metricas { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 16px; margin-bottom: 28px; }
     .card-metrica {
-      background: #1a1d27; border: 1px solid rgba(255,255,255,.07);
-      border-radius: 12px; padding: 20px 16px;
+      background: var(--cor-fundo-card); border: 1px solid var(--cor-borda);
+      border-radius: var(--raio-lg); padding: 20px 16px;
+      box-shadow: var(--sombra);
     }
-    .card-metrica .valor { font-size: 2rem; font-weight: 700; color: #6366f1; }
-    .card-metrica .label { font-size: .78rem; color: #64748b; margin-top: 4px; }
+    .card-metrica .valor { font-size: 2rem; font-weight: 700; color: var(--cor-destaque); font-family: var(--font-titulo); }
+    .card-metrica .label { font-size: .78rem; color: var(--cor-primaria); margin-top: 4px; }
 
     /* ── Tabela ──────────────────────────────────────────────────── */
-    .tbl-wrap { overflow-x: auto; }
+    .tbl-wrap { overflow-x: auto; background: var(--cor-fundo-card); border: 1px solid var(--cor-borda); border-radius: var(--raio-lg); box-shadow: var(--sombra); }
     table { width: 100%; border-collapse: collapse; }
     thead th {
-      background: rgba(255,255,255,.04);
+      background: var(--cor-fundo-quente);
       padding: 10px 14px; text-align: left;
-      font-size: .75rem; font-weight: 600; color: #64748b;
+      font-size: .75rem; font-weight: 600; color: var(--cor-primaria-escura);
       text-transform: uppercase; letter-spacing: .05em;
-      border-bottom: 1px solid rgba(255,255,255,.07);
+      border-bottom: 1px solid var(--cor-borda);
     }
-    tbody tr:hover { background: rgba(255,255,255,.025); }
-    tbody td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.04); font-size: .85rem; }
+    tbody tr:hover { background: var(--cor-destaque-bg); }
+    tbody td { padding: 12px 14px; border-bottom: 1px solid var(--cor-borda-clara); font-size: .85rem; }
 
     /* ── Badges ─────────────────────────────────────────────────── */
     .badge {
       display: inline-block; padding: 2px 10px; border-radius: 20px;
       font-size: .72rem; font-weight: 600;
     }
-    .badge-admin   { background: rgba(99,102,241,.2);  color: #818cf8; }
-    .badge-usuario { background: rgba(34,197,94,.15);  color: #86efac; }
-    .badge-viz     { background: rgba(100,116,139,.2); color: #94a3b8; }
-    .badge-ativo   { background: rgba(34,197,94,.15);  color: #86efac; }
-    .badge-inativo { background: rgba(239,68,68,.12);  color: #fca5a5; }
-    .badge-bloq    { background: rgba(245,158,11,.15); color: #fcd34d; }
+    .badge-admin   { background: var(--cor-destaque-bg);         color: var(--cor-aviso); }
+    .badge-usuario { background: rgba(74,103,65,.13);            color: #3a6030; }
+    .badge-viz     { background: var(--cor-primaria-bg);         color: var(--cor-primaria); }
+    .badge-ativo   { background: rgba(74,103,65,.13);            color: #3a6030; }
+    .badge-inativo { background: rgba(139,46,46,.10);            color: var(--cor-perigo); }
+    .badge-bloq    { background: rgba(196,130,42,.15);           color: var(--cor-aviso); }
 
     /* ── Botões ─────────────────────────────────────────────────── */
     .btn {
-      padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer;
-      font-size: .82rem; font-weight: 500; transition: opacity .15s;
+      padding: 7px 14px; border-radius: var(--raio); border: none; cursor: pointer;
+      font-size: .82rem; font-weight: 500; transition: opacity .15s; font-family: var(--font-corpo);
     }
     .btn:hover { opacity: .85; }
-    .btn-primary { background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; }
-    .btn-ghost { background: rgba(255,255,255,.06); color: #94a3b8; border: 1px solid rgba(255,255,255,.1); }
-    .btn-danger { background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.2); }
+    .btn-primary { background: linear-gradient(135deg, var(--cor-destaque), #a06820); color: #fff; box-shadow: 0 2px 8px rgba(196,130,42,.3); }
+    .btn-ghost { background: var(--cor-primaria-bg); color: var(--cor-primaria-escura); border: 1px solid var(--cor-borda); }
+    .btn-danger { background: rgba(139,46,46,.08); color: var(--cor-perigo); border: 1px solid rgba(139,46,46,.25); }
     .btn-sm { padding: 4px 10px; font-size: .78rem; }
 
     /* ── Toolbar ─────────────────────────────────────────────────── */
     .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
-    .toolbar h2 { font-size: 1rem; font-weight: 600; color: #fff; }
+    .toolbar h2 { font-size: 1.1rem; font-weight: 600; color: var(--cor-texto); font-family: var(--font-titulo); }
     .toolbar-acoes { display: flex; gap: 8px; align-items: center; }
 
     /* ── Modal ──────────────────────────────────────────────────── */
     .modal-overlay {
       display: none; position: fixed; inset: 0; z-index: 500;
-      background: rgba(0,0,0,.6); align-items: center; justify-content: center;
+      background: rgba(44,24,16,.45); align-items: center; justify-content: center;
     }
     .modal-overlay.aberto { display: flex; }
     .modal-caixa {
-      background: #1a1d27; border: 1px solid rgba(255,255,255,.08);
+      background: var(--cor-fundo-card); border: 1px solid var(--cor-borda);
       border-radius: 14px; padding: 28px; width: 100%; max-width: 480px;
-      box-shadow: 0 24px 60px rgba(0,0,0,.5);
+      box-shadow: var(--sombra-lg);
     }
-    .modal-titulo { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 20px; }
+    .modal-titulo { font-size: 1.1rem; font-weight: 600; color: var(--cor-texto); margin-bottom: 20px; font-family: var(--font-titulo); }
     .campo-grupo { margin-bottom: 14px; }
-    .campo-grupo label { display: block; font-size: .78rem; color: #94a3b8; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+    .campo-grupo label { display: block; font-size: .78rem; color: var(--cor-primaria); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
     .campo-grupo input, .campo-grupo select {
-      width: 100%; background: #0f1117; border: 1px solid rgba(255,255,255,.1);
-      border-radius: 8px; padding: 10px 12px; color: #e2e8f0; font-size: .9rem; outline: none;
+      width: 100%; background: #fff; border: 1px solid var(--cor-borda);
+      border-radius: var(--raio); padding: 10px 12px; color: var(--cor-texto); font-size: .9rem; outline: none; font-family: var(--font-corpo);
     }
-    .campo-grupo input:focus, .campo-grupo select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+    .campo-grupo input:focus, .campo-grupo select:focus { border-color: var(--cor-destaque); box-shadow: 0 0 0 3px var(--cor-destaque-bg); }
     .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
     /* ── Senha gerada ────────────────────────────────────────────── */
     .senha-gerada {
-      background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2);
-      border-radius: 8px; padding: 12px 14px; font-size: .85rem;
-      color: #86efac; display: none; margin-top: 12px; word-break: break-all;
+      background: rgba(74,103,65,.08); border: 1px solid rgba(74,103,65,.25);
+      border-radius: var(--raio); padding: 12px 14px; font-size: .85rem;
+      color: #3a6030; display: none; margin-top: 12px; word-break: break-all;
     }
 
     /* ── Filtro logs ──────────────────────────────────────────────── */
     .filtros-logs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
     .filtros-logs select, .filtros-logs input {
-      background: #1a1d27; border: 1px solid rgba(255,255,255,.1);
-      border-radius: 8px; padding: 7px 10px; color: #e2e8f0; font-size: .83rem; outline: none;
+      background: var(--cor-fundo-card); border: 1px solid var(--cor-borda);
+      border-radius: var(--raio); padding: 7px 10px; color: var(--cor-texto); font-size: .83rem; outline: none; font-family: var(--font-corpo);
     }
 
     /* ── Toast ─────────────────────────────────────────────────── */
@@ -146,20 +152,20 @@
       animation: toastIn .25s ease;
     }
     @keyframes toastIn { from{opacity:0;transform:translateX(60px);} to{opacity:1;transform:translateX(0);} }
-    .toast-ok  { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); color: #86efac; }
-    .toast-err { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+    .toast-ok  { background: rgba(74,103,65,.12); border: 1px solid rgba(74,103,65,.3); color: #3a6030; }
+    .toast-err { background: rgba(139,46,46,.10); border: 1px solid rgba(139,46,46,.3); color: var(--cor-perigo); }
 
     /* ── Spinner ──────────────────────────────────────────────────── */
     .spinner-inline {
       display: inline-block; width: 14px; height: 14px;
-      border: 2px solid rgba(255,255,255,.2); border-top-color: #6366f1;
+      border: 2px solid var(--cor-borda); border-top-color: var(--cor-destaque);
       border-radius: 50%; animation: spin .6s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Empty state ─────────────────────────────────────────────── */
-    .empty-state { text-align: center; padding: 48px 24px; color: #475569; }
-    .empty-state i { font-size: 2.5rem; margin-bottom: 12px; }
+    .empty-state { text-align: center; padding: 48px 24px; color: var(--cor-primaria); }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 12px; color: var(--cor-borda); }
   </style>
 </head>
 <body>
@@ -170,6 +176,9 @@
   <nav class="adm-nav">
     <a onclick="mostrarSecao('secUsuarios')" class="ativo" id="tabUsuarios">
       <i class="fas fa-users"></i> Usuários
+    </a>
+    <a onclick="mostrarSecao('secDepartamentos')" id="tabDepartamentos">
+      <i class="fas fa-building"></i> Departamentos
     </a>
     <a onclick="mostrarSecao('secLogs')" id="tabLogs">
       <i class="fas fa-scroll"></i> Logs
@@ -220,6 +229,38 @@
         </thead>
         <tbody id="tbodyUsuarios">
           <tr><td colspan="5" style="text-align:center;padding:32px;color:#475569;">
+            <span class="spinner-inline"></span> Carregando...
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Seção Departamentos ── -->
+  <section class="adm-secao" id="secDepartamentos">
+    <div class="toolbar">
+      <h2><i class="fas fa-building"></i> Departamentos</h2>
+      <div class="toolbar-acoes">
+        <button class="btn btn-primary" onclick="abrirModalNovoDepartamento()">
+          <i class="fas fa-plus"></i> Novo Departamento
+        </button>
+        <button class="btn btn-ghost" onclick="carregarDepartamentos()">
+          <i class="fas fa-sync"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Descrição</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyDepartamentos">
+          <tr><td colspan="3" style="text-align:center;padding:32px;color:var(--cor-primaria);">
             <span class="spinner-inline"></span> Carregando...
           </td></tr>
         </tbody>
@@ -307,12 +348,42 @@
         <option value="false">Inativo</option>
       </select>
     </div>
+    <div class="campo-grupo">
+      <label>Departamentos <span style="font-weight:400;color:var(--cor-primaria-clara);text-transform:none;">(deixe vazio para admin global)</span></label>
+      <div id="listaDepartamentosUsuario" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px 0;min-height:32px;">
+        <span style="color:var(--cor-primaria);font-size:.82rem;">Carregando...</span>
+      </div>
+    </div>
 
     <div class="senha-gerada" id="senhaGerada"></div>
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="fecharModalUsuario()">Cancelar</button>
       <button class="btn btn-primary" id="btnSalvarUsuario" onclick="salvarUsuario()">
+        <i class="fas fa-save"></i> Salvar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DEPARTAMENTO ══ -->
+<div class="modal-overlay" id="modalDepartamento">
+  <div class="modal-caixa">
+    <div class="modal-titulo" id="modalDepTitulo">Novo Departamento</div>
+    <input type="hidden" id="editDepId">
+
+    <div class="campo-grupo">
+      <label>Nome *</label>
+      <input type="text" id="editDepNome" placeholder="Ex: Financeiro, TI, RH">
+    </div>
+    <div class="campo-grupo">
+      <label>Descrição</label>
+      <input type="text" id="editDepDescricao" placeholder="Descrição opcional">
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="fecharModalDepartamento()">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarDepartamento" onclick="salvarDepartamento()">
         <i class="fas fa-save"></i> Salvar
       </button>
     </div>

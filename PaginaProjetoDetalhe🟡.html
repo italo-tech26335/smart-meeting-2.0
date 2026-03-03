@@ -17,6 +17,7 @@
     var SESSAO_TOKEN   = '<?= sessaoToken ?>';
     var USUARIO_NOME   = '<?= usuarioNome ?>';
     var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
+    var BASE_URL       = '<?= baseUrl ?>';
   </script>
 
   <!-- Chart.js -->
@@ -465,6 +466,15 @@
             <input type="url" id="itemLink" placeholder="https://drive.google.com/...">
             <small class="campo-hint">Link para o diretório do projeto no Drive</small>
           </div>
+
+          <!-- Departamento -->
+          <div class="campo-grupo" id="itemDepartamentoGrupo">
+            <label><i class="fas fa-sitemap" style="margin-right:4px;color:var(--cor-primaria);"></i> Departamento</label>
+            <select id="itemDepartamento">
+              <option value="">Selecione...</option>
+            </select>
+            <small class="campo-hint">Departamento responsável pelo projeto</small>
+          </div>
         </div>
 
         <!-- ===== Campos específicos de ATIVIDADE (antigo "Etapa") ===== -->
@@ -547,6 +557,14 @@
             <label>Pilar</label>
             <input type="text" id="novoProjetoPilar" placeholder="Pilar estratégico">
           </div>
+        </div>
+
+        <div class="campo-grupo" id="novoProjetoDepartamentoGrupo">
+          <label><i class="fas fa-sitemap" style="margin-right:4px;color:var(--cor-primaria);"></i> Departamento</label>
+          <select id="novoProjetoDepartamento">
+            <option value="">Selecione...</option>
+          </select>
+          <small class="campo-hint">Departamento responsável pelo projeto</small>
         </div>
 
         <div class="campo-row">

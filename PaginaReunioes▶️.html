@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Meeting - Reuniões</title>
+  <base target="_top">
 
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,6 +14,7 @@
     var SESSAO_TOKEN   = '<?= sessaoToken ?>';
     var USUARIO_NOME   = '<?= usuarioNome ?>';
     var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
+    var BASE_URL       = '<?= baseUrl ?>';
   </script>
 
   <style>
@@ -1171,9 +1173,15 @@
           <label class="form-label">Título da Reunião</label>
           <input type="text" class="form-input" id="inputTitulo" placeholder="Ex: Reunião de Sprint Planning">
         </div>
-        <div class="form-grupo" style="margin-bottom:0">
+        <div class="form-grupo">
           <label class="form-label">Participantes</label>
           <input type="text" class="form-input" id="inputParticipantes" placeholder="João, Maria, Pedro...">
+        </div>
+        <div class="form-grupo" style="margin-bottom:0">
+          <label class="form-label">Departamento</label>
+          <select class="form-input" id="inputDepartamento">
+            <option value="">Selecione...</option>
+          </select>
         </div>
 
         <div class="progresso-wrap" id="progressoWrap">
@@ -1390,17 +1398,42 @@ document.addEventListener('DOMContentLoaded', () => {
   var elNome = document.getElementById('headerUsuarioNome');
   if (elNome && typeof USUARIO_NOME !== 'undefined') elNome.textContent = USUARIO_NOME;
 
-  verificarSessaoCliente(function() {
+  // Sessão já verificada pelo servidor (doGet). Inicializa diretamente para
+  // evitar loop de redirecionamento causado por falha transitória no google.script.run.
+  if (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) {
     verificarConfig();
     carregarCatalogo();
     setupDropzone();
     log('INFO', '🚀 Smart Meeting inicializado');
-  });
+  } else {
+    _redirecionarLogin();
+  }
 });
 
 // ═══════════════════════════════════════
 //  CONFIGURAÇÃO / HEADER STATUS
 // ═══════════════════════════════════════
+function popularSelectDepartamentosReunioes(departamentos) {
+  var sel = document.getElementById('inputDepartamento');
+  if (!sel) return;
+  var modoAdmin = typeof MODO_ADMIN_URL !== 'undefined' && MODO_ADMIN_URL;
+  var perfil = typeof USUARIO_PERFIL !== 'undefined' ? USUARIO_PERFIL : '';
+  var ehAdmin = modoAdmin || perfil === 'admin';
+  // Filtrar departamentos pelo perfil (admin vê todos, outros veem apenas os seus)
+  // Como não temos departamentosIds no frontend de reuniões, admin ou usuário sem restrição vê todos
+  sel.innerHTML = '<option value="">Selecione...</option>';
+  var frag = document.createDocumentFragment();
+  (departamentos || []).forEach(function(d) {
+    var opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.nome || d.id;
+    frag.appendChild(opt);
+  });
+  sel.appendChild(frag);
+  // Auto-selecionar se só houver um departamento
+  if ((departamentos || []).length === 1) sel.value = departamentos[0].id;
+}
+
 function verificarConfig() {
   google.script.run
     .withSuccessHandler(r => {
@@ -1408,6 +1441,7 @@ function verificarConfig() {
       setPill('pillDrive', r && r.temPastaDrive, r && r.nomePastaDrive ? 'Drive: ' + r.nomePastaDrive : 'Drive');
       if (r && r.temChaveApi) log('SUCESSO', '✅ Chave API Gemini configurada');
       if (r && r.temPastaDrive) log('SUCESSO', '✅ Pasta Drive: ' + r.nomePastaDrive);
+      if (r && r.departamentos) popularSelectDepartamentosReunioes(r.departamentos);
     })
     .withFailureHandler(() => setPill('pillChave', false, 'Erro'))
     .verificarConfiguracaoReunioes();
@@ -1617,6 +1651,9 @@ async function enviarAudio() {
 
 async function enviarDireto(b64, titulo, participantes) {
   atualizarLoading('Enviando para IA...');
+  var depSel = document.getElementById('inputDepartamento');
+  var departamentoId = depSel ? depSel.value : '';
+  var departamentoNome = depSel && depSel.selectedIndex >= 0 ? depSel.options[depSel.selectedIndex].text : '';
   google.script.run
     .withSuccessHandler(r => trataResposta(r, titulo))
     .withFailureHandler(e => {
@@ -1628,7 +1665,7 @@ async function enviarDireto(b64, titulo, participantes) {
     processamentoConcluido(false, typeof estadoProtecao !== 'undefined' ? estadoProtecao.sessaoId : null);
   }
 })
-    .processarAudioReuniao({ audioBase64:b64, tipoMime:arquivoAtual.type, tamanhoBytes:arquivoAtual.size, titulo, participantes, dataInicio:new Date().toISOString(), duracaoMinutos:Math.ceil(segsGravados/60) });
+    .processarAudioReuniao({ audioBase64:b64, tipoMime:arquivoAtual.type, tamanhoBytes:arquivoAtual.size, titulo, participantes, dataInicio:new Date().toISOString(), duracaoMinutos:Math.ceil(segsGravados/60), departamentoId, departamentoNome });
 }
 
 function trataResposta(r, titulo) {
@@ -1729,9 +1766,12 @@ async function enviarGrande(titulo, participantes) {
 
   // Relatório e salvar em paralelo
   atualizarLoading('Finalizando...');
+  var depSel = document.getElementById('inputDepartamento');
+  var departamentoId = depSel ? depSel.value : '';
+  var departamentoNome = depSel && depSel.selectedIndex >= 0 ? depSel.options[depSel.selectedIndex].text : '';
   const [rRel, rSalvar] = await Promise.all([
-    chamarServidor('etapa_SoRelatorioIdentificacoes', { transcricao, titulo }).catch(e => ({ sucesso:false, mensagem:e.message })),
-    chamarServidor('etapa_SalvarReuniao', { titulo, participantes, transcricao, ata:ataFinal, sugestoes:rAta?.sugestoes||'', dataInicio:new Date().toISOString(), duracaoMinutos:Math.ceil(segsGravados/60), fileName:gemName, idUpload, linkAudio:r1c.linkAudio||'' })
+    chamarServidor('etapa_SoRelatorioIdentificacoes', { transcricao, titulo, departamentoNome }).catch(e => ({ sucesso:false, mensagem:e.message })),
+    chamarServidor('etapa_SalvarReuniao', { titulo, participantes, transcricao, ata:ataFinal, sugestoes:rAta?.sugestoes||'', dataInicio:new Date().toISOString(), duracaoMinutos:Math.ceil(segsGravados/60), fileName:gemName, idUpload, linkAudio:r1c.linkAudio||'', departamentoId })
   ]);
   (rRel?.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
   (rSalvar?.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
@@ -1910,7 +1950,7 @@ function carregarCatalogo() {
     .withFailureHandler(e => {
       document.getElementById('catalogoLista').innerHTML='<p style="text-align:center;padding:2rem;color:var(--marrom-claro);font-size:0.8rem;">Erro: '+(e?.message||'desconhecido')+'</p>';
     })
-    .obterReunioesCatalogadas();
+    .obterReunioesCatalogadas(typeof SESSAO_TOKEN !== 'undefined' ? SESSAO_TOKEN : null);
 }
 
 function carregarAtaParaPainel(r) {
@@ -2425,6 +2465,8 @@ function limparForm() {
   removerArquivo();
   document.getElementById('inputTitulo').value = '';
   document.getElementById('inputParticipantes').value = '';
+  var depSel = document.getElementById('inputDepartamento');
+  if (depSel) depSel.value = '';
   document.getElementById('timerDisplay').textContent = '00:00:00';
   segsGravados = 0;
 }
@@ -2433,18 +2475,12 @@ function limparForm() {
 //  NAVEGAÇÃO
 // ═══════════════════════════════════════
 (function() {
-  function configurarLinks(url) {
-    const tk = (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) ? '&token=' + encodeURIComponent(SESSAO_TOKEN) : '';
-    document.querySelectorAll('a[data-pagina]').forEach(a => {
-      const pg = a.getAttribute('data-pagina');
-      const full = url + '?pagina=' + pg + tk;
-      a.href = full;
-      a.addEventListener('click', e => { e.preventDefault(); window.location.href = full; });
-    });
-  }
-  if (typeof google !== 'undefined' && google.script) {
-    google.script.run.withSuccessHandler(configurarLinks).withFailureHandler(()=>{}).obterUrlBaseWebApp();
-  }
+  var BASE = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
+  var tk = (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN)
+    ? '&token=' + encodeURIComponent(SESSAO_TOKEN) : '';
+  document.querySelectorAll('a[data-pagina]').forEach(function(a) {
+    a.href = BASE + '?pagina=' + a.getAttribute('data-pagina') + tk;
+  });
 })();
 </script>
 <?!= include('Compartilhado-Utilidades🔧'); ?>

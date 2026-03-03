@@ -1,126 +1,159 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  :root {
+    --creme-base:   #F5EFE0;
+    --creme-claro:  #FAF7F0;
+    --creme-medio:  #EDE3CC;
+    --creme-escuro: #D9CCAA;
+    --marrom:       #2C1810;
+    --marrom-medio: #5C3D2E;
+    --marrom-claro: #8B6347;
+    --ocre:         #C4822A;
+    --ocre-hover:   #A06820;
+    --ocre-claro:   rgba(196,130,42,0.12);
+    --ocre-borda:   rgba(196,130,42,0.35);
+    --vermelho:     #8B2E2E;
+    --vermelho-bg:  rgba(139,46,46,0.10);
+    --vermelho-bd:  rgba(139,46,46,0.30);
+    --verde:        #3A5C32;
+    --verde-bg:     rgba(58,92,50,0.10);
+    --verde-bd:     rgba(58,92,50,0.30);
+    --sombra:       0 8px 32px rgba(44,24,16,0.14), 0 2px 8px rgba(44,24,16,0.08);
+    --borda:        1px solid rgba(44,24,16,0.12);
+    --raio:         12px;
+    --fonte:        'Inter', 'Segoe UI', system-ui, sans-serif;
+  }
+
   body {
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #0f1117;
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-    color: #e2e8f0;
+    background: var(--creme-base);
+    background-image:
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232C1810' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    font-family: var(--fonte);
+    color: var(--marrom);
   }
 
+  /* ── Background decorativo ─────────────────────────────────────── */
   .login-bg {
     position: fixed; inset: 0;
-    background: radial-gradient(ellipse at 20% 50%, rgba(99,102,241,.15) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 20%, rgba(139,92,246,.1) 0%, transparent 50%);
+    background:
+      radial-gradient(ellipse at 15% 60%, rgba(196,130,42,0.08) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 20%, rgba(92,61,46,0.06) 0%, transparent 50%);
     pointer-events: none;
   }
 
+  /* ── Card ──────────────────────────────────────────────────────── */
   .login-card {
     position: relative;
     width: 100%;
     max-width: 420px;
-    background: #1a1d27;
-    border: 1px solid rgba(255,255,255,.07);
-    border-radius: 16px;
+    background: var(--creme-claro);
+    border: var(--borda);
+    border-radius: 18px;
     padding: 40px 36px;
-    box-shadow: 0 25px 50px rgba(0,0,0,.5);
+    box-shadow: var(--sombra);
   }
 
+  /* ── Logo / Cabeçalho ──────────────────────────────────────────── */
   .login-logo {
     text-align: center;
     margin-bottom: 28px;
   }
-  .login-logo h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -.02em;
-  }
-  .login-logo p {
-    font-size: .85rem;
-    color: #64748b;
-    margin-top: 4px;
-  }
   .login-logo .icon {
-    width: 52px; height: 52px;
-    background: linear-gradient(135deg,#6366f1,#8b5cf6);
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, var(--ocre), #A06820);
     border-radius: 14px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 12px;
-    font-size: 1.4rem;
+    margin-bottom: 14px;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 14px rgba(196,130,42,0.35);
+  }
+  .login-logo h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--marrom);
+    letter-spacing: -.02em;
+  }
+  .login-logo p {
+    font-size: .85rem;
+    color: var(--marrom-claro);
+    margin-top: 4px;
   }
 
-  .form-group {
-    margin-bottom: 16px;
-  }
+  /* ── Formulário ────────────────────────────────────────────────── */
+  .form-group { margin-bottom: 16px; }
   .form-group label {
     display: block;
-    font-size: .8rem;
-    font-weight: 500;
-    color: #94a3b8;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--marrom-medio);
     margin-bottom: 6px;
     text-transform: uppercase;
-    letter-spacing: .05em;
+    letter-spacing: .06em;
   }
-  .input-wrap {
-    position: relative;
-  }
+  .input-wrap { position: relative; }
   .input-wrap input {
     width: 100%;
-    background: #0f1117;
-    border: 1px solid rgba(255,255,255,.1);
+    background: #fff;
+    border: 1px solid var(--creme-escuro);
     border-radius: 10px;
     padding: 12px 44px 12px 14px;
-    color: #e2e8f0;
+    color: var(--marrom);
     font-size: .95rem;
+    font-family: var(--fonte);
     outline: none;
-    transition: border-color .2s;
+    transition: border-color .2s, box-shadow .2s;
   }
   .input-wrap input:focus {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+    border-color: var(--ocre);
+    box-shadow: 0 0 0 3px var(--ocre-claro);
   }
-  .input-wrap input::placeholder { color: #475569; }
+  .input-wrap input::placeholder { color: var(--creme-escuro); }
+
   .toggle-senha {
     position: absolute;
     right: 13px; top: 50%;
     transform: translateY(-50%);
     background: none; border: none;
-    color: #64748b; cursor: pointer;
-    font-size: .95rem;
-    padding: 2px;
+    color: var(--marrom-claro); cursor: pointer;
+    font-size: .95rem; padding: 2px;
     transition: color .2s;
   }
-  .toggle-senha:hover { color: #94a3b8; }
+  .toggle-senha:hover { color: var(--ocre); }
 
+  /* ── Botão entrar ──────────────────────────────────────────────── */
   .btn-entrar {
     width: 100%;
     padding: 13px;
-    background: linear-gradient(135deg,#6366f1,#8b5cf6);
+    background: linear-gradient(135deg, var(--ocre), var(--ocre-hover));
     color: #fff;
     border: none;
     border-radius: 10px;
     font-size: 1rem;
     font-weight: 600;
+    font-family: var(--fonte);
     cursor: pointer;
     margin-top: 8px;
     transition: opacity .2s, transform .1s;
     letter-spacing: .01em;
+    box-shadow: 0 3px 12px rgba(196,130,42,0.35);
   }
   .btn-entrar:hover:not(:disabled) { opacity: .9; }
   .btn-entrar:active:not(:disabled) { transform: scale(.99); }
-  .btn-entrar:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-entrar:disabled { opacity: .55; cursor: not-allowed; }
 
+  /* ── Mensagens ─────────────────────────────────────────────────── */
   .msg-erro {
     display: none;
-    background: rgba(239,68,68,.12);
-    border: 1px solid rgba(239,68,68,.3);
-    color: #fca5a5;
+    background: var(--vermelho-bg);
+    border: 1px solid var(--vermelho-bd);
+    color: var(--vermelho);
     border-radius: 8px;
     padding: 10px 14px;
     font-size: .875rem;
@@ -129,57 +162,198 @@
   }
   .msg-sucesso {
     display: none;
-    background: rgba(34,197,94,.12);
-    border: 1px solid rgba(34,197,94,.3);
-    color: #86efac;
+    background: var(--verde-bg);
+    border: 1px solid var(--verde-bd);
+    color: var(--verde);
     border-radius: 8px;
     padding: 10px 14px;
     font-size: .875rem;
     margin-bottom: 16px;
   }
 
-  .link-reset {
-    text-align: center;
-    margin-top: 18px;
-  }
+  /* ── Link esqueci a senha ──────────────────────────────────────── */
+  .link-reset { text-align: center; margin-top: 18px; }
   .link-reset a {
-    color: #6366f1;
+    color: var(--ocre);
     font-size: .875rem;
     text-decoration: none;
     cursor: pointer;
     transition: color .2s;
   }
-  .link-reset a:hover { color: #818cf8; text-decoration: underline; }
+  .link-reset a:hover { color: var(--ocre-hover); text-decoration: underline; }
 
-  /* Painel de reset */
-  .painel-reset { display: none; }
-  .btn-voltar {
-    background: none; border: none;
-    color: #6366f1; cursor: pointer;
-    font-size: .875rem;
-    padding: 0;
+  /* ── Painel reset / nova senha / escolha de página ────────────── */
+  .painel-reset      { display: none; }
+  .painel-nova-senha { display: none; }
+  .painel-escolha    { display: none; }
+
+  .escolha-saudacao {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .escolha-saudacao .icon {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, var(--ocre), var(--ocre-hover));
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 14px rgba(196,130,42,0.35);
+  }
+  .escolha-saudacao h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--marrom);
+    letter-spacing: -.02em;
+  }
+  .escolha-saudacao p {
+    font-size: .85rem;
+    color: var(--marrom-claro);
+    margin-top: 4px;
+  }
+
+  .escolha-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     margin-bottom: 20px;
+  }
+  .escolha-item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 14px;
+    padding: 14px 16px;
+    background: #fff;
+    border: 1px solid var(--creme-escuro);
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--marrom);
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+  }
+  .escolha-item:hover {
+    border-color: var(--ocre-borda);
+    box-shadow: 0 2px 12px var(--ocre-claro);
+    background: var(--creme-claro);
+  }
+  .escolha-item-icone {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    background: var(--ocre-claro);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: var(--ocre);
+    flex-shrink: 0;
+  }
+  .escolha-item-texto strong {
+    display: block;
+    font-size: .95rem;
+    font-weight: 600;
+  }
+  .escolha-item-texto span {
+    font-size: .78rem;
+    color: var(--marrom-claro);
+  }
+  .escolha-item-seta {
+    margin-left: auto;
+    color: var(--creme-escuro);
+    font-size: .85rem;
+    transition: color .2s, transform .2s;
+  }
+  .escolha-item:hover .escolha-item-seta {
+    color: var(--ocre);
+    transform: translateX(3px);
+  }
+  .btn-voltar {
+    background: none; border: none;
+    color: var(--ocre); cursor: pointer;
+    font-size: .875rem; font-family: var(--fonte);
+    padding: 0; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 6px;
     transition: color .2s;
   }
-  .btn-voltar:hover { color: #818cf8; }
+  .btn-voltar:hover { color: var(--ocre-hover); }
 
-  /* Painel de nova senha */
-  .painel-nova-senha { display: none; }
-
+  /* ── Spinner inline (botão) ────────────────────────────────────── */
   .spinner {
     display: inline-block;
     width: 16px; height: 16px;
-    border: 2px solid rgba(255,255,255,.3);
+    border: 2px solid rgba(255,255,255,.35);
     border-top-color: #fff;
     border-radius: 50%;
     animation: spin .7s linear infinite;
     vertical-align: middle;
     margin-right: 6px;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Tela de carregamento global ───────────────────────────────── */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--creme-base);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    animation: fadeIn .2s ease;
+  }
+  .loading-overlay.visivel { display: flex; }
+
+  .loading-copo {
+    position: relative;
+    width: 56px; height: 56px;
+  }
+  .loading-copo::before {
+    content: '☕';
+    font-size: 2.4rem;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulsar 1.4s ease-in-out infinite;
+  }
+  .loading-anel {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 3px solid var(--creme-medio);
+    border-top-color: var(--ocre);
+    animation: spin .9s linear infinite;
+  }
+
+  .loading-texto {
+    font-size: .95rem;
+    font-weight: 500;
+    color: var(--marrom-medio);
+    letter-spacing: .02em;
+  }
+  .loading-barra {
+    width: 140px; height: 3px;
+    background: var(--creme-medio);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .loading-barra::after {
+    content: '';
+    display: block;
+    height: 100%;
+    width: 40%;
+    background: var(--ocre);
+    border-radius: 99px;
+    animation: loadBar 1.2s ease-in-out infinite;
+  }
+
+  @keyframes spin    { to { transform: rotate(360deg); } }
+  @keyframes pulsar  { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.7;transform:scale(.92);} }
+  @keyframes loadBar { 0%{transform:translateX(-100%);} 100%{transform:translateX(350%);} }
+  @keyframes fadeIn  { from{opacity:0;} to{opacity:1;} }
 
   @media (max-width: 460px) {
     .login-card { margin: 16px; padding: 28px 20px; }

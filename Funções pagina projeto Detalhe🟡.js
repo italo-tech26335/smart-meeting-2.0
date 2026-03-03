@@ -251,13 +251,16 @@ const CONFIG_PROJETO_DETALHE = {
   URL_API: 'https://generativelanguage.googleapis.com/v1beta/models'
 };
 
-function carregarDadosEditorProjeto() {
+function carregarDadosEditorProjeto(token) {
   Logger.log('Iniciando carregarDadosEditorProjeto (sem projeto específico)');
   try {
+    const sessao = token ? _obterSessao(token) : null;
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida ou expirada.' };
+
     const setores = listarSetores();
     const responsaveis = listarResponsaveisCompletos();
     
-    const todosProjetosRaw = listarProjetosCompletos();
+    const todosProjetosRaw = listarProjetosCompletos(token);
     const listaProjetosCompleta = todosProjetosRaw.map(p => ({
       id: p.id,
       nome: p.nome,
@@ -275,7 +278,8 @@ function carregarDadosEditorProjeto() {
       responsaveisIds: p.responsaveisIds || [],
       valorPrioridade: p.valorPrioridade || 0,
       dataInicio: p.dataInicio || '',
-      dataFim: p.dataFim || ''
+      dataFim: p.dataFim || '',
+      departamentoId: p.departamentoId || ''
     }));
 
         // ── Calcular duração de cada projeto ──
@@ -292,7 +296,12 @@ function carregarDadosEditorProjeto() {
 
     // ── Obter tema e permissões do usuário ──
     var temaUsuario = obterPreferenciaTema();
-    const permissoes = obterPermissoesUsuarioAtual();
+    const permissoes = {
+      perfil: sessao.perfil || 'visualizador',
+      podeEditar: sessao.perfil === 'admin' || sessao.perfil === 'usuario',
+      modoAdmin: sessao.perfil === 'admin',
+      departamentosIds: sessao.departamentosIds || []
+    };
     
     let prioridadesProjetos = [];
     try {
@@ -306,7 +315,9 @@ function carregarDadosEditorProjeto() {
     
     const pessoasParaQuem = PESSOAS_PARA_QUEM || {};
     const configCalculoPrioridade = obterConfigCalculoPrioridade();
-    
+    const resDepartamentos = listarDepartamentos(null);
+    const departamentos = resDepartamentos.sucesso ? (resDepartamentos.departamentos || []) : [];
+
     return {
       sucesso: true,
       setores: setores,
@@ -318,7 +329,8 @@ function carregarDadosEditorProjeto() {
       pessoasParaQuem: pessoasParaQuem,
       configCalculoPrioridade: configCalculoPrioridade,
       tema: temaUsuario,
-      permissoes: permissoes
+      permissoes: permissoes,
+      departamentos: departamentos
     };
     
   } catch (e) {
@@ -495,7 +507,6 @@ function listarSetores() {
 }
 
 function salvarSetor(dados) {
-  exigirPermissaoEdicao();
   try {
     const aba = obterAba(NOME_ABA_SETORES);
     const valores = aba.getDataRange().getValues();
@@ -531,7 +542,6 @@ function salvarSetor(dados) {
 }
 
 function excluirSetor(id) {
-  exigirPermissaoEdicao();
   try {
     const aba = obterAba(NOME_ABA_SETORES);
     const dados = aba.getDataRange().getValues();
@@ -548,13 +558,99 @@ function excluirSetor(id) {
   }
 }
 
-function listarProjetosCompletos() {
+function _normalizarDepartamentoValor(valor) {
+  return (valor || '').toString().trim().toLowerCase();
+}
+
+/**
+ * Obtém departamentos atualizados do usuário diretamente da planilha,
+ * garantindo que sessões antigas não causem problemas de validação.
+ */
+function _obterDepsAtualizadosUsuario(sessao) {
+  try {
+    const usuario = _buscarUsuarioPorEmail(sessao.email);
+    const deps = usuario ? (usuario.departamentosIds || []) : (sessao.departamentosIds || []);
+    return _resolverIdsDepartamento(deps);
+  } catch (e) {
+    return _resolverIdsDepartamento(sessao.departamentosIds || []);
+  }
+}
+
+function _resolverIdsDepartamento(valores) {
+  const lista = Array.isArray(valores) ? valores : [valores];
+  const mapa = {};
+  const dados = obterDadosAbaComCache(NOME_ABA_DEPARTAMENTOS) || [];
+
+  for (let i = 1; i < dados.length; i++) {
+    const id = (dados[i][COLUNAS_DEPARTAMENTOS.ID] || '').toString().trim();
+    const nome = (dados[i][COLUNAS_DEPARTAMENTOS.NOME] || '').toString().trim();
+    if (!id && !nome) continue;
+    if (id) mapa[_normalizarDepartamentoValor(id)] = id;
+    if (nome) mapa[_normalizarDepartamentoValor(nome)] = id || nome;
+  }
+
+  const resolvidos = [];
+  lista.forEach(function(v) {
+    const bruto = (v || '').toString().trim();
+    if (!bruto) return;
+    const normalizado = _normalizarDepartamentoValor(bruto);
+    resolvidos.push(mapa[normalizado] || bruto);
+  });
+  return resolvidos;
+}
+
+function _obterSessaoEdicaoProjetos(token) {
+  const sessao = token ? _obterSessao(token) : null;
+  if (!sessao) return { ok: false, mensagem: 'Sessão inválida ou expirada.' };
+  if (sessao.perfil === 'visualizador') return { ok: false, mensagem: 'Sem permissão para editar.' };
+  return { ok: true, sessao: sessao };
+}
+
+function _usuarioPodeAcessarProjetoPorDepartamento(sessao, projetoId) {
+  if (!sessao || !projetoId) return false;
+  if (sessao.perfil === 'admin') return true;
+
+  const depsUsuario = _obterDepsAtualizadosUsuario(sessao);
+  // Se usuário não tem departamentos, permite acesso (compatibilidade retroativa)
+  if (depsUsuario.length === 0) return true;
+
+  const aba = obterAba(NOME_ABA_PROJETOS);
+  const dados = aba.getDataRange().getValues();
+  for (let i = 1; i < dados.length; i++) {
+    if (dados[i][COLUNAS_PROJETOS.ID] === projetoId) {
+      const depProjetoRaw = (dados[i][COLUNAS_PROJETOS.DEPARTAMENTO_ID] || '').toString().trim();
+      // Projetos sem departamento são acessíveis por todos (retrocompat)
+      if (!depProjetoRaw) return true;
+      const depProjeto = _resolverIdsDepartamento([depProjetoRaw])[0] || depProjetoRaw;
+      return depsUsuario.includes(depProjeto);
+    }
+  }
+  return false;
+}
+
+function listarProjetosCompletos(token) {
+  const sessao = token ? _obterSessao(token) : null;
+  const isAdmin = sessao && sessao.perfil === 'admin';
+  // Busca departamentos atualizados da planilha (não usa somente a sessão cacheada)
+  const depsFiltro = (sessao && !isAdmin) ? _obterDepsAtualizadosUsuario(sessao) : null;
+
   const aba = obterAba(NOME_ABA_PROJETOS);
   const dados = aba.getDataRange().getValues();
   const projetos = [];
-  
+
   for (let i = 1; i < dados.length; i++) {
     if (dados[i][COLUNAS_PROJETOS.ID]) {
+      // Filtro de departamento: não-admin só vê projetos do(s) seu(s) departamento(s)
+      // Projetos SEM departamento são visíveis para todos (compatibilidade retroativa)
+      if (depsFiltro !== null && depsFiltro.length > 0) {
+        const depProjetoRaw = (dados[i][COLUNAS_PROJETOS.DEPARTAMENTO_ID] || '').toString().trim();
+        if (depProjetoRaw) {
+          const depProjeto = _resolverIdsDepartamento([depProjetoRaw])[0] || depProjetoRaw;
+          if (!depsFiltro.includes(depProjeto)) continue;
+        }
+        // Se projeto sem departamento: mostra para todos
+      }
+
       const respRaw = dados[i][COLUNAS_PROJETOS.RESPONSAVEIS_IDS];
       let respIds = [];
       if (respRaw) {
@@ -568,7 +664,7 @@ function listarProjetosCompletos() {
         }
         return val.toString();
       };
-      
+
       projetos.push({
         id:              dados[i][COLUNAS_PROJETOS.ID],
         nome:            dados[i][COLUNAS_PROJETOS.NOME],
@@ -580,23 +676,27 @@ function listarProjetosCompletos() {
         link:            dados[i][COLUNAS_PROJETOS.LINK],
         gravidade:       dados[i][COLUNAS_PROJETOS.GRAVIDADE]  || '',
         urgencia:        dados[i][COLUNAS_PROJETOS.URGENCIA]   || '',
-        esforco:         dados[i][COLUNAS_PROJETOS.ESFORCO]    || '',   // ← novo
+        esforco:         dados[i][COLUNAS_PROJETOS.ESFORCO]    || '',
         setor:           dados[i][COLUNAS_PROJETOS.SETOR],
         pilar:           dados[i][COLUNAS_PROJETOS.PILAR],
         responsaveisIds: respIds,
         valorPrioridade: dados[i][COLUNAS_PROJETOS.VALOR_PRIORIDADE] || 0,
         dataInicio:      converterData(dados[i][COLUNAS_PROJETOS.DATA_INICIO]),
-        dataFim:         converterData(dados[i][COLUNAS_PROJETOS.DATA_FIM])
+        dataFim:         converterData(dados[i][COLUNAS_PROJETOS.DATA_FIM]),
+        departamentoId:  (dados[i][COLUNAS_PROJETOS.DEPARTAMENTO_ID] || '').toString()
       });
     }
   }
   return projetos;
 }
 
-function salvarProjetoCompleto(dados) {
-  exigirPermissaoEdicao();
+function salvarProjetoCompleto(dados, token) {
   Logger.log('Salvando projeto: ' + JSON.stringify(dados));
   try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    const sessao = auth.sessao;
+
     const aba = obterAba(NOME_ABA_PROJETOS);
     const valores = aba.getDataRange().getValues();
     let linha = -1;
@@ -634,9 +734,32 @@ function salvarProjetoCompleto(dados) {
     linhaDados[COLUNAS_PROJETOS.PILAR]           = dados.pilar;
     linhaDados[COLUNAS_PROJETOS.RESPONSAVEIS_IDS]= JSON.stringify(dados.responsaveisIds || []);
     linhaDados[COLUNAS_PROJETOS.VALOR_PRIORIDADE]= dados.valorPrioridade || 0;
-    linhaDados[COLUNAS_PROJETOS.DATA_INICIO]     = dados.dataInicio  || '';
-    linhaDados[COLUNAS_PROJETOS.DATA_FIM]        = dados.dataFim     || '';
-    
+    linhaDados[COLUNAS_PROJETOS.DATA_INICIO]      = dados.dataInicio    || '';
+    linhaDados[COLUNAS_PROJETOS.DATA_FIM]         = dados.dataFim       || '';
+
+    // Busca departamentos ATUALIZADOS da planilha (ignora sessão cacheada)
+    const depsUsuario = (sessao.perfil !== 'admin') ? _obterDepsAtualizadosUsuario(sessao) : [];
+    let departamentoIdFinal = _resolverIdsDepartamento([dados.departamentoId || ''])[0] || (dados.departamentoId || '').toString().trim();
+    const depExistenteRaw = (linha > 0 ? (linhaDados[COLUNAS_PROJETOS.DEPARTAMENTO_ID] || '').toString().trim() : '');
+    const depExistente = _resolverIdsDepartamento([depExistenteRaw])[0] || depExistenteRaw;
+
+    if (sessao.perfil === 'admin') {
+      // Admin: preserva departamento existente se não enviou um novo
+      if (!departamentoIdFinal && depExistente) departamentoIdFinal = depExistente;
+    } else {
+      // Não-admin: valida departamento
+      if (!departamentoIdFinal) departamentoIdFinal = depExistente;
+      if (!departamentoIdFinal && depsUsuario.length > 0) departamentoIdFinal = depsUsuario[0];
+
+      // Se usuário tem departamentos, valida que o departamento escolhido é permitido
+      if (depsUsuario.length > 0 && departamentoIdFinal && !depsUsuario.includes(departamentoIdFinal)) {
+        return { sucesso: false, mensagem: 'Departamento inválido para este usuário.' };
+      }
+      // Se usuário sem departamentos: permite salvar (compatibilidade retroativa)
+    }
+
+    linhaDados[COLUNAS_PROJETOS.DEPARTAMENTO_ID]  = departamentoIdFinal;
+
     if (linha > 0) {
       aba.getRange(linha, 1, 1, linhaDados.length).setValues([linhaDados]);
     } else {
@@ -680,9 +803,15 @@ function listarEtapasPorProjeto(projetoId) {
   return etapas;
 }
 
-function salvarEtapaCompleta(dados) {
-  exigirPermissaoEdicao();
+function salvarEtapaCompleta(dados, token) {
   try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    const sessao = auth.sessao;
+    if (!_usuarioPodeAcessarProjetoPorDepartamento(sessao, dados && dados.projetoId)) {
+      return { sucesso: false, mensagem: 'Sem acesso ao projeto informado.' };
+    }
+
     const aba = obterAba(NOME_ABA_ETAPAS);
     const valores = aba.getDataRange().getValues();
     let linha = -1;
@@ -720,14 +849,21 @@ function salvarEtapaCompleta(dados) {
   }
 }
 
-function excluirEtapaCompleta(id) {
-  exigirPermissaoEdicao();
+function excluirEtapaCompleta(id, token) {
   try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    const sessao = auth.sessao;
+
     const aba = obterAba(NOME_ABA_ETAPAS);
     const dados = aba.getDataRange().getValues();
 
     for (let i = dados.length - 1; i >= 1; i--) {
       if (dados[i][COLUNAS_ETAPAS.ID] === id) {
+        const projetoId = (dados[i][COLUNAS_ETAPAS.PROJETO_ID] || '').toString();
+        if (!_usuarioPodeAcessarProjetoPorDepartamento(sessao, projetoId)) {
+          return { sucesso: false, mensagem: 'Sem acesso ao projeto desta atividade.' };
+        }
         aba.deleteRow(i + 1);
         return { sucesso: true, mensagem: 'Atividade excluída.' };
       }
@@ -758,7 +894,6 @@ function listarResponsaveisCompletos() {
 }
 
 function salvarResponsavelCompleto(dados) {
-  exigirPermissaoEdicao();
   try {
     const aba = obterAba(NOME_ABA_RESPONSAVEIS);
     const valores = aba.getDataRange().getValues();
@@ -1269,8 +1404,6 @@ function obterPrioridadesDoProjeto(projetoId) {
 }
 
 function salvarPrioridadesDoProjeto(projetoId, listaPrioridades) {
-  exigirPermissaoEdicao();
-  
   try {
     if (!projetoId) {
       return { sucesso: false, mensagem: 'ID do projeto é obrigatório' };
@@ -1488,8 +1621,6 @@ function obterPrioridadesGeraisDeProjetos() {
  * @returns {Object} Resultado da operação
  */
 function salvarPrioridadesGeraisDeProjetos(listaPrioridades) {
-  exigirPermissaoEdicao();
-  
   try {
     const aba = obterAba(NOME_ABA_PRIORIDADES);
     const dados = aba.getDataRange().getValues();
@@ -1599,8 +1730,7 @@ function obterPrioridadesProjetosPorResponsavel(responsavelId) {
  * @returns {Object} Resultado da operação
  */
 function salvarPrioridadesProjetosPorResponsavel(responsavelId, listaPrioridades) {
-  exigirPermissaoEdicao();
-  
+
   try {
     const aba = obterAba(NOME_ABA_PRIORIDADES);
     const dados = aba.getDataRange().getValues();
@@ -1647,10 +1777,15 @@ function salvarPrioridadesProjetosPorResponsavel(responsavelId, listaPrioridades
   }
 }
 
-function salvarValorPrioridadeProjeto(projetoId, valorPrioridade, dadosCalculo) {
-  exigirPermissaoEdicao();
-  
+function salvarValorPrioridadeProjeto(projetoId, valorPrioridade, dadosCalculo, token) {
+
   try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    if (!_usuarioPodeAcessarProjetoPorDepartamento(auth.sessao, projetoId)) {
+      return { sucesso: false, mensagem: 'Sem acesso ao projeto informado.' };
+    }
+
     if (!projetoId) {
       return { sucesso: false, mensagem: 'ID do projeto é obrigatório' };
     }
@@ -1874,9 +2009,14 @@ function obterConfigCalculoPrioridade() {
  * @param {string} projetoId - ID do projeto a excluir
  * @returns {Object} Resultado da operação
  */
-function excluirProjeto(projetoId) {
-  exigirPermissaoEdicao();
+function excluirProjeto(projetoId, token) {
   try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    if (!_usuarioPodeAcessarProjetoPorDepartamento(auth.sessao, projetoId)) {
+      return { sucesso: false, mensagem: 'Sem acesso ao projeto informado.' };
+    }
+
     const abaProjetos = obterAba(NOME_ABA_PROJETOS);
     const dados = abaProjetos.getDataRange().getValues();
 
@@ -1923,8 +2063,12 @@ function excluirProjeto(projetoId) {
  * Lista todos os projetos na lixeira
  * @returns {Object} Lista de projetos excluídos
  */
-function listarLixeira() {
+function listarLixeira(token) {
   try {
+    const sessao = token ? _obterSessao(token) : null;
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida ou expirada.', projetos: [] };
+
+    const depsFiltro = (sessao.perfil === 'admin') ? null : _obterDepsAtualizadosUsuario(sessao);
     const abaLixeira = obterOuCriarAbaLixeira();
     if (abaLixeira.getLastRow() <= 1) return { sucesso: true, projetos: [] };
 
@@ -1933,6 +2077,14 @@ function listarLixeira() {
 
     for (let i = 1; i < dados.length; i++) {
       if (dados[i][COLUNAS_PROJETOS.ID]) {
+        if (depsFiltro !== null && depsFiltro.length > 0) {
+          const depProjetoRaw = (dados[i][COLUNAS_PROJETOS.DEPARTAMENTO_ID] || '').toString().trim();
+          if (depProjetoRaw) {
+            const depProjeto = _resolverIdsDepartamento([depProjetoRaw])[0] || depProjetoRaw;
+            if (!depsFiltro.includes(depProjeto)) continue;
+          }
+          // Projetos sem departamento: visíveis por todos (retrocompat)
+        }
         const respRaw = dados[i][COLUNAS_PROJETOS.RESPONSAVEIS_IDS];
         let respIds = [];
         if (respRaw) {
@@ -1965,16 +2117,25 @@ function listarLixeira() {
  * @param {string} projetoId - ID do projeto a restaurar
  * @returns {Object} Resultado da operação
  */
-function restaurarDaLixeira(projetoId) {
-  exigirPermissaoEdicao();
+function restaurarDaLixeira(projetoId, token) {
   try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
     const abaLixeira = obterOuCriarAbaLixeira();
     const dados = abaLixeira.getDataRange().getValues();
 
     for (let i = 1; i < dados.length; i++) {
       if (dados[i][COLUNAS_PROJETOS.ID] === projetoId) {
+        const depProjetoRaw = (dados[i][COLUNAS_PROJETOS.DEPARTAMENTO_ID] || '').toString().trim();
+        const depProjeto = _resolverIdsDepartamento([depProjetoRaw])[0] || depProjetoRaw;
+        const depsUsuario = _resolverIdsDepartamento(auth.sessao.departamentosIds || []);
+        if (auth.sessao.perfil !== 'admin' && !depsUsuario.includes(depProjeto)) {
+          return { sucesso: false, mensagem: 'Sem acesso ao departamento deste projeto.' };
+        }
+
         // Pega apenas as colunas do projeto (sem a coluna de data de exclusão)
-        const linhaOriginal = dados[i].slice(0, 17);
+        const linhaOriginal = dados[i].slice(0, 20);
 
         // Restaura para aba de projetos
         const abaProjetos = obterAba(NOME_ABA_PROJETOS);
@@ -2000,14 +2161,22 @@ function restaurarDaLixeira(projetoId) {
  * @param {string} projetoId - ID do projeto
  * @returns {Object} Resultado da operação
  */
-function excluirDefinitivamente(projetoId) {
-  exigirPermissaoEdicao();
+function excluirDefinitivamente(projetoId, token) {
   try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
     const abaLixeira = obterOuCriarAbaLixeira();
     const dados = abaLixeira.getDataRange().getValues();
 
     for (let i = 1; i < dados.length; i++) {
       if (dados[i][COLUNAS_PROJETOS.ID] === projetoId) {
+        const depProjetoRaw = (dados[i][COLUNAS_PROJETOS.DEPARTAMENTO_ID] || '').toString().trim();
+        const depProjeto = _resolverIdsDepartamento([depProjetoRaw])[0] || depProjetoRaw;
+        const depsUsuario = _resolverIdsDepartamento(auth.sessao.departamentosIds || []);
+        if (auth.sessao.perfil !== 'admin' && !depsUsuario.includes(depProjeto)) {
+          return { sucesso: false, mensagem: 'Sem acesso ao departamento deste projeto.' };
+        }
         abaLixeira.deleteRow(i + 1);
         Logger.log('Projeto excluído definitivamente: ' + projetoId);
         return { sucesso: true, mensagem: 'Projeto excluído permanentemente!' };
@@ -2071,9 +2240,14 @@ function listarEtapasPorProjetoOrdenadas(projetoId) {
  * @param {Array<string>} idsOrdenados - IDs das atividades raiz na nova ordem
  * @returns {Object} { sucesso, mensagem }
  */
-function salvarOrdemAtividades(projetoId, idsOrdenados) {
-  exigirPermissaoEdicao();
+function salvarOrdemAtividades(projetoId, idsOrdenados, token) {
   try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    if (!_usuarioPodeAcessarProjetoPorDepartamento(auth.sessao, projetoId)) {
+      return { sucesso: false, mensagem: 'Sem acesso ao projeto informado.' };
+    }
+
     if (!projetoId || !Array.isArray(idsOrdenados) || idsOrdenados.length === 0) {
       return { sucesso: false, mensagem: 'Dados inválidos para salvar ordem' };
     }
@@ -2510,4 +2684,3 @@ entry.projetos.forEach(function(proj) {
   h += '</div></body></html>';
   return h;
 }
-

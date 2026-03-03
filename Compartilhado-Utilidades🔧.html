@@ -31,25 +31,46 @@
           _redirecionarLogin();
         }
       })
-      .withFailureHandler(function() { _redirecionarLogin(); })
+      .withFailureHandler(function() {
+        // Falha transitória (rede/quota) — executa callback sem redirecionar
+        // para evitar loop: a sessão foi verificada pelo servidor ao servir a página.
+        if (typeof callbackSucesso === 'function') callbackSucesso(null);
+      })
       .verificarSessao(SESSAO_TOKEN);
   }
 
   // ── Logout ────────────────────────────────────────────────────────────────
   function fazerLogoutCliente() {
-    if (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) {
-      google.script.run.fazerLogout(SESSAO_TOKEN);
-    }
+    // Limpa armazenamento local PRIMEIRO (evita auto-login loop)
+    localStorage.removeItem('sm_token');
+    localStorage.removeItem('sm_usuario');
     sessionStorage.removeItem('sm_token');
     sessionStorage.removeItem('sm_usuario');
-    _redirecionarLogin();
+
+    // Invalida sessão no servidor e redireciona
+    if (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) {
+      google.script.run
+        .withSuccessHandler(function() { _redirecionarLogin(); })
+        .withFailureHandler(function() { _redirecionarLogin(); })
+        .fazerLogout(SESSAO_TOKEN);
+    } else {
+      _redirecionarLogin();
+    }
   }
 
   // ── Helpers internos ──────────────────────────────────────────────────────
   function _redirecionarLogin() {
-    google.script.run.withSuccessHandler(function(url) {
-      window.location.href = url + '?pagina=login';
-    }).obterUrlWebApp();
+    // Guard contra loop infinito
+    var tentativas = parseInt(sessionStorage.getItem('_sm_redir') || '0');
+    if (tentativas >= 2) {
+      sessionStorage.removeItem('_sm_redir');
+      localStorage.removeItem('sm_token');
+      localStorage.removeItem('sm_usuario');
+    } else {
+      sessionStorage.setItem('_sm_redir', tentativas + 1);
+    }
+    var url = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
+    window.location.replace(url + '?pagina=login');
   }
 
   function podeEditar() {

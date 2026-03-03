@@ -4,12 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Smart Meeting - Login</title>
+  <base target="_top">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <?!= include('Login-CSS') ?>
 </head>
 <body>
+
+<!-- ══ TELA DE CARREGAMENTO GLOBAL ══ -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-copo">
+    <div class="loading-anel"></div>
+  </div>
+  <div class="loading-texto" id="loadingTexto">Autenticando...</div>
+  <div class="loading-barra"></div>
+</div>
+
 <div class="login-bg"></div>
 
 <div class="login-card" id="painelLogin">
@@ -26,6 +37,7 @@
   <div class="msg-erro" id="erroLogin"></div>
   <div class="msg-sucesso" id="sucessoLogin"></div>
 
+  <form onsubmit="fazerLogin(); return false;" autocomplete="on">
   <div class="form-group">
     <label>Email</label>
     <div class="input-wrap">
@@ -43,10 +55,60 @@
     </div>
   </div>
 
-  <button class="btn-entrar" id="btnEntrar" onclick="fazerLogin()">Entrar</button>
+  <button class="btn-entrar" id="btnEntrar" type="submit">Entrar</button>
+  </form>
 
   <div class="link-reset">
     <a onclick="mostrarReset()">Esqueci minha senha</a>
+  </div>
+</div>
+
+<div class="login-card painel-escolha" id="painelEscolha">
+  <div class="escolha-saudacao">
+    <div class="icon">&#9889;</div>
+    <h2>Bem-vindo, <span id="escolhaNome">usuário</span>!</h2>
+    <p>Onde você quer ir hoje?</p>
+  </div>
+
+  <div class="escolha-grid">
+    <a class="escolha-item" id="linkReunioes" href="#">
+      <div class="escolha-item-icone"><i class="fas fa-video"></i></div>
+      <div class="escolha-item-texto">
+        <strong>Reuniões</strong>
+        <span>Gerencie e transcreva reuniões</span>
+      </div>
+      <i class="fas fa-chevron-right escolha-item-seta"></i>
+    </a>
+    <a class="escolha-item" id="linkProjetos" href="#">
+      <div class="escolha-item-icone"><i class="fas fa-project-diagram"></i></div>
+      <div class="escolha-item-texto">
+        <strong>Projetos</strong>
+        <span>Acompanhe projetos e atividades</span>
+      </div>
+      <i class="fas fa-chevron-right escolha-item-seta"></i>
+    </a>
+    <a class="escolha-item" id="linkRelatorios" href="#">
+      <div class="escolha-item-icone"><i class="fas fa-clipboard-check"></i></div>
+      <div class="escolha-item-texto">
+        <strong>Relatórios IA</strong>
+        <span>Analise atas e insights das reuniões</span>
+      </div>
+      <i class="fas fa-chevron-right escolha-item-seta"></i>
+    </a>
+    <a class="escolha-item" id="linkAdmin" href="#" style="display:none;">
+      <div class="escolha-item-icone"><i class="fas fa-shield-alt"></i></div>
+      <div class="escolha-item-texto">
+        <strong>Painel Admin</strong>
+        <span>Gerencie usuários e logs do sistema</span>
+      </div>
+      <i class="fas fa-chevron-right escolha-item-seta"></i>
+    </a>
+  </div>
+
+  <div style="text-align:center;">
+    <a onclick="fazerLogoutEscolha()" style="color:var(--marrom-claro);font-size:.8rem;cursor:pointer;text-decoration:none;">
+      <i class="fas fa-sign-out-alt"></i> Sair
+    </a>
   </div>
 </div>
 
@@ -64,6 +126,7 @@
   <div class="msg-erro" id="erroReset"></div>
   <div class="msg-sucesso" id="sucessoReset"></div>
 
+  <form onsubmit="enviarReset(); return false;" autocomplete="on">
   <div class="form-group">
     <label>Email cadastrado</label>
     <div class="input-wrap">
@@ -71,7 +134,8 @@
     </div>
   </div>
 
-  <button class="btn-entrar" id="btnReset" onclick="enviarReset()">Enviar link</button>
+  <button class="btn-entrar" id="btnReset" type="submit">Enviar link</button>
+  </form>
 </div>
 
 <div class="login-card painel-nova-senha" id="painelNovaSenha">
@@ -84,6 +148,7 @@
   <div class="msg-erro" id="erroNovaSenha"></div>
   <div class="msg-sucesso" id="sucessoNovaSenha"></div>
 
+  <form onsubmit="salvarNovaSenha(); return false;" autocomplete="on">
   <div class="form-group">
     <label>Nova Senha</label>
     <div class="input-wrap">
@@ -108,13 +173,46 @@
     Minimo 8 caracteres, 1 letra maiuscula, 1 numero e 1 caractere especial.
   </small>
 
-  <button class="btn-entrar" id="btnNovaSenha" onclick="salvarNovaSenha()">Salvar nova senha</button>
+  <button class="btn-entrar" id="btnNovaSenha" type="submit">Salvar nova senha</button>
+  </form>
 </div>
 
 <script>
   var TOKEN_RESET = '<?= tokenReset ?>';
+  var BASE_URL    = '<?= baseUrl ?>';
 
   document.addEventListener('DOMContentLoaded', function() {
+    // Verificar sessão salva no localStorage (persiste entre refreshes)
+    // Ao chegar na página de login, limpa o contador de redirecionamentos
+    sessionStorage.removeItem('_sm_redir');
+
+    if (!TOKEN_RESET) {
+      var tokenSalvo = localStorage.getItem('sm_token');
+      if (tokenSalvo) {
+        mostrarLoading('Verificando sessão...');
+        google.script.run
+          .withSuccessHandler(function(r) {
+            if (r && r.valida) {
+              esconderLoading();
+              var usuarioSalvo = null;
+              try { usuarioSalvo = JSON.parse(localStorage.getItem('sm_usuario') || 'null'); } catch(e) {}
+              _mostrarEscolhaPagina(tokenSalvo, usuarioSalvo);
+            } else {
+              localStorage.removeItem('sm_token');
+              localStorage.removeItem('sm_usuario');
+              esconderLoading();
+              mostrarPainel('painelLogin');
+            }
+          })
+          .withFailureHandler(function() {
+            esconderLoading();
+            mostrarPainel('painelLogin');
+          })
+          .verificarSessao(tokenSalvo);
+        return;
+      }
+    }
+
     if (TOKEN_RESET) {
       mostrarPainel('painelNovaSenha');
     } else {
@@ -122,24 +220,15 @@
     }
 
     document.getElementById('inputEmail').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') document.getElementById('inputSenha').focus();
-    });
-    document.getElementById('inputSenha').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') fazerLogin();
-    });
-    document.getElementById('inputEmailReset').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') enviarReset();
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('inputSenha').focus(); }
     });
     document.getElementById('inputNovaSenha').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') document.getElementById('inputConfirmaSenha').focus();
-    });
-    document.getElementById('inputConfirmaSenha').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') salvarNovaSenha();
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('inputConfirmaSenha').focus(); }
     });
   });
 
   function mostrarPainel(id) {
-    ['painelLogin', 'painelReset', 'painelNovaSenha'].forEach(function(p) {
+    ['painelLogin', 'painelEscolha', 'painelReset', 'painelNovaSenha'].forEach(function(p) {
       var el = document.getElementById(p);
       if (el) el.style.display = (p === id) ? 'block' : 'none';
     });
@@ -170,11 +259,20 @@
   function mostrarErro(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; }
   function mostrarSucesso(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; }
 
-  function setCarregando(btnId, carregando) {
+  function mostrarLoading(texto) {
+    document.getElementById('loadingTexto').textContent = texto || 'Carregando...';
+    document.getElementById('loadingOverlay').classList.add('visivel');
+  }
+
+  function esconderLoading() {
+    document.getElementById('loadingOverlay').classList.remove('visivel');
+  }
+
+  function setCarregando(btnId, carregando, texto) {
     var btn = document.getElementById(btnId);
     if (carregando) {
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Aguarde...';
+      btn.innerHTML = '<span class="spinner"></span> ' + (texto || 'Aguarde...');
     } else {
       btn.disabled = false;
     }
@@ -190,24 +288,27 @@
       return;
     }
 
-    setCarregando('btnEntrar', true);
-    document.getElementById('btnEntrar').innerHTML = '<span class="spinner"></span> Entrando...';
+    setCarregando('btnEntrar', true, 'Entrando...');
+    mostrarLoading('Autenticando...');
 
     google.script.run
       .withSuccessHandler(function(r) {
-        setCarregando('btnEntrar', false);
-        document.getElementById('btnEntrar').textContent = 'Entrar';
         if (r.sucesso) {
+          localStorage.setItem('sm_token', r.token);
+          localStorage.setItem('sm_usuario', JSON.stringify(r.usuario));
           sessionStorage.setItem('sm_token', r.token);
           sessionStorage.setItem('sm_usuario', JSON.stringify(r.usuario));
-          google.script.run.withSuccessHandler(function(url) {
-            window.location.href = url + '?pagina=reunioes&token=' + r.token;
-          }).obterUrlWebApp();
+          esconderLoading();
+          _mostrarEscolhaPagina(r.token, r.usuario);
         } else {
+          esconderLoading();
+          setCarregando('btnEntrar', false);
+          document.getElementById('btnEntrar').textContent = 'Entrar';
           mostrarErro('erroLogin', r.mensagem || 'Erro ao fazer login.');
         }
       })
       .withFailureHandler(function() {
+        esconderLoading();
         setCarregando('btnEntrar', false);
         document.getElementById('btnEntrar').textContent = 'Entrar';
         mostrarErro('erroLogin', 'Erro de conexao. Tente novamente.');
@@ -220,17 +321,19 @@
     var email = document.getElementById('inputEmailReset').value.trim();
     if (!email) { mostrarErro('erroReset', 'Informe seu email.'); return; }
 
-    setCarregando('btnReset', true);
-    document.getElementById('btnReset').innerHTML = '<span class="spinner"></span> Enviando...';
+    setCarregando('btnReset', true, 'Enviando...');
+    mostrarLoading('Enviando email...');
 
     google.script.run
       .withSuccessHandler(function(r) {
+        esconderLoading();
         setCarregando('btnReset', false);
         document.getElementById('btnReset').textContent = 'Enviar link';
         mostrarSucesso('sucessoReset', r.mensagem || 'Email enviado!');
         document.getElementById('inputEmailReset').value = '';
       })
       .withFailureHandler(function() {
+        esconderLoading();
         setCarregando('btnReset', false);
         document.getElementById('btnReset').textContent = 'Enviar link';
         mostrarErro('erroReset', 'Erro ao enviar. Tente novamente.');
@@ -246,11 +349,12 @@
     if (!nova || !confirma) { mostrarErro('erroNovaSenha', 'Preencha os dois campos.'); return; }
     if (nova !== confirma) { mostrarErro('erroNovaSenha', 'As senhas nao coincidem.'); return; }
 
-    setCarregando('btnNovaSenha', true);
-    document.getElementById('btnNovaSenha').innerHTML = '<span class="spinner"></span> Salvando...';
+    setCarregando('btnNovaSenha', true, 'Salvando...');
+    mostrarLoading('Salvando nova senha...');
 
     google.script.run
       .withSuccessHandler(function(r) {
+        esconderLoading();
         setCarregando('btnNovaSenha', false);
         document.getElementById('btnNovaSenha').textContent = 'Salvar nova senha';
         if (r.sucesso) {
@@ -261,11 +365,57 @@
         }
       })
       .withFailureHandler(function() {
+        esconderLoading();
         setCarregando('btnNovaSenha', false);
         document.getElementById('btnNovaSenha').textContent = 'Salvar nova senha';
         mostrarErro('erroNovaSenha', 'Erro de conexao.');
       })
       .redefinirSenha(TOKEN_RESET, nova);
+  }
+
+  function _mostrarEscolhaPagina(token, usuario) {
+    var nome = (usuario && usuario.nome) ? usuario.nome.split(' ')[0] : 'usuário';
+    document.getElementById('escolhaNome').textContent = nome;
+
+    var BASE = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
+    var tk = '&token=' + encodeURIComponent(token);
+    var paginas = { linkReunioes: 'reunioes', linkProjetos: 'projeto', linkRelatorios: 'relatorios' };
+    Object.keys(paginas).forEach(function(id) {
+      var el = document.getElementById(id);
+      el.href = BASE + '?pagina=' + paginas[id] + tk;
+      el.target = '_top';
+    });
+
+    var elAdmin = document.getElementById('linkAdmin');
+    if (usuario && usuario.perfil === 'admin') {
+      elAdmin.href = BASE + '?pagina=admin' + tk;
+      elAdmin.target = '_top';
+      elAdmin.style.display = 'flex';
+    } else {
+      elAdmin.style.display = 'none';
+    }
+
+    mostrarPainel('painelEscolha');
+  }
+
+  function fazerLogoutEscolha() {
+    localStorage.removeItem('sm_token');
+    localStorage.removeItem('sm_usuario');
+    sessionStorage.removeItem('sm_token');
+    sessionStorage.removeItem('sm_usuario');
+    mostrarPainel('painelLogin');
+    document.getElementById('inputEmail').value = '';
+    document.getElementById('inputSenha').value = '';
+    document.getElementById('btnEntrar').textContent = 'Entrar';
+  }
+
+  /**
+   * Navega o sistema após autenticação.
+   * Usa window.location.replace para navegar o próprio iframe — não requer
+   * ativação do usuário (ao contrário de target="_top" em callbacks assíncronos).
+   */
+  function _navegarSistema(url) {
+    window.location.replace(url);
   }
 </script>
 </body>

@@ -1,4 +1,5 @@
-const ID_PLANILHA = '1rjcUe9iGoguQVNcmwRHoxICmWB44q3tv5ARdp58pqxo';
+const ID_PLANILHA = '1Bmy4gcbF13mxRYBTHhu3Y82jMLg3QUEDqg_sCyx5X9M';
+const URL_WEBAPP  = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
 
 /** =====================================================================
  *                          ABAS DA PLANILHAss
@@ -12,6 +13,7 @@ const NOME_ABA_DEPENDENCIAS = 'Dependencias';
 const NOME_ABA_PRIORIDADES = 'PrioridadesResponsavel';
 // NOME_ABA_PERMISSOES removido — sistema substituído por Auth.js
 const NOME_ABA_LIXEIRA = 'LixeiraProjetos';
+const NOME_ABA_DEPARTAMENTOS = 'Departamentos';
 
 /** Reuniões */
 
@@ -42,7 +44,14 @@ const COLUNAS_PROJETOS = {
   DATA_INICIO: 15,
   DATA_FIM: 16,
   DATA_CRIACAO: 17,
-  DATA_ULTIMA_MODIFICACAO: 18
+  DATA_ULTIMA_MODIFICACAO: 18,
+  DEPARTAMENTO_ID: 19
+};
+
+const COLUNAS_DEPARTAMENTOS = {
+  ID: 0,
+  NOME: 1,
+  DESCRICAO: 2
 };
 
 const COLUNAS_RESPONSAVEIS = {
@@ -102,7 +111,8 @@ const COLUNAS_REUNIOES = {
   LINK_ATA: 11,
   EMAILS_ENVIADOS: 12,
   PROJETOS_IMPACTADOS: 13,
-  ETAPAS_IMPACTADAS: 14
+  ETAPAS_IMPACTADAS: 14,
+  DEPARTAMENTO_ID: 15
 };
 
 /** =====================================================================
@@ -186,6 +196,7 @@ function doGet(e) {
       tmpl.sessaoToken   = token;
       tmpl.usuarioNome   = sessao.nome;
       tmpl.usuarioPerfil = sessao.perfil;
+      tmpl.baseUrl       = URL_WEBAPP;
       return tmpl.evaluate()
         .setTitle('Smart Meeting - Painel Admin')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -213,6 +224,8 @@ function doGet(e) {
     tmpl.sessaoToken   = token;
     tmpl.usuarioNome   = sessao.nome;
     tmpl.usuarioPerfil = sessao.perfil;
+    tmpl.modoAdmin     = (sessao.perfil === 'admin');
+    tmpl.baseUrl       = URL_WEBAPP;
 
     return tmpl.evaluate()
       .setTitle(titulo)
@@ -229,6 +242,7 @@ function _servirLogin(mensagemErro) {
   const tmpl = HtmlService.createTemplateFromFile('Login');
   tmpl.mensagemErroUrl = mensagemErro || '';
   tmpl.tokenReset = '';
+  tmpl.baseUrl = URL_WEBAPP;
   return tmpl.evaluate()
     .setTitle('Smart Meeting - Login')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -239,6 +253,7 @@ function _servirReset(rt) {
   const tmpl = HtmlService.createTemplateFromFile('Login');
   tmpl.mensagemErroUrl = '';
   tmpl.tokenReset = rt || '';
+  tmpl.baseUrl = URL_WEBAPP;
   return tmpl.evaluate()
     .setTitle('Smart Meeting - Redefinir Senha')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -246,13 +261,271 @@ function _servirReset(rt) {
 }
 
 function abrirPaginaRelatorios() {
-  const url = ScriptApp.getService().getUrl() + '?pagina=relatorios';
+  const url = URL_WEBAPP + '?pagina=relatorios';
   const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html), 'Abrindo...');
 }
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ *  VERIFICAR ESTRUTURA DA PLANILHA — Execute no editor do GAS!
+ *
+ *  Como usar:
+ *  1. Abra script.google.com → selecione "verificarEstruturaPlanilha"
+ *  2. Clique em Executar (▶)
+ *  3. Veja o resultado no painel de Logs (Ctrl+Enter)
+ *
+ *  A função verifica se todas as abas existem e se os cabeçalhos
+ *  de cada aba correspondem ao esperado pelo sistema.
+ * ═══════════════════════════════════════════════════════════════════
+ */
+function verificarEstruturaPlanilha() {
+  const estruturaEsperada = {
+    [NOME_ABA_PROJETOS]:      ['ID', 'Nome', 'Descricao', 'Tipo', 'ParaQuem', 'Status', 'Prioridade', 'Link', 'Gravidade', 'Urgencia', 'Esforco', 'Setor', 'Pilar', 'ResponsaveisIds', 'ValorPrioridade', 'DataInicio', 'DataFim', 'DataCriacao', 'DataUltimaModificacao', 'DepartamentoId'],
+    [NOME_ABA_RESPONSAVEIS]:  ['ID', 'Nome', 'Email', 'Cargo'],
+    [NOME_ABA_ETAPAS]:        ['ID', 'ProjetoId', 'ResponsaveisIds', 'Nome', 'OQueFazer', 'Status'],
+    [NOME_ABA_DEPENDENCIAS]:  ['ID', 'EtapaOrigemId', 'OrigemAnchor', 'EtapaDestinoId', 'DestinoAnchor'],
+    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId'],
+    [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
+    [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
+    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
+    [NOME_ABA_DEPARTAMENTOS]: ['ID', 'Nome', 'Descricao'],
+    [NOME_ABA_LOGS]:          ['Timestamp', 'Evento', 'Usuario', 'IP', 'Detalhes', 'Resultado']
+  };
+
+  const linha = '─'.repeat(56);
+  const log = [];
+  let erros = 0;
+  let avisos = 0;
+
+  try {
+    const planilha = SpreadsheetApp.openById(ID_PLANILHA);
+    log.push('📋 Planilha: ' + planilha.getName());
+    log.push(linha);
+
+    const abasExistentes = planilha.getSheets().map(function(s) { return s.getName(); });
+    log.push('Abas encontradas (' + abasExistentes.length + '): ' + abasExistentes.join(', '));
+    log.push(linha);
+
+    for (const nomeAba in estruturaEsperada) {
+      const colunasEsperadas = estruturaEsperada[nomeAba];
+
+      if (!abasExistentes.includes(nomeAba)) {
+        log.push('❌ ABA AUSENTE: "' + nomeAba + '"');
+        log.push('   → Dica: Execute obterAba("' + nomeAba + '") para criá-la automaticamente.');
+        erros++;
+        continue;
+      }
+
+      const aba = planilha.getSheetByName(nomeAba);
+      const ultimaCol = aba.getLastColumn();
+
+      if (ultimaCol === 0) {
+        log.push('⚠️  "' + nomeAba + '" — aba vazia (sem cabeçalho)');
+        log.push('   → Dica: Execute inicializarCabecalhoAba(aba, "' + nomeAba + '") para criar o cabeçalho.');
+        avisos++;
+        continue;
+      }
+
+      const cabecalhoAtual = aba.getRange(1, 1, 1, ultimaCol).getValues()[0];
+      const errosAba = [];
+
+      if (ultimaCol < colunasEsperadas.length) {
+        errosAba.push('Tem ' + ultimaCol + ' col(s), esperado mínimo ' + colunasEsperadas.length);
+      }
+
+      for (let i = 0; i < colunasEsperadas.length; i++) {
+        const esperado = colunasEsperadas[i];
+        const atual = (cabecalhoAtual[i] || '').toString().trim();
+        if (atual !== esperado) {
+          errosAba.push('Col ' + (i + 1) + ': esperado "' + esperado + '", encontrado "' + (atual || '(vazio)') + '"');
+        }
+      }
+
+      if (errosAba.length === 0) {
+        const qtdLinhas = Math.max(0, aba.getLastRow() - 1);
+        log.push('✅ "' + nomeAba + '" — ' + colunasEsperadas.length + ' col(s), ' + qtdLinhas + ' registro(s)');
+      } else {
+        log.push('❌ "' + nomeAba + '":');
+        errosAba.forEach(function(msg) { log.push('   • ' + msg); });
+        erros++;
+      }
+    }
+
+    log.push(linha);
+    if (erros === 0 && avisos === 0) {
+      log.push('🎉 Estrutura OK — todas as abas e colunas estão corretas!');
+    } else {
+      if (erros  > 0) log.push('❌ ' + erros  + ' erro(s) encontrado(s)');
+      if (avisos > 0) log.push('⚠️  ' + avisos + ' aviso(s)');
+      log.push('');
+      log.push('💡 Para corrigir abas ausentes ou com cabeçalho errado, execute');
+      log.push('   obterAba("<nome>") no editor — ela criará a aba e o cabeçalho automaticamente.');
+    }
+
+  } catch (e) {
+    log.push('❌ ERRO FATAL: ' + e.toString());
+  }
+
+  const resumo = log.join('\n');
+  Logger.log(resumo);
+  console.log('\n' + resumo);
+  return resumo;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ *  CORRIGIR ESTRUTURA DA PLANILHA — Execute no editor do GAS!
+ *
+ *  O que faz:
+ *  • Corrige os cabeçalhos de todas as abas (linha 1) sem tocar nos dados
+ *  • Cria abas ausentes com o cabeçalho correto
+ *  • Na aba Logs: insere linha de cabeçalho no topo se não existir
+ *  • Adiciona colunas faltando (ex: DepartamentoId) escrevendo só o header
+ *
+ *  ⚠️  Os dados existentes NÃO são alterados, apenas os cabeçalhos.
+ *  Após executar, rode verificarEstruturaPlanilha() para confirmar.
+ * ═══════════════════════════════════════════════════════════════════
+ */
+function corrigirEstruturaPlanilha() {
+  const cabecalhos = {
+    [NOME_ABA_PROJETOS]:      ['ID', 'Nome', 'Descricao', 'Tipo', 'ParaQuem', 'Status', 'Prioridade', 'Link', 'Gravidade', 'Urgencia', 'Esforco', 'Setor', 'Pilar', 'ResponsaveisIds', 'ValorPrioridade', 'DataInicio', 'DataFim', 'DataCriacao', 'DataUltimaModificacao', 'DepartamentoId'],
+    [NOME_ABA_RESPONSAVEIS]:  ['ID', 'Nome', 'Email', 'Cargo'],
+    [NOME_ABA_ETAPAS]:        ['ID', 'ProjetoId', 'ResponsaveisIds', 'Nome', 'OQueFazer', 'Status'],
+    [NOME_ABA_DEPENDENCIAS]:  ['ID', 'EtapaOrigemId', 'OrigemAnchor', 'EtapaDestinoId', 'DestinoAnchor'],
+    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId'],
+    [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
+    [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
+    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
+    [NOME_ABA_DEPARTAMENTOS]: ['ID', 'Nome', 'Descricao'],
+    [NOME_ABA_LOGS]:          ['Timestamp', 'Evento', 'Usuario', 'IP', 'Detalhes', 'Resultado']
+  };
+
+  const linha = '─'.repeat(56);
+  const log = [];
+  let corrigidos = 0;
+  let criados = 0;
+
+  try {
+    const planilha = SpreadsheetApp.openById(ID_PLANILHA);
+    const abasExistentes = planilha.getSheets().map(function(s) { return s.getName(); });
+
+    log.push('🔧 Corrigindo estrutura da planilha: ' + planilha.getName());
+    log.push(linha);
+
+    for (const nomeAba in cabecalhos) {
+      const headers = cabecalhos[nomeAba];
+
+      // ── Aba ausente: criar com cabeçalho ─────────────────────────────
+      if (!abasExistentes.includes(nomeAba)) {
+        const novaAba = planilha.insertSheet(nomeAba);
+        novaAba.getRange(1, 1, 1, headers.length).setValues([headers]);
+        novaAba.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+        log.push('✅ ABA CRIADA: "' + nomeAba + '" (' + headers.length + ' colunas)');
+        limparCacheAba(nomeAba);
+        criados++;
+        continue;
+      }
+
+      const aba = planilha.getSheetByName(nomeAba);
+
+      // ── Aba Logs: verificar se falta linha de cabeçalho ──────────────
+      if (nomeAba === NOME_ABA_LOGS) {
+        const primeiraCell = aba.getLastRow() > 0
+          ? aba.getRange(1, 1).getValue().toString().trim()
+          : '';
+        const jaTemCabecalho = (primeiraCell === 'Timestamp' || primeiraCell === '');
+        if (!jaTemCabecalho) {
+          aba.insertRowBefore(1);
+          log.push('📌 "' + nomeAba + '" — linha de cabeçalho inserida no topo (dados deslocados para baixo)');
+        }
+      }
+
+      // ── Escrever cabeçalho correto na linha 1 ────────────────────────
+      // Apenas os headers são sobrescritos; os dados (linhas 2+) ficam intactos.
+      aba.getRange(1, 1, 1, headers.length).setValues([headers]);
+      aba.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+
+      log.push('✅ "' + nomeAba + '" — cabeçalho atualizado');
+      limparCacheAba(nomeAba);
+      corrigidos++;
+    }
+
+    log.push(linha);
+    log.push('Resultado: ' + corrigidos + ' aba(s) corrigida(s)' + (criados > 0 ? ', ' + criados + ' criada(s)' : '') + '.');
+    log.push('');
+    log.push('▶ Execute verificarEstruturaPlanilha() para confirmar.');
+
+  } catch (e) {
+    log.push('❌ ERRO: ' + e.toString());
+  }
+
+  const resumo = log.join('\n');
+  Logger.log(resumo);
+  console.log('\n' + resumo);
+  return resumo;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ *  INICIALIZAR PERMISSÕES — Execute esta função no editor do GAS!
+ *
+ *  Como usar:
+ *  1. Abra script.google.com e entre no projeto
+ *  2. No menu suspenso de funções, selecione "inicializarPermissoes"
+ *  3. Clique em "Executar" (▶)
+ *  4. O Google abrirá uma tela pedindo autorização → clique em
+ *     "Revisar permissões" → escolha sua conta → "Avançado" →
+ *     "Ir para Smart Meeting (não seguro)" → "Permitir"
+ *  5. Após autorizar, crie uma nova implantação no menu Implantar
+ * ═══════════════════════════════════════════════════════════════════
+ */
+function inicializarPermissoes() {
+  const log = [];
+
+  // Planilha
+  try {
+    const ss = SpreadsheetApp.openById(ID_PLANILHA);
+    log.push('✅ Planilha: ' + ss.getName());
+  } catch(e) { log.push('❌ Planilha: ' + e.message); }
+
+  // Drive
+  try {
+    const pasta = DriveApp.getFolderById(ID_PASTA_DRIVE_REUNIOES);
+    log.push('✅ Drive: ' + pasta.getName());
+  } catch(e) { log.push('❌ Drive: ' + e.message); }
+
+  // Email
+  try {
+    const quota = MailApp.getRemainingDailyQuota();
+    log.push('✅ Email: quota restante = ' + quota);
+  } catch(e) { log.push('❌ Email: ' + e.message); }
+
+  // PropertiesService
+  try {
+    const qtd = PropertiesService.getScriptProperties().getKeys().length;
+    log.push('✅ Properties: ' + qtd + ' chave(s)');
+  } catch(e) { log.push('❌ Properties: ' + e.message); }
+
+  // Cache
+  try {
+    CacheService.getScriptCache().put('_perm_teste_', '1', 1);
+    log.push('✅ Cache: OK');
+  } catch(e) { log.push('❌ Cache: ' + e.message); }
+
+  // URL da implantação
+  log.push('✅ URL WebApp: ' + URL_WEBAPP);
+
+  const resumo = log.join('\n');
+  Logger.log(resumo);
+
+  // Exibe no painel de execução do editor
+  console.log('\n' + resumo);
+  return resumo;
 }
 
 /**
@@ -274,22 +547,22 @@ function gravarTimestamp(aba, linhaIndex, colCriacao, colModificacao, ehNovo) {
 }
 
 function obterUrlWebApp() {
-  return ScriptApp.getService().getUrl();
+  return URL_WEBAPP;
 }
 
 // Alias usado por PaginaReunioes para configurar links de navegação
 function obterUrlBaseWebApp() {
-  return ScriptApp.getService().getUrl();
+  return URL_WEBAPP;
 }
 
 function abrirPaginaReunioes() {
-  const url = ScriptApp.getService().getUrl();
+  const url = URL_WEBAPP;
   const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html), 'Abrindo...');
 }
 
 function abrirPaginaProjetos() {
-  const url = ScriptApp.getService().getUrl() + '?pagina=projetos';
+  const url = URL_WEBAPP + '?pagina=projetos';
   const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html), 'Abrindo...');
 }
@@ -361,13 +634,16 @@ function obterAba(nomeAba) {
 
 function inicializarCabecalhoAba(aba, nomeAba) {
   const cabecalhos = {
-    [NOME_ABA_PROJETOS]:      ['ID', 'Nome', 'Descricao', 'Tipo', 'ParaQuem', 'Status', 'Prioridade', 'Link', 'Gravidade', 'Urgencia', 'Esforco', 'Setor', 'Pilar', 'ResponsaveisIds', 'ValorPrioridade', 'DataInicio', 'DataFim'],
+    [NOME_ABA_PROJETOS]:      ['ID', 'Nome', 'Descricao', 'Tipo', 'ParaQuem', 'Status', 'Prioridade', 'Link', 'Gravidade', 'Urgencia', 'Esforco', 'Setor', 'Pilar', 'ResponsaveisIds', 'ValorPrioridade', 'DataInicio', 'DataFim', 'DataCriacao', 'DataUltimaModificacao', 'DepartamentoId'],
     [NOME_ABA_RESPONSAVEIS]:  ['ID', 'Nome', 'Email', 'Cargo'],
     [NOME_ABA_ETAPAS]:        ['ID', 'ProjetoId', 'ResponsaveisIds', 'Nome', 'OQueFazer', 'Status'],
     [NOME_ABA_DEPENDENCIAS]:  ['ID', 'EtapaOrigemId', 'OrigemAnchor', 'EtapaDestinoId', 'DestinoAnchor'],
-    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas'],
-    [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'Cor'],
-    [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia']
+    [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId'],
+    [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
+    [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
+    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
+    [NOME_ABA_DEPARTAMENTOS]: ['ID', 'Nome', 'Descricao'],
+    [NOME_ABA_LOGS]:          ['Timestamp', 'Evento', 'Usuario', 'IP', 'Detalhes', 'Resultado']
   };
 
   if (cabecalhos[nomeAba]) {
@@ -564,3 +840,126 @@ function obterResponsavelPorEmail(email) {
 
 // listarTodasPermissoes, salvarPermissaoUsuario, removerPermissaoUsuario
 // removidos — gerenciamento de usuários feito via PaginaAdmin + Auth.js
+
+// ============================================================================
+//  CRUD DE DEPARTAMENTOS
+// ============================================================================
+
+/**
+ * Lista todos os departamentos. Disponível para qualquer sessão válida.
+ */
+function listarDepartamentos(token) {
+  try {
+    if (token && !_obterSessao(token)) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    const dados = obterDadosAbaComCache(NOME_ABA_DEPARTAMENTOS);
+    if (!dados || dados.length <= 1) return { sucesso: true, departamentos: [] };
+    const departamentos = [];
+    for (let i = 1; i < dados.length; i++) {
+      if (dados[i][COLUNAS_DEPARTAMENTOS.ID]) {
+        departamentos.push({
+          id:       dados[i][COLUNAS_DEPARTAMENTOS.ID],
+          nome:     dados[i][COLUNAS_DEPARTAMENTOS.NOME],
+          descricao: dados[i][COLUNAS_DEPARTAMENTOS.DESCRICAO] || ''
+        });
+      }
+    }
+    return { sucesso: true, departamentos: departamentos };
+  } catch (e) {
+    Logger.log('ERRO listarDepartamentos: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Cria um novo departamento. Requer admin.
+ */
+function criarDepartamento(token, dados) {
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao || sessao.perfil !== 'admin') return { sucesso: false, mensagem: 'Acesso negado.' };
+    if (!dados || !dados.nome || !dados.nome.trim()) return { sucesso: false, mensagem: 'Nome obrigatório.' };
+
+    const aba = obterAba(NOME_ABA_DEPARTAMENTOS);
+    const id = gerarId();
+    aba.appendRow([id, dados.nome.trim(), (dados.descricao || '').trim()]);
+    limparCacheAba(NOME_ABA_DEPARTAMENTOS);
+    return { sucesso: true, mensagem: 'Departamento criado!', id: id };
+  } catch (e) {
+    Logger.log('ERRO criarDepartamento: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Atualiza um departamento existente. Requer admin.
+ */
+function atualizarDepartamento(token, dados) {
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao || sessao.perfil !== 'admin') return { sucesso: false, mensagem: 'Acesso negado.' };
+    if (!dados || !dados.id) return { sucesso: false, mensagem: 'ID obrigatório.' };
+
+    const aba = obterAba(NOME_ABA_DEPARTAMENTOS);
+    const rows = aba.getDataRange().getValues();
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][COLUNAS_DEPARTAMENTOS.ID] === dados.id) {
+        const linha = i + 1;
+        if (dados.nome      !== undefined) aba.getRange(linha, COLUNAS_DEPARTAMENTOS.NOME      + 1).setValue(dados.nome.trim());
+        if (dados.descricao !== undefined) aba.getRange(linha, COLUNAS_DEPARTAMENTOS.DESCRICAO + 1).setValue(dados.descricao.trim());
+        limparCacheAba(NOME_ABA_DEPARTAMENTOS);
+        return { sucesso: true, mensagem: 'Departamento atualizado!' };
+      }
+    }
+    return { sucesso: false, mensagem: 'Departamento não encontrado.' };
+  } catch (e) {
+    Logger.log('ERRO atualizarDepartamento: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Remove um departamento. Requer admin. Bloqueia se houver usuários vinculados.
+ */
+function removerDepartamento(token, id) {
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao || sessao.perfil !== 'admin') return { sucesso: false, mensagem: 'Acesso negado.' };
+    if (!id) return { sucesso: false, mensagem: 'ID obrigatório.' };
+
+    // Verificar se há usuários vinculados
+    const dadosUsuarios = obterDadosAbaComCache(NOME_ABA_USUARIOS);
+    for (let i = 1; i < dadosUsuarios.length; i++) {
+      const depIds = (dadosUsuarios[i][COLUNAS_USUARIOS.DEPARTAMENTOS_IDS] || '').toString();
+      if (depIds.split(',').map(d => d.trim()).includes(id)) {
+        return { sucesso: false, mensagem: 'Não é possível remover: há usuários vinculados a este departamento.' };
+      }
+    }
+
+    const aba = obterAba(NOME_ABA_DEPARTAMENTOS);
+    const rows = aba.getDataRange().getValues();
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][COLUNAS_DEPARTAMENTOS.ID] === id) {
+        aba.deleteRow(i + 1);
+        limparCacheAba(NOME_ABA_DEPARTAMENTOS);
+        return { sucesso: true, mensagem: 'Departamento removido!' };
+      }
+    }
+    return { sucesso: false, mensagem: 'Departamento não encontrado.' };
+  } catch (e) {
+    Logger.log('ERRO removerDepartamento: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Retorna os departamentos de um usuário com base no token de sessão.
+ */
+function obterDepartamentosDoUsuario(token) {
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    return { sucesso: true, departamentosIds: sessao.departamentosIds || [], perfil: sessao.perfil };
+  } catch (e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
