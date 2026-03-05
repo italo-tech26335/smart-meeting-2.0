@@ -667,51 +667,34 @@ function processarAudioReuniao(dadosAudio) {
       adicionarLog('SUCESSO', `✅ Transcrição salva: ${resultadoTranscricaoDrive.nomeArquivo}`);
     }
 
-    // ========== ETAPA 2: GERAÇÃO DA ATA ==========
-    adicionarLog('INFO', '📋 [ETAPA 2/3] Gerando ATA da reunião...');
-    const resultadoAta = executarEtapaGeracaoAta(
-      resultadoTranscricao.transcricao, dadosAudio, chaveGemini
-    );
-    if (!resultadoAta.sucesso) {
-      throw new Error('Falha na geração da ATA: ' + resultadoAta.mensagem);
-    }
-    adicionarLog('SUCESSO', '✅ ATA gerada com sucesso!');
-
-    // ========== ESTILOS DE ATA ADICIONAIS ==========
+    // ========== ETAPA 2: GERAÇÃO DE ATAS POR ESTILO (SEGMENTADA) ==========
     const estilosAtaSolicitados = dadosAudio.estilosAta || [];
     const atasPorEstilo = {};
+    let ataBase = '';
+
     if (estilosAtaSolicitados.length > 0) {
       const instrucaoExtra = dadosAudio.instrucaoExtra || '';
       const tituloReuniao = dadosAudio.titulo || '';
       const participantesReuniao = dadosAudio.participantes || '';
       const dataFormatada = new Date().toLocaleDateString('pt-BR');
-      const cfgEstilos = CONFIG_PROMPTS_REUNIAO.ATA_ESTILOS;
-      const urlApiEstilos = 'https://generativelanguage.googleapis.com/v1beta/models/' + cfgEstilos.modelo + ':generateContent?key=' + chaveGemini;
+
       for (let e = 0; e < estilosAtaSolicitados.length; e++) {
         const estilo = estilosAtaSolicitados[e];
-        adicionarLog('INFO', '📋 Gerando ata estilo: ' + estilo + '...');
-        try {
-          const prompt = montarPromptAtaEstilo(estilo, tituloReuniao, participantesReuniao, dataFormatada, instrucaoExtra, resultadoTranscricao.transcricao);
-          const configGeracao = montarConfigGeracao(cfgEstilos, 'ATA-' + estilo);
-          const respostaHttp = UrlFetchApp.fetch(urlApiEstilos, {
-            method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-            payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: configGeracao })
-          });
-          if (respostaHttp.getResponseCode() === 200) {
-            const ataGerada = extrairTextoRespostaGemini(JSON.parse(respostaHttp.getContentText()));
-            if (ataGerada && ataGerada.length > 10) {
-              atasPorEstilo[estilo] = ataGerada;
-              adicionarLog('SUCESSO', '✅ Ata ' + estilo + ' gerada!');
-            } else {
-              adicionarLog('ALERTA', '⚠️ Ata ' + estilo + ' retornou texto vazio.');
-            }
-          } else {
-            adicionarLog('ALERTA', '⚠️ Ata ' + estilo + ': HTTP ' + respostaHttp.getResponseCode());
-          }
-        } catch (eAta) {
-          adicionarLog('ALERTA', '⚠️ Erro gerando ata ' + estilo + ': ' + eAta.message);
+        adicionarLog('INFO', '📋 [ETAPA 2/3] Gerando ata estilo "' + estilo + '" (' + (e + 1) + '/' + estilosAtaSolicitados.length + ')...');
+        const resultadoEstilo = gerarAtaEstiloSegmentada(
+          estilo, tituloReuniao, participantesReuniao, dataFormatada, instrucaoExtra,
+          resultadoTranscricao.transcricao, chaveGemini, adicionarLog
+        );
+        if (resultadoEstilo.sucesso) {
+          atasPorEstilo[estilo] = resultadoEstilo.ata;
+          if (!ataBase) ataBase = resultadoEstilo.ata;
+          adicionarLog('SUCESSO', '✅ Ata ' + estilo + ' gerada!');
+        } else {
+          adicionarLog('ALERTA', '⚠️ Falha na ata ' + estilo + ': ' + resultadoEstilo.mensagem);
         }
       }
+    } else {
+      adicionarLog('ALERTA', '⚠️ Nenhum estilo de ata selecionado.');
     }
 
     // ========== ETAPA 3: RELATÓRIO ==========
@@ -747,8 +730,8 @@ function processarAudioReuniao(dadosAudio) {
       duracao: dadosAudio.duracaoMinutos || 0,
       participantes: dadosAudio.participantes || '',
       transcricao: resultadoTranscricao.transcricao || '',
-      ata: resultadoAta.ata || '',
-      sugestoesIA: resultadoAta.sugestoes || '',
+      ata: ataBase,
+      sugestoesIA: '',
       linkAudio: resultadoDrive.linkArquivo,
       projetosImpactados: '',
       etapasImpactadas: '',
@@ -761,7 +744,7 @@ function processarAudioReuniao(dadosAudio) {
     return {
       sucesso: true, logs, reuniaoId,
       transcricao: resultadoTranscricao.transcricao,
-      ata: resultadoAta.ata, sugestoes: resultadoAta.sugestoes || '',
+      ata: ataBase, sugestoes: '',
       relatorioIdentificacoes: relatorioTexto,
       linkRelatorioIdentificacoes: linkRelatorio,
       nomeArquivoRelatorio,
@@ -1453,60 +1436,48 @@ function etapa3_GerarAta(dados) {
   };
 
   try {
-    log('INFO', '📋 Gerando ATA da reunião (modo segmentado: 4 seções)...');
-    log('INFO', '  📝 Transcrição: ' + dados.transcricao.length + ' chars');
-    log('INFO', '  🤖 Modelo: ' + CONFIG_PROMPTS_REUNIAO.ATA.modelo);
-    log('INFO', '  🧠 Pensamento: ' + (CONFIG_PROMPTS_REUNIAO.ATA.pensamento === 0 ? 'DESABILITADO' : 'HABILITADO'));
-    log('INFO', '  📊 maxTokens/seção: ' + CONFIG_PROMPTS_REUNIAO.ATA.maxTokens);
+    const estilosAta = dados.estilosAta || [];
+    const instrucaoExtra = dados.instrucaoExtra || '';
+    const titulo = dados.titulo || 'Reunião ' + new Date().toLocaleDateString('pt-BR');
+    const participantes = dados.participantes || '';
+    const transcricao = dados.transcricao || '';
 
-    if (dados.transcricao.length > 200000) {
-      log('ALERTA', '  ✂️ Transcrição será truncada (' + dados.transcricao.length + ' > 200K chars)');
-      log('INFO', '  💡 Para resultado completo, use Map-Reduce no client');
+    log('INFO', '📋 Gerando ATA por estilo segmentado...');
+    log('INFO', '  📝 Transcrição: ' + transcricao.length + ' chars');
+    log('INFO', '  🎨 Estilos: ' + (estilosAta.length > 0 ? estilosAta.join(', ') : 'nenhum'));
+
+    if (estilosAta.length === 0) {
+      log('ALERTA', '⚠️ Nenhum estilo de ata selecionado.');
+      return { sucesso: true, logs: logs, ata: '', ataEstilos: {} };
     }
 
-    const tempoInicio = Date.now();
     const chaveApi = obterChaveGeminiProjeto();
-
     if (!chaveApi) {
-      log('ERRO', '❌ Chave API do Gemini não configurada!');
-      return { sucesso: false, logs: logs, mensagem: 'Chave API não configurada' };
+      return { sucesso: false, logs: logs, mensagem: 'Chave API do Gemini não configurada.' };
     }
 
-    const resultado = executarEtapaGeracaoAta(
-      dados.transcricao,
-      {
-        titulo: dados.titulo || 'Reunião ' + new Date().toLocaleDateString('pt-BR'),
-        participantes: dados.participantes || ''
-      },
-      chaveApi
-    );
+    const dataFormatada = new Date().toLocaleDateString('pt-BR');
+    const ataEstilos = {};
+    let ataBase = '';
+    const tempoInicio = Date.now();
+
+    for (var e = 0; e < estilosAta.length; e++) {
+      const estilo = estilosAta[e];
+      log('INFO', '📋 Gerando ata estilo: ' + estilo + ' (' + (e + 1) + '/' + estilosAta.length + ')...');
+      const resultado = gerarAtaEstiloSegmentada(estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao, chaveApi, log);
+      if (resultado.sucesso) {
+        ataEstilos[estilo] = resultado.ata;
+        if (!ataBase) ataBase = resultado.ata;
+        log('SUCESSO', '✅ Ata ' + estilo + ' gerada (' + resultado.ata.length + ' chars)');
+      } else {
+        log('ALERTA', '⚠️ Falha na ata ' + estilo + ': ' + resultado.mensagem);
+      }
+    }
 
     const tempoSeg = ((Date.now() - tempoInicio) / 1000).toFixed(1);
+    log('SUCESSO', '✅ Processamento de estilos concluído em ' + tempoSeg + 's');
 
-    if (!resultado.sucesso) {
-      log('ERRO', '❌ ATA falhou (' + tempoSeg + 's): ' + resultado.mensagem);
-      return { sucesso: false, logs: logs, mensagem: resultado.mensagem };
-    }
-
-    // ✅ NOVO: Validação do resultado antes de retornar
-    const tamanhoAta = resultado.ata ? resultado.ata.length : 0;
-    log('SUCESSO', '✅ ATA gerada em ' + tempoSeg + 's! (' + tamanhoAta + ' chars)');
-
-    if (tamanhoAta > 150000) {
-      log('ALERTA', '⚠️ ATA muito grande (' + tamanhoAta + ' chars). Possível conteúdo repetitivo.');
-    }
-
-    if (tamanhoAta < 100) {
-      log('ALERTA', '⚠️ ATA muito curta (' + tamanhoAta + ' chars). Possível falha parcial.');
-    }
-
-    // ✅ NOVO: Log com preview do início e fim da ATA
-    if (resultado.ata) {
-      log('INFO', '  📄 Preview início: "' + resultado.ata.substring(0, 120).replace(/\n/g, ' ') + '..."');
-      log('INFO', '  📄 Preview fim: "...' + resultado.ata.substring(resultado.ata.length - 80).replace(/\n/g, ' ') + '"');
-    }
-
-    return { sucesso: true, logs: logs, ata: resultado.ata, sugestoes: resultado.sugestoes || '' };
+    return { sucesso: true, logs: logs, ata: ataBase, ataEstilos: ataEstilos };
 
   } catch (erro) {
     log('ERRO', '❌ Exceção: ' + erro.message);
@@ -1583,39 +1554,45 @@ function gerarAtaDesdeExtracoes(dados) {
     const pontosConsolidados = dados.pontosConsolidados || '';
     const titulo = dados.titulo || 'Reunião';
     const participantes = dados.participantes || '';
+    const estilosAta = dados.estilosAta || [];
+    const instrucaoExtra = dados.instrucaoExtra || '';
 
-    log('INFO', '📋 Gerando ATA final SEGMENTADA a partir de ' + pontosConsolidados.length + ' chars de pontos-chave...');
-    log('INFO', '  🤖 Modelo: ' + CONFIG_PROMPTS_REUNIAO.ATA.modelo);
-    log('INFO', '  🧠 Pensamento: ' + (CONFIG_PROMPTS_REUNIAO.ATA.pensamento === 0 ? 'DESABILITADO' : 'HABILITADO'));
+    log('INFO', '📋 Gerando ATA por estilo a partir de ' + pontosConsolidados.length + ' chars de pontos-chave...');
+    log('INFO', '  🎨 Estilos: ' + (estilosAta.length > 0 ? estilosAta.join(', ') : 'nenhum'));
 
-    const tempoInicio = Date.now();
+    if (estilosAta.length === 0) {
+      log('ALERTA', '⚠️ Nenhum estilo de ata selecionado.');
+      return { sucesso: true, logs: logs, ata: '', ataEstilos: {} };
+    }
+
     const chaveApi = obterChaveGeminiProjeto();
+    if (!chaveApi) {
+      return { sucesso: false, logs: logs, mensagem: 'Chave API do Gemini não configurada.' };
+    }
 
-    const dadosAudio = { titulo: titulo, participantes: participantes };
+    const dataFormatada = new Date().toLocaleDateString('pt-BR');
+    const ataEstilos = {};
+    let ataBase = '';
+    const tempoInicio = Date.now();
 
-    const resultado = gerarAtaSegmentada(pontosConsolidados, dadosAudio, chaveApi, true);
+    for (var e = 0; e < estilosAta.length; e++) {
+      const estilo = estilosAta[e];
+      log('INFO', '📋 Gerando ata estilo: ' + estilo + ' (' + (e + 1) + '/' + estilosAta.length + ')...');
+      // Usa os pontos consolidados como fonte (já é o conteúdo destilado da transcrição longa)
+      const resultado = gerarAtaEstiloSegmentada(estilo, titulo, participantes, dataFormatada, instrucaoExtra, pontosConsolidados, chaveApi, log);
+      if (resultado.sucesso) {
+        ataEstilos[estilo] = resultado.ata;
+        if (!ataBase) ataBase = resultado.ata;
+        log('SUCESSO', '✅ Ata ' + estilo + ' gerada (' + resultado.ata.length + ' chars)');
+      } else {
+        log('ALERTA', '⚠️ Falha na ata ' + estilo + ': ' + resultado.mensagem);
+      }
+    }
 
     const tempoSeg = ((Date.now() - tempoInicio) / 1000).toFixed(1);
+    log('SUCESSO', '✅ Estilos gerados em ' + tempoSeg + 's');
 
-    if (!resultado.sucesso) {
-      log('ERRO', '❌ ATA final falhou (' + tempoSeg + 's): ' + resultado.mensagem);
-      return { sucesso: false, logs: logs, mensagem: resultado.mensagem };
-    }
-
-    const tamanhoAta = resultado.ata ? resultado.ata.length : 0;
-    log('SUCESSO', '✅ ATA final segmentada gerada em ' + tempoSeg + 's! (' + tamanhoAta + ' chars)');
-
-    // ✅ NOVO: Alerta se ATA parecer suspeita
-    if (tamanhoAta > 100000) {
-      log('ALERTA', '⚠️ ATA muito grande (' + tamanhoAta + ' chars). Verifique se há repetições.');
-    }
-
-    return {
-      sucesso: true,
-      logs: logs,
-      ata: resultado.ata,
-      sugestoes: resultado.sugestoes || ''
-    };
+    return { sucesso: true, logs: logs, ata: ataBase, ataEstilos: ataEstilos };
 
   } catch (erro) {
     log('ERRO', '❌ ' + erro.message);
@@ -2040,11 +2017,12 @@ function etapa_SalvarReuniao(dados) {
       participantes: dados.participantes || '',
       transcricao: dados.transcricao || '',
       ata: dados.ata || '',
-      sugestoesIA: dados.sugestoes || '',
+      sugestoesIA: '',
       linkAudio: linkAudioFinal,
       projetosImpactados: '',
       etapasImpactadas: '',
-      departamentoId: dados.departamentoId || ''
+      departamentoId: dados.departamentoId || '',
+      ataEstilos: dados.ataEstilos || {}
     });
 
     log('SUCESSO', `✅ Reunião salva com ID: ${reuniaoId}`);
@@ -2443,7 +2421,7 @@ function converterMarkdownParaHtmlEmail(markdown) {
   return html;
 }
 
-function verificarConfiguracaoReunioes() {
+function verificarConfiguracaoReunioes(token) {
   try {
     let temChave = false;
     try {
@@ -2471,7 +2449,19 @@ function verificarConfiguracaoReunioes() {
     } catch (e) { temPasta = false; }
 
     const resDeps = listarDepartamentos(null);
-    const departamentos = resDeps && resDeps.sucesso ? (resDeps.departamentos || []) : [];
+    const todosDeps = resDeps && resDeps.sucesso ? (resDeps.departamentos || []) : [];
+
+    // Filtrar departamentos pelo usuário (admin vê todos, usuário comum só os seus)
+    let departamentos = todosDeps;
+    if (token) {
+      const sessao = _obterSessao(token);
+      if (sessao && sessao.perfil !== 'admin') {
+        const depsUsuario = _obterDepsAtualizadosUsuario(sessao);
+        if (depsUsuario !== null && depsUsuario.length > 0) {
+          departamentos = todosDeps.filter(function(d) { return depsUsuario.includes(d.id); });
+        }
+      }
+    }
 
     return {
       sucesso: true, temChaveApi: temChave, temPastaDrive: temPasta,
@@ -2705,6 +2695,85 @@ function salvarEdicaoAta(token, reuniaoId, novoTexto) {
   }
 }
 
+
+/**
+ * Refina uma seção da ata usando IA (Gemini), com base na transcrição da reunião.
+ * token, reuniaoId, tituloSecao, conteudoSecao, instrucaoUsuario
+ */
+function refinarSecaoAta(token, reuniaoId, tituloSecao, conteudoSecao, instrucaoUsuario) {
+  try {
+    const sessao = verificarSessao(token);
+    if (!sessao || !sessao.valida) return { sucesso: false, mensagem: 'Sessão inválida' };
+    if (!conteudoSecao || !instrucaoUsuario) return { sucesso: false, mensagem: 'Parâmetros inválidos' };
+
+    const chave = obterChaveGeminiProjeto();
+    if (!chave) return { sucesso: false, mensagem: 'Chave API Gemini não configurada' };
+
+    // Buscar transcrição da reunião para usar como contexto
+    let transcricao = '';
+    if (reuniaoId) {
+      const aba = obterAba(NOME_ABA_REUNIOES);
+      const ultimaLinha = aba.getLastRow();
+      if (ultimaLinha > 1) {
+        const idBuscado = String(reuniaoId).trim();
+        const idsColuna = aba.getRange(2, COLUNAS_REUNIOES.ID + 1, ultimaLinha - 1, 1).getValues();
+        for (let i = 0; i < idsColuna.length; i++) {
+          if (String(idsColuna[i][0]).trim() === idBuscado) {
+            transcricao = String(aba.getRange(i + 2, COLUNAS_REUNIOES.TRANSCRICAO + 1).getValue() || '');
+            break;
+          }
+        }
+      }
+      // Trunca transcrição para não estourar limite do prompt
+      if (transcricao.length > 50000) {
+        transcricao = transcricao.substring(0, 50000) + '\n[...transcrição truncada...]';
+      }
+    }
+
+    const blocoTranscricao = transcricao
+      ? '## TRANSCRIÇÃO DA REUNIÃO (use como fonte de informações)\n' + transcricao + '\n\n'
+      : '';
+
+    const prompt = `Você é um assistente especializado em refinamento de atas de reunião.
+
+${blocoTranscricao}## SEÇÃO DA ATA A REFINAR
+**Título:** ${tituloSecao || 'Seção'}
+
+**Conteúdo atual:**
+${conteudoSecao}
+
+## INSTRUÇÃO DO USUÁRIO
+${instrucaoUsuario}
+
+## TAREFA
+Reescreva o conteúdo da seção "${tituloSecao || 'Seção'}" seguindo exatamente a instrução do usuário${transcricao ? ', usando a transcrição como fonte de informações adicionais' : ''}.
+Mantenha a formatação markdown (listas com -, negrito, etc.) e o tom profissional de ata.
+Responda APENAS com o novo conteúdo da seção, sem repetir o título, sem explicações extras.`;
+
+    const payload = {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: 8192 }
+    };
+
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODELO_GEMINI + ':generateContent?key=' + chave;
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    const json = JSON.parse(response.getContentText());
+    if (json.error) throw new Error(json.error.message);
+
+    const conteudoRefinado = json.candidates[0].content.parts[0].text.trim();
+    return { sucesso: true, conteudoRefinado: conteudoRefinado };
+
+  } catch (erro) {
+    Logger.log('ERRO refinarSecaoAta: ' + erro.toString());
+    return { sucesso: false, mensagem: 'Erro na IA: ' + erro.message };
+  }
+}
 
 function obterSetoresParaContexto() {
   try {
@@ -4015,35 +4084,19 @@ function processarReuniaoSalva(token, dadosProcessamento) {
 
     for (let e = 0; e < estilosAta.length; e++) {
       const estilo = estilosAta[e];
-      log('INFO', '📋 Gerando ata estilo: ' + estilo + '...');
-
-      try {
-        const prompt = montarPromptAtaEstilo(estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
-        const cfg = CONFIG_PROMPTS_REUNIAO.ATA_ESTILOS;
-        const urlApi = 'https://generativelanguage.googleapis.com/v1beta/models/' + cfg.modelo + ':generateContent?key=' + chaveApi;
-        const configGeracao = montarConfigGeracao(cfg, 'ATA-' + estilo);
-        const respostaHttp = UrlFetchApp.fetch(urlApi, {
-          method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-          payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: configGeracao })
-        });
-
-        if (respostaHttp.getResponseCode() === 200) {
-          const ataGerada = extrairTextoRespostaGemini(JSON.parse(respostaHttp.getContentText()));
-          if (ataGerada && ataGerada.length > 10) {
-            atasPorEstilo[estilo] = ataGerada;
-            const colAtaEstilo = mapaColuna[estilo];
-            if (colAtaEstilo !== undefined) {
-              aba.getRange(linhaReal, colAtaEstilo + 1).setValue(ataGerada);
-            }
-            log('SUCESSO', '✅ Ata ' + estilo + ' gerada!');
-          } else {
-            log('ALERTA', '⚠️ Ata ' + estilo + ' retornou texto vazio.');
-          }
-        } else {
-          log('ALERTA', '⚠️ Falha na ata ' + estilo + ': HTTP ' + respostaHttp.getResponseCode());
+      log('INFO', '📋 Gerando ata estilo: ' + estilo + ' (' + (e + 1) + '/' + estilosAta.length + ')...');
+      const resultadoEstilo = gerarAtaEstiloSegmentada(
+        estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao, chaveApi, log
+      );
+      if (resultadoEstilo.sucesso) {
+        atasPorEstilo[estilo] = resultadoEstilo.ata;
+        const colAtaEstilo = mapaColuna[estilo];
+        if (colAtaEstilo !== undefined) {
+          aba.getRange(linhaReal, colAtaEstilo + 1).setValue(resultadoEstilo.ata);
         }
-      } catch (eAta) {
-        log('ALERTA', '⚠️ Erro gerando ata ' + estilo + ': ' + eAta.message);
+        log('SUCESSO', '✅ Ata ' + estilo + ' gerada!');
+      } else {
+        log('ALERTA', '⚠️ Falha na ata ' + estilo + ': ' + resultadoEstilo.mensagem);
       }
     }
 
@@ -4102,6 +4155,83 @@ function processarReuniaoSalva(token, dadosProcessamento) {
 }
 
 /**
+ * Gera uma ata por estilo usando chamadas segmentadas ao Gemini.
+ * Cada segmento do estilo (definido em CONFIG_PROMPTS_REUNIAO.ESTILOS) é
+ * processado em uma chamada separada com modelo e tokens próprios,
+ * forçando o Gemini a se dedicar inteiramente a cada seção.
+ *
+ * @param {string}   estilo         - 'executiva'|'detalhada'|'por_responsavel'|'alinhamento'
+ * @param {string}   titulo
+ * @param {string}   participantes
+ * @param {string}   dataFormatada
+ * @param {string}   instrucaoExtra
+ * @param {string}   transcricao
+ * @param {string}   chaveApi
+ * @param {Function} [logFn]        - function(tipo, msg) para logging
+ * @returns {{ sucesso: boolean, ata: string, mensagem?: string }}
+ */
+function gerarAtaEstiloSegmentada(estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao, chaveApi, logFn) {
+  var log = logFn || function(t, m) { Logger.log('[gerarAtaEstiloSegmentada][' + t + '] ' + m); };
+  try {
+    var cfgEstilo = CONFIG_PROMPTS_REUNIAO.ESTILOS[estilo];
+    if (!cfgEstilo) {
+      return { sucesso: false, mensagem: 'Estilo desconhecido: ' + estilo };
+    }
+
+    var segmentos = cfgEstilo.segmentos;
+    var partesAta = [];
+
+    for (var s = 0; s < segmentos.length; s++) {
+      var seg = segmentos[s];
+      log('INFO', '  📝 Segmento ' + (s + 1) + '/' + segmentos.length + ': ' + seg.nome + '...');
+
+      var prompt = montarPromptSegmentoAta(estilo, seg.id, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
+      if (!prompt) {
+        log('ALERTA', '  ⚠️ Prompt vazio para segmento: ' + seg.id);
+        continue;
+      }
+
+      var urlApi = 'https://generativelanguage.googleapis.com/v1beta/models/' + seg.modelo + ':generateContent?key=' + chaveApi;
+      var configGeracao = montarConfigGeracao(seg, 'ATA-' + estilo + '-' + seg.id);
+
+      try {
+        var respostaHttp = UrlFetchApp.fetch(urlApi, {
+          method: 'post',
+          contentType: 'application/json',
+          muteHttpExceptions: true,
+          payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: configGeracao })
+        });
+
+        if (respostaHttp.getResponseCode() === 200) {
+          var textoSegmento = extrairTextoRespostaGemini(JSON.parse(respostaHttp.getContentText()));
+          if (textoSegmento && textoSegmento.length > 10) {
+            partesAta.push(textoSegmento);
+            log('SUCESSO', '  ✅ Segmento ' + seg.nome + ' gerado (' + textoSegmento.length + ' chars)');
+          } else {
+            log('ALERTA', '  ⚠️ Segmento ' + seg.nome + ' retornou texto vazio.');
+          }
+        } else {
+          log('ALERTA', '  ⚠️ Segmento ' + seg.nome + ': HTTP ' + respostaHttp.getResponseCode());
+        }
+      } catch (eSeg) {
+        log('ALERTA', '  ⚠️ Erro no segmento ' + seg.nome + ': ' + eSeg.message);
+      }
+    }
+
+    if (partesAta.length === 0) {
+      return { sucesso: false, mensagem: 'Nenhum segmento gerado para o estilo: ' + estilo };
+    }
+
+    return { sucesso: true, ata: partesAta.join('\n\n') };
+
+  } catch (erro) {
+    Logger.log('[gerarAtaEstiloSegmentada] ERRO: ' + erro.toString());
+    return { sucesso: false, mensagem: erro.message };
+  }
+}
+
+
+/**
  * Gera um estilo de ata para uma reunião já transcrita.
  * Útil para adicionar estilos adicionais após o processamento inicial.
  */
@@ -4144,25 +4274,16 @@ function gerarAtaEstiloParaReuniao(token, reuniaoId, estilo, instrucaoExtra) {
     }
 
     const dataFormatada = new Date().toLocaleDateString('pt-BR');
-    const prompt = montarPromptAtaEstilo(estilo, titulo, participantes, dataFormatada, instrucaoExtra || '', transcricao);
-    const cfg = CONFIG_PROMPTS_REUNIAO.ATA_ESTILOS;
 
-    log('INFO', '📋 Gerando ata estilo: ' + estilo + '...');
-    const urlApi = 'https://generativelanguage.googleapis.com/v1beta/models/' + cfg.modelo + ':generateContent?key=' + chaveApi;
-    const configGeracao = montarConfigGeracao(cfg, 'ATA-estilo-' + estilo);
-    const respostaHttp = UrlFetchApp.fetch(urlApi, {
-      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-      payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: configGeracao })
-    });
-
-    if (respostaHttp.getResponseCode() !== 200) {
-      return { sucesso: false, mensagem: 'Erro da API Gemini: HTTP ' + respostaHttp.getResponseCode(), logs };
+    log('INFO', '📋 Gerando ata estilo: ' + estilo + ' (segmentada)...');
+    const resultadoEstilo = gerarAtaEstiloSegmentada(
+      estilo, titulo, participantes, dataFormatada, instrucaoExtra || '', transcricao, chaveApi, log
+    );
+    if (!resultadoEstilo.sucesso) {
+      return { sucesso: false, mensagem: resultadoEstilo.mensagem, logs };
     }
 
-    const ataGerada = extrairTextoRespostaGemini(JSON.parse(respostaHttp.getContentText()));
-    if (!ataGerada || ataGerada.length < 10) {
-      return { sucesso: false, mensagem: 'Resposta da ata vazia.', logs };
-    }
+    const ataGerada = resultadoEstilo.ata;
 
     const mapaColuna = {
       'executiva':      COLUNAS_REUNIOES.ATA_EXECUTIVA,
@@ -4189,6 +4310,117 @@ function gerarAtaEstiloParaReuniao(token, reuniaoId, estilo, instrucaoExtra) {
  * Retorna o prompt completo de um estilo de ata para visualizacao no frontend.
  * Nao chama IA; apenas monta o texto final do prompt.
  */
+/**
+ * Transcreve um áudio pequeno enviado como base64 (inline).
+ * Equivale às etapas 0+1 de processarAudioReuniao, mas retorna
+ * apenas a transcrição para que o frontend possa continuar o fluxo.
+ * Usado pelo novo pipeline segmentado da tela de processamento.
+ */
+function etapa_TranscreverInline(dados) {
+  var logs = [];
+  var log = function(tipo, msg) {
+    logs.push({ tipo: tipo, mensagem: msg, timestamp: new Date().toLocaleTimeString('pt-BR') });
+    Logger.log('[etapa_TranscreverInline][' + tipo + '] ' + msg);
+  };
+  try {
+    var chaveGemini = obterChaveGeminiProjeto();
+    if (!chaveGemini) throw new Error('Chave API do Gemini não configurada.');
+
+    log('INFO', '💾 Salvando áudio no Drive...');
+    var resultDrive = salvarAudioNoDrive(dados);
+    if (!resultDrive.sucesso) throw new Error('Falha ao salvar no Drive: ' + resultDrive.mensagem);
+    log('SUCESSO', '✅ Áudio salvo: ' + resultDrive.nomeArquivo);
+
+    var vocabulario = carregarVocabularioCompleto();
+    if (vocabulario.totalTermos > 0) {
+      log('INFO', vocabulario.totalTermos + ' termos de vocabulário carregados');
+    }
+
+    log('INFO', '🎙️ Transcrevendo áudio inline...');
+    var resultTransc = executarEtapaTranscricao(dados, chaveGemini, vocabulario);
+    if (!resultTransc.sucesso) throw new Error('Falha na transcrição: ' + resultTransc.mensagem);
+    log('SUCESSO', '✅ Transcrição: ' + resultTransc.transcricao.length + ' chars');
+
+    log('INFO', '📝 Salvando transcrição no Drive...');
+    try {
+      salvarTranscricaoNoDrive(resultTransc.transcricao, dados.titulo);
+    } catch (e) { log('ALERTA', 'Não foi possível salvar transcrição no Drive: ' + e.message); }
+
+    return {
+      sucesso: true, logs: logs,
+      transcricao: resultTransc.transcricao,
+      linkAudio: resultDrive.linkArquivo || '',
+      nomeArquivo: resultDrive.nomeArquivo
+    };
+  } catch (e) {
+    log('ERRO', '❌ ' + e.message);
+    return { sucesso: false, logs: logs, mensagem: e.message };
+  }
+}
+
+
+/**
+ * Gera UM único segmento de ata via Gemini.
+ * Chamado pelo frontend para cada segmento, permitindo visualização em tempo real.
+ * dados: { estilo, segmentoId, titulo, participantes, instrucaoExtra, transcricao }
+ */
+function gerarSegmentoAtaSingle(dados) {
+  var logs = [];
+  var log = function(tipo, msg) {
+    logs.push({ tipo: tipo, mensagem: msg, timestamp: new Date().toLocaleTimeString('pt-BR') });
+    Logger.log('[gerarSegmentoAtaSingle][' + tipo + '] ' + msg);
+  };
+  try {
+    var estilo     = dados.estilo     || '';
+    var segmentoId = dados.segmentoId || '';
+    var titulo     = dados.titulo     || '';
+    var participantes  = dados.participantes  || '';
+    var instrucaoExtra = dados.instrucaoExtra || '';
+    var transcricao    = dados.transcricao    || '';
+
+    var chaveApi = obterChaveGeminiProjeto();
+    if (!chaveApi) throw new Error('Chave API do Gemini não configurada.');
+
+    var cfgEstilo = CONFIG_PROMPTS_REUNIAO.ESTILOS[estilo];
+    if (!cfgEstilo) throw new Error('Estilo desconhecido: ' + estilo);
+
+    var seg = null;
+    for (var i = 0; i < cfgEstilo.segmentos.length; i++) {
+      if (cfgEstilo.segmentos[i].id === segmentoId) { seg = cfgEstilo.segmentos[i]; break; }
+    }
+    if (!seg) throw new Error('Segmento desconhecido: ' + segmentoId);
+
+    var dataFormatada = new Date().toLocaleDateString('pt-BR');
+    var prompt = montarPromptSegmentoAta(estilo, segmentoId, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
+    if (!prompt) throw new Error('Prompt vazio para segmento ' + segmentoId);
+
+    log('INFO', 'Gerando segmento "' + seg.nome + '" [' + seg.modelo + ']...');
+
+    var urlApi = 'https://generativelanguage.googleapis.com/v1beta/models/' + seg.modelo + ':generateContent?key=' + chaveApi;
+    var configGeracao = montarConfigGeracao(seg, 'SEG-' + estilo + '-' + segmentoId);
+
+    var resp = UrlFetchApp.fetch(urlApi, {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: configGeracao })
+    });
+
+    if (resp.getResponseCode() !== 200) {
+      throw new Error('HTTP ' + resp.getResponseCode() + ': ' + resp.getContentText().substring(0, 200));
+    }
+
+    var texto = extrairTextoRespostaGemini(JSON.parse(resp.getContentText()));
+    if (!texto || texto.length < 10) throw new Error('Resposta vazia do Gemini para ' + segmentoId);
+
+    log('SUCESSO', '✅ ' + seg.nome + ': ' + texto.length + ' chars');
+    return { sucesso: true, logs: logs, texto: texto, estilo: estilo, segmentoId: segmentoId };
+
+  } catch (e) {
+    log('ERRO', '❌ ' + e.message);
+    return { sucesso: false, logs: logs, mensagem: e.message };
+  }
+}
+
+
 function obterPreviewPromptAta(token, opcoes) {
   try {
     if (!_obterSessao(token)) return { sucesso: false, mensagem: 'Sessao invalida.' };
@@ -4224,8 +4456,14 @@ function obterPreviewPromptAta(token, opcoes) {
     }
 
     const dataFormatada = new Date().toLocaleDateString('pt-BR');
-    const prompt = montarPromptAtaEstilo(estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
-    return { sucesso: true, estilo, prompt, usouTranscricaoReal };
+    const cfgEstilo = CONFIG_PROMPTS_REUNIAO.ESTILOS[estilo];
+    const segmentos = cfgEstilo ? cfgEstilo.segmentos : [];
+    const promptsSegmentos = segmentos.map(function(seg) {
+      return '=== SEGMENTO: ' + seg.nome + ' [' + seg.modelo + '] ===\n\n' +
+        montarPromptSegmentoAta(estilo, seg.id, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
+    });
+    const prompt = promptsSegmentos.join('\n\n' + '─'.repeat(60) + '\n\n');
+    return { sucesso: true, estilo, prompt, usouTranscricaoReal, totalSegmentos: segmentos.length };
   } catch (e) {
     Logger.log('ERRO obterPreviewPromptAta: ' + e.toString());
     return { sucesso: false, mensagem: e.message };

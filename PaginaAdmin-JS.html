@@ -74,9 +74,11 @@ function _renderizarUsuarios(lista) {
 
     var statusBadge = u.bloqueado
       ? '<span class="badge badge-bloq"><i class="fas fa-lock"></i> Bloqueado</span>'
-      : u.ativo
-        ? '<span class="badge badge-ativo">Ativo</span>'
-        : '<span class="badge badge-inativo">Inativo</span>';
+      : u.primeiroAcesso
+        ? '<span class="badge badge-inativo"><i class="fas fa-hourglass-half"></i> Aguardando ativação</span>'
+        : u.ativo
+          ? '<span class="badge badge-ativo">Ativo</span>'
+          : '<span class="badge badge-inativo">Inativo</span>';
 
     var ultimoLogin = u.ultimoLogin || '—';
     var depNomes = (u.departamentosIds || []).map(function(depId) {
@@ -302,7 +304,6 @@ function abrirModalNovoUsuario() {
   _val('editNome', '');
   _val('editEmail', '');
   _val('editPerfil', 'usuario');
-  _val('editSenha', '');
   document.getElementById('campoStatusModal').style.display = 'none';
   document.getElementById('campoSenhaModal').style.display = '';
   document.getElementById('senhaGerada').style.display = 'none';
@@ -347,21 +348,16 @@ function salvarUsuario() {
   var depIds = Array.prototype.map.call(depChecks, function(c) { return c.value; });
 
   if (!id) {
-    // Criar novo usuário
-    var senha = document.getElementById('editSenha').value;
-    var dados = { nome: nome, email: email, perfil: perfil, senha: senha, departamentosIds: depIds };
+    // Criar novo usuário (sem senha — usuário definirá PIN no primeiro acesso)
+    var dados = { nome: nome, email: email, perfil: perfil, departamentosIds: depIds };
 
     google.script.run
       .withSuccessHandler(function(r) {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-save"></i> Salvar';
         if (r.sucesso) {
-          if (r.senhaTemporaria) {
-            var sg = document.getElementById('senhaGerada');
-            sg.textContent = 'Senha temporária: ' + r.senhaTemporaria;
-            sg.style.display = 'block';
-          }
-          toast(r.mensagem || 'Usuário criado!', 'ok');
+          toast(r.mensagem || 'Usuário criado! Ele definirá o PIN no primeiro acesso.', 'ok');
+          fecharModalUsuario();
           carregarUsuarios();
         } else {
           toast(r.mensagem || 'Erro ao criar', 'err');
@@ -412,12 +408,13 @@ function desbloquear(userId) {
 
 // ── Resetar senha (admin) ──────────────────────────────────────────────
 function resetarSenhaAdmin(userId) {
-  if (!confirm('Resetar a senha deste usuário? Uma nova senha temporária será gerada.')) return;
+  if (!confirm('Resetar o PIN deste usuário? O usuário deverá criar um novo PIN no próximo acesso.')) return;
 
   google.script.run
     .withSuccessHandler(function(r) {
       if (r.sucesso) {
-        toast('Senha resetada! Nova senha: ' + r.novaSenha, 'ok');
+        toast('PIN resetado! O usuário criará um novo PIN no próximo acesso.', 'ok');
+        carregarUsuarios();
       } else {
         toast(r.mensagem || 'Erro ao resetar', 'err');
       }

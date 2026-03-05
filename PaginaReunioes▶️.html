@@ -481,15 +481,17 @@
     .ata-conteudo-html em { color: var(--marrom-claro); }
     .ata-conteudo-html hr { border:none; border-top: 1px solid var(--creme-escuro); margin: 1.5rem 0; }
     .ata-conteudo-html table {
-      width:100%; border-collapse:collapse; margin: 1rem 0; font-size:0.85rem;
+      border-collapse:collapse; margin:1rem auto; font-size:0.85rem;
+      width:auto; min-width:60%; max-width:100%; border:1px solid var(--marrom-claro);
     }
     .ata-conteudo-html th {
       background: var(--marrom-escuro); color: var(--creme-claro);
-      padding: 0.5rem 0.875rem; text-align:left; font-weight:700; font-size:0.78rem;
+      padding: 0.5rem 0.875rem; text-align:center; font-weight:700; font-size:0.78rem;
+      border:1px solid var(--marrom-escuro);
     }
     .ata-conteudo-html td {
-      padding: 0.5rem 0.875rem; border-bottom: 1px solid var(--creme-escuro);
-      vertical-align:top;
+      padding: 0.5rem 0.875rem; text-align:center; vertical-align:middle;
+      border:1px solid var(--creme-escuro);
     }
     .ata-conteudo-html tr:nth-child(even) td { background: rgba(217,204,170,0.2); }
     .ata-conteudo-html blockquote {
@@ -706,9 +708,9 @@
     .conteudo-texto h1 { font-family:var(--fonte-titulo); font-size:1.4rem; color:var(--marrom-escuro); margin:0 0 1rem; padding-bottom:0.5rem; border-bottom:2px solid var(--creme-escuro); }
     .conteudo-texto h2 { font-family:var(--fonte-titulo); font-size:1.1rem; color:var(--marrom-medio); margin:1.5rem 0 0.6rem; }
     .conteudo-texto h3 { font-family:var(--fonte-titulo); font-size:0.95rem; color:var(--marrom-escuro); margin:1rem 0 0.4rem; }
-    .conteudo-texto table { width:100%; border-collapse:collapse; margin:0.875rem 0; font-size:0.82rem; }
-    .conteudo-texto th { background:var(--marrom-escuro); color:var(--creme-claro); padding:0.4rem 0.75rem; text-align:left; font-size:0.75rem; }
-    .conteudo-texto td { padding:0.4rem 0.75rem; border-bottom:1px solid var(--creme-escuro); }
+    .conteudo-texto table { border-collapse:collapse; margin:0.875rem auto; font-size:0.82rem; width:auto; min-width:60%; max-width:100%; border:1px solid var(--marrom-claro); }
+    .conteudo-texto th { background:var(--marrom-escuro); color:var(--creme-claro); padding:0.4rem 0.75rem; text-align:center; font-size:0.75rem; border:1px solid var(--marrom-escuro); }
+    .conteudo-texto td { padding:0.4rem 0.75rem; text-align:center; border:1px solid var(--creme-escuro); }
     .conteudo-texto tr:nth-child(even) td { background:rgba(217,204,170,0.2); }
     .conteudo-texto strong { color:var(--marrom-escuro); }
     .conteudo-texto ul, .conteudo-texto ol { padding-left:1.5rem; margin-bottom:0.75rem; }
@@ -786,15 +788,16 @@
     /* ═══════════════════════════════════════════════
        LOADING OVERLAY
     ═══════════════════════════════════════════════ */
+    /* ─── TELA DE PROCESSAMENTO ─── */
     .loading-overlay {
-      position:fixed; inset:0;
-      background: rgba(44,24,16,0.88); backdrop-filter:blur(8px);
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      z-index:2000; opacity:0; visibility:hidden; transition:var(--trans);
+      position:fixed; inset:0; z-index:2000;
+      display:flex; flex-direction:column; align-items:stretch;
+      background:rgba(20,11,5,0.97); backdrop-filter:blur(12px);
+      opacity:0; visibility:hidden; transition:var(--trans);
     }
     .loading-overlay.visivel { opacity:1; visibility:visible; }
     .loading-spinner {
-      width:52px; height:52px; position:relative; margin-bottom:1.5rem;
+      width:36px; height:36px; position:relative; flex-shrink:0;
     }
     .loading-spinner::before, .loading-spinner::after {
       content:''; position:absolute; border-radius:50%; animation: spin 1.4s linear infinite;
@@ -808,9 +811,333 @@
       border-top-color:rgba(245,239,224,0.7);
       animation-duration:0.9s; animation-direction:reverse;
     }
-    .loading-texto { font-family:var(--fonte-titulo); font-size:1.1rem; color:var(--creme-claro); margin-bottom:1rem; }
-    .loading-bar { width:180px; height:3px; background:rgba(245,239,224,0.15); border-radius:2px; overflow:hidden; }
-    .loading-bar-fill { height:100%; background:linear-gradient(90deg,var(--ocre),#e6c07a,var(--ocre)); background-size:200%; animation:loadBar 1.5s ease-in-out infinite; width:40%; }
+    /* ─── AVISO DE NÃO FECHAR ─── */
+    .proc-aviso {
+      background:#7a1a1a; color:var(--creme-claro);
+      text-align:center; padding:9px 16px; font-size:0.79rem; font-weight:600;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      letter-spacing:0.15px; flex-shrink:0;
+    }
+    /* ─── CONTAINER CENTRAL ─── */
+    .proc-wrap {
+      flex:1; display:flex; align-items:center; justify-content:center;
+      padding:1rem; overflow-y:auto;
+    }
+    .proc-container {
+      width:100%; max-width:1120px;
+      background:rgba(30,17,9,0.98); border:1px solid rgba(209,166,95,0.18);
+      border-radius:var(--raio-lg); display:flex; flex-direction:column;
+      max-height:calc(90vh - 60px); overflow:hidden;
+      box-shadow:0 24px 72px rgba(0,0,0,0.7);
+    }
+    .proc-header {
+      display:flex; align-items:center; gap:0.9rem; padding:1rem 1.25rem;
+      border-bottom:1px solid rgba(209,166,95,0.12); flex-shrink:0;
+    }
+    .proc-titulo-reuniao {
+      font-family:var(--fonte-titulo); font-size:1.05rem; color:var(--creme-claro);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .proc-fase { font-size:0.77rem; color:rgba(245,239,224,0.4); margin-top:2px; }
+    .proc-body { display:flex; flex:1; overflow:hidden; min-height:0; }
+    /* ─── COLUNA ESQUERDA: ETAPAS ─── */
+    .proc-etapas-col {
+      flex:0 0 310px; padding:0.9rem; overflow-y:auto;
+      border-right:1px solid rgba(209,166,95,0.1);
+    }
+    .proc-etapa {
+      margin-bottom:0.45rem; background:rgba(255,255,255,0.025);
+      border:1px solid rgba(255,255,255,0.06); border-radius:var(--raio);
+      padding:0.6rem 0.65rem; transition:border-color 0.25s;
+    }
+    .proc-etapa.ativa   { border-color:rgba(209,166,95,0.5); }
+    .proc-etapa.concluida { border-color:rgba(70,160,70,0.3); }
+    .proc-etapa.erro    { border-color:rgba(200,55,55,0.4); }
+    .proc-etapa-top { display:flex; align-items:center; gap:0.45rem; }
+    .proc-etapa-icone { font-size:0.85rem; flex-shrink:0; width:16px; text-align:center; }
+    .proc-etapa-nome {
+      flex:1; font-size:0.82rem; font-weight:600;
+      color:rgba(245,239,224,0.8);
+    }
+    .proc-etapa.concluida .proc-etapa-nome { color:rgba(245,239,224,0.5); }
+    .proc-etapa.aguardando .proc-etapa-nome { color:rgba(245,239,224,0.4); }
+    .proc-etapa-pct { font-size:0.73rem; color:rgba(245,239,224,0.35); font-variant-numeric:tabular-nums; }
+    .proc-barra { height:2px; background:rgba(255,255,255,0.07); border-radius:2px; margin:0.4rem 0; overflow:hidden; }
+    .proc-barra-fill {
+      height:100%; background:linear-gradient(90deg, var(--ocre), #e6c07a);
+      border-radius:2px; transition:width 0.5s ease; width:0%;
+    }
+    .proc-barra-fill.indet { width:40% !important; animation:loadBar 1.5s ease-in-out infinite; background-size:200%; }
+    .proc-subs { display:flex; flex-direction:column; gap:0.2rem; padding-top:0.1rem; }
+    .proc-sub {
+      display:flex; align-items:center; gap:0.45rem;
+      padding:0.22rem 0.3rem; border-radius:3px; cursor:pointer;
+      transition:background 0.15s;
+    }
+    .proc-sub:hover { background:rgba(255,255,255,0.05); }
+    .proc-sub.ativo  { background:rgba(209,166,95,0.1); }
+    .proc-sub-st { flex-shrink:0; font-size:0.72rem; width:13px; text-align:center; }
+    .proc-sub-nome { font-size:0.75rem; color:rgba(245,239,224,0.5); flex:1; }
+    .proc-sub.concluido .proc-sub-nome { color:rgba(245,239,224,0.82); }
+    .proc-sub.ativo    .proc-sub-nome { color:rgba(245,239,224,0.9); }
+    /* ─── COLUNA DIREITA: VIEWER ─── */
+    .proc-viewer-col {
+      flex:1; display:flex; flex-direction:column; min-width:0; padding:0.9rem;
+    }
+    .proc-viewer-label {
+      font-size:0.77rem; font-weight:600; color:rgba(245,239,224,0.4);
+      display:flex; align-items:center; gap:0.4rem; margin-bottom:0.5rem; flex-shrink:0;
+    }
+    .proc-viewer-area {
+      flex:1; overflow-y:auto; background:rgba(0,0,0,0.25);
+      border-radius:var(--raio); border:1px solid rgba(255,255,255,0.05);
+      padding:0.8rem; font-size:0.75rem; line-height:1.65;
+      color:rgba(245,239,224,0.88); font-family:monospace; white-space:pre-wrap;
+      min-height:180px;
+    }
+    .proc-viewer-placeholder { color:rgba(245,239,224,0.25); font-family:inherit; font-style:italic; }
+    .proc-viewer-seg-header {
+      font-family:var(--fonte-titulo); font-size:0.78rem; font-weight:700;
+      color:var(--ocre); margin-bottom:0.6rem; font-style:normal;
+    }
+    @media (max-width:680px) {
+      .proc-etapas-col { display:none; }
+      .proc-container { max-height:calc(92vh - 55px); }
+    }
+
+    /* ═══════════════════════════════════════════════
+       VALIDAÇÃO DE ATA
+    ═══════════════════════════════════════════════ */
+    .val-overlay {
+      position:fixed; inset:0; z-index:1800;
+      background:rgba(44,24,16,0.55); backdrop-filter:blur(5px);
+      display:flex; align-items:center; justify-content:center; padding:1rem;
+      opacity:0; visibility:hidden; transition:var(--trans);
+    }
+    .val-overlay.visivel { opacity:1; visibility:visible; }
+    .val-modal {
+      width:100%; max-width:1400px; max-height:94vh;
+      background:var(--creme-claro); border-radius:var(--raio-lg);
+      border:1px solid var(--creme-escuro);
+      display:flex; flex-direction:column; overflow:hidden;
+      box-shadow:0 24px 72px rgba(44,24,16,0.35);
+    }
+    .val-header {
+      display:flex; align-items:flex-start; gap:0.75rem;
+      padding:1rem 1.25rem; border-bottom:1px solid var(--creme-escuro); flex-shrink:0;
+    }
+    .val-header-info { flex:1; }
+    .val-titulo { font-family:var(--fonte-titulo); font-size:1rem; color:var(--marrom-escuro); }
+    .val-subtitulo { font-size:0.73rem; color:var(--marrom-claro); margin-top:2px; }
+    .val-body { display:flex; flex:1; overflow:hidden; min-height:0; }
+    /* Coluna esquerda: cards de seção */
+    .val-secoes-col { flex:0 0 560px; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--creme-escuro); }
+    .val-secoes-header {
+      padding:0.5rem 0.75rem; border-bottom:1px solid var(--creme-escuro);
+      font-size:0.7rem; font-weight:700; color:var(--marrom-claro); letter-spacing:0.6px;
+      display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+    }
+    .val-secoes-list { flex:1; overflow-y:auto; padding:0.45rem; display:flex; flex-direction:column; gap:0.35rem; }
+    .val-card { background:white; border:1px solid var(--creme-escuro); border-radius:var(--raio); overflow:visible; transition:border-color 0.2s,opacity 0.2s; }
+    .val-card:not(.excluida) { border-left:3px solid var(--ocre); }
+    .val-card.excluida { opacity:0.55; background:var(--creme-base); border-left:3px solid var(--creme-escuro); }
+    .val-card-top { display:flex; align-items:center; gap:0.5rem; padding:0.5rem 0.6rem; }
+    .val-toggle-btn {
+      width:34px; height:18px; border-radius:9px; border:none; cursor:pointer;
+      position:relative; flex-shrink:0; transition:background 0.2s;
+    }
+    .val-toggle-btn.on  { background:var(--verde-vintage); }
+    .val-toggle-btn.off { background:var(--creme-escuro); }
+    .val-toggle-btn::after {
+      content:''; position:absolute; top:2px; width:14px; height:14px;
+      border-radius:50%; background:white; transition:left 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2);
+    }
+    .val-toggle-btn.on::after  { left:18px; }
+    .val-toggle-btn.off::after { left:2px; }
+    .val-card-titulo { flex:1; font-size:0.8rem; font-weight:600; color:var(--marrom-escuro); line-height:1.3; }
+    .val-card-excluido { font-size:0.68rem; color:var(--marrom-claro); font-style:italic; }
+    .val-btn-mini {
+      padding:2px 7px; font-size:0.68rem; border-radius:3px;
+      border:1px solid var(--creme-escuro); background:transparent;
+      cursor:pointer; color:var(--marrom-claro); transition:all 0.15s; flex-shrink:0;
+    }
+    .val-btn-mini:hover { background:var(--creme-medio); color:var(--marrom-escuro); }
+    .val-card-preview {
+      padding:0 0.6rem 0.5rem 0.85rem; font-size:0.72rem; color:var(--marrom-claro);
+      line-height:1.5; max-height:72px; overflow:hidden;
+      display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical;
+    }
+    .val-card-editor { padding:0.3rem 0.6rem 0.5rem; }
+    .val-card-editor textarea {
+      width:100%; min-height:130px; resize:vertical;
+      border:1px solid var(--creme-escuro); border-radius:var(--raio);
+      padding:0.5rem; font-size:0.74rem; font-family:monospace;
+      color:var(--marrom-escuro); background:var(--creme-base); line-height:1.55;
+      box-sizing:border-box;
+    }
+    .val-card-editor-btns { display:flex; gap:0.35rem; margin-top:0.35rem; justify-content:flex-end; }
+    /* Expand toggle */
+    .val-card-expand-btn {
+      background:none; border:none; cursor:pointer; padding:1px 4px;
+      color:var(--marrom-claro); font-size:0.7rem; flex-shrink:0; transition:color 0.15s;
+    }
+    .val-card-expand-btn:hover { color:var(--ocre); }
+    .val-card-preview.expandido {
+      max-height:none; overflow:visible;
+      display:block; -webkit-line-clamp:unset; -webkit-box-orient:unset;
+      white-space:normal;
+    }
+    /* ── Tabelas renderizadas via md2html — todas as áreas ── */
+    .md-table,
+    .val-card-preview table, .val-card-preview.expandido table,
+    .val-preview-wrap table,
+    .val-ai-result table,
+    .val-edit-rich-editor table {
+      border-collapse:collapse; margin:0.7rem auto; font-size:0.76rem;
+      width:auto; min-width:60%; max-width:100%;
+      border:1px solid var(--marrom-claro);
+    }
+    .md-table th,
+    .val-card-preview table th, .val-preview-wrap table th,
+    .val-ai-result table th, .val-edit-rich-editor table th {
+      background:var(--marrom-escuro); color:var(--creme-claro);
+      padding:0.4rem 0.85rem; text-align:center; font-size:0.73rem; font-weight:700;
+      border:1px solid var(--marrom-escuro);
+    }
+    .md-table td,
+    .val-card-preview table td, .val-preview-wrap table td,
+    .val-ai-result table td, .val-edit-rich-editor table td {
+      padding:0.35rem 0.85rem; text-align:center; color:var(--marrom-escuro);
+      border:1px solid var(--creme-escuro);
+    }
+    .md-table tr:nth-child(even) td,
+    .val-card-preview table tr:nth-child(even) td, .val-preview-wrap table tr:nth-child(even) td,
+    .val-ai-result table tr:nth-child(even) td, .val-edit-rich-editor table tr:nth-child(even) td {
+      background:rgba(217,204,170,0.22);
+    }
+    /* Scroll horizontal em áreas menores */
+    .val-card-preview table { display:block; overflow-x:auto; }
+    /* Resultado da IA renderizado como HTML */
+    .val-ai-result h1,.val-ai-result h2,.val-ai-result h3 { color:var(--marrom-escuro); margin:0.5rem 0 0.25rem; font-family:var(--fonte-titulo); }
+    .val-ai-result ul { padding-left:1.2rem; margin:0.3rem 0; }
+    .val-ai-result li { margin-bottom:0.15rem; }
+    /* Expansão do card com conteúdo renderizado */
+    .val-card-preview.expandido h2,.val-card-preview.expandido h3 { font-size:0.82rem; margin:0.4rem 0 0.2rem; color:var(--marrom-escuro); }
+    .val-card-preview.expandido ul { padding-left:1.2rem; margin:0.2rem 0; }
+    .val-card-preview.expandido li { margin-bottom:0.1rem; font-size:0.72rem; }
+    .val-card-preview.expandido strong { color:var(--marrom-escuro); }
+    /* Preview final também recebe estilos de lista */
+    .val-preview-wrap ul { padding-left:1.4rem; margin:0.4rem 0; }
+    .val-preview-wrap li { margin-bottom:0.2rem; }
+    /* Modal de edição de seção */
+    /* Editor rico (contenteditable) no modal de edição */
+    .val-edit-rich-editor {
+      min-height:240px; padding:0.75rem 1rem;
+      border:1px solid var(--creme-escuro); border-radius:var(--raio);
+      background:white; font-size:0.82rem; line-height:1.7; color:var(--marrom-escuro);
+      overflow-y:auto; outline:none; cursor:text;
+    }
+    .val-edit-rich-editor:focus { border-color:var(--ocre); }
+    .val-edit-rich-editor h2,.val-edit-rich-editor h3 { font-family:var(--fonte-titulo); color:var(--marrom-escuro); margin:0.75rem 0 0.35rem; }
+    .val-edit-rich-editor ul { padding-left:1.4rem; margin:0.4rem 0; }
+    .val-edit-rich-editor li { margin-bottom:0.2rem; }
+    /* Toggle para edição raw markdown */
+    .val-edit-raw-toggle {
+      font-size:0.7rem; color:var(--marrom-claro); cursor:pointer;
+      display:flex; align-items:center; gap:0.3rem; user-select:none;
+      padding:0.2rem 0; border:none; background:transparent;
+    }
+    .val-edit-raw-toggle:hover { color:var(--ocre); }
+    .val-edit-raw-wrap { display:none; }
+    .val-edit-raw-wrap.aberto { display:block; }
+    .val-edit-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:3100;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .val-edit-modal {
+      background:var(--creme-base); border-radius:var(--raio); box-shadow:0 8px 32px rgba(0,0,0,0.22);
+      width:min(980px,96vw); max-height:92vh; display:flex; flex-direction:column;
+    }
+    .val-edit-header {
+      padding:0.75rem 1rem; border-bottom:1px solid var(--creme-escuro);
+      display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+    }
+    .val-edit-titulo { font-size:0.85rem; font-weight:700; color:var(--marrom-escuro); }
+    .val-edit-body { padding:0.85rem 1rem; overflow-y:auto; display:flex; flex-direction:column; gap:0.75rem; flex:1; min-height:0; }
+    .val-edit-textarea {
+      width:100%; min-height:220px; resize:vertical;
+      border:1px solid var(--creme-escuro); border-radius:var(--raio);
+      padding:0.6rem; font-size:0.78rem; font-family:monospace;
+      color:var(--marrom-escuro); background:white; line-height:1.6;
+      box-sizing:border-box;
+    }
+    .val-edit-textarea:focus { outline:none; border-color:var(--ocre); }
+    .val-ai-box {
+      background:white; border:1px solid var(--creme-escuro); border-radius:var(--raio);
+      padding:0.65rem 0.75rem; display:flex; flex-direction:column; gap:0.5rem;
+    }
+    .val-ai-box-label {
+      font-size:0.7rem; font-weight:700; color:var(--ocre); letter-spacing:0.5px; text-transform:uppercase;
+      display:flex; align-items:center; gap:0.35rem;
+    }
+    .val-ai-input-row { display:flex; gap:0.45rem; align-items:flex-end; }
+    .val-ai-input {
+      flex:1; padding:0.4rem 0.6rem; border:1px solid var(--creme-escuro);
+      border-radius:var(--raio); font-size:0.8rem; background:var(--creme-base);
+      color:var(--marrom-escuro); resize:none; min-height:38px; max-height:90px;
+      font-family:inherit; line-height:1.45; box-sizing:border-box;
+    }
+    .val-ai-input:focus { outline:none; border-color:var(--ocre); }
+    .val-ai-result {
+      font-size:0.78rem; color:var(--marrom-escuro); line-height:1.6;
+      background:var(--creme-base); border-radius:var(--raio); padding:0.6rem 0.75rem;
+      white-space:normal; max-height:220px; overflow-y:auto;
+      border:1px solid var(--creme-escuro);
+    }
+    .val-ai-result-actions { display:flex; gap:0.4rem; margin-top:0.35rem; }
+    .val-edit-footer {
+      padding:0.65rem 1rem; border-top:1px solid var(--creme-escuro);
+      display:flex; justify-content:flex-end; gap:0.45rem; flex-shrink:0;
+    }
+    /* Coluna direita */
+    .val-right-col { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .val-tabs { display:flex; border-bottom:1px solid var(--creme-escuro); flex-shrink:0; }
+    .val-tab {
+      padding:0.5rem 1rem; font-size:0.78rem; font-weight:600;
+      color:var(--marrom-claro); border:none; background:transparent;
+      cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s;
+    }
+    .val-tab.ativo { color:var(--ocre); border-bottom-color:var(--ocre); }
+    .val-tab-pane { flex:1; overflow-y:auto; padding:1rem; display:none; }
+    .val-tab-pane.ativo { display:block; }
+    .val-preview-wrap { font-size:0.82rem; line-height:1.65; color:var(--marrom-escuro); }
+    .val-corr-row { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; }
+    .val-corr-input {
+      flex:1; padding:0.4rem 0.6rem; border:1px solid var(--creme-escuro);
+      border-radius:var(--raio); font-size:0.82rem; background:white; color:var(--marrom-escuro);
+    }
+    .val-corr-input:focus { outline:none; border-color:var(--ocre); }
+    .val-hist-item {
+      display:flex; align-items:center; gap:0.5rem; font-size:0.75rem;
+      padding:0.3rem 0; border-bottom:1px solid var(--creme-base);
+    }
+    .val-nome-chip {
+      display:inline-block; padding:2px 7px; margin:2px; font-size:0.7rem;
+      border:1px solid var(--creme-escuro); border-radius:10px;
+      cursor:pointer; color:var(--marrom-claro); background:var(--creme-base);
+      transition:all 0.15s;
+    }
+    .val-nome-chip:hover { background:var(--creme-medio); color:var(--marrom-escuro); border-color:var(--marrom-claro); }
+    /* Footer */
+    .val-footer {
+      display:flex; align-items:center; justify-content:space-between; gap:0.5rem;
+      padding:0.8rem 1.25rem; border-top:1px solid var(--creme-escuro); flex-shrink:0;
+    }
+    .val-footer-info { font-size:0.75rem; color:var(--marrom-claro); }
+    @media(max-width:680px) {
+      .val-secoes-col { display:none; }
+      .val-modal { max-height:96vh; }
+    }
 
     /* ═══════════════════════════════════════════════
        TOAST
@@ -1064,9 +1391,33 @@
 
 <!-- Loading Overlay -->
 <div class="loading-overlay" id="loadingOverlay">
-  <div class="loading-spinner"></div>
-  <div class="loading-texto" id="loadingTexto">Processando com IA</div>
-  <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+  <div class="proc-aviso">
+    <i class="fas fa-triangle-exclamation"></i>
+    Por favor, <strong>não feche nem recarregue</strong> esta página durante o processamento.
+  </div>
+  <div class="proc-wrap">
+    <div class="proc-container">
+      <div class="proc-header">
+        <div class="loading-spinner"></div>
+        <div style="flex:1;min-width:0;overflow:hidden;">
+          <div class="proc-titulo-reuniao" id="procTituloReuniao">Processando com IA...</div>
+          <div class="proc-fase" id="procFaseAtual">Iniciando...</div>
+        </div>
+      </div>
+      <div class="proc-body">
+        <div class="proc-etapas-col" id="procEtapas"></div>
+        <div class="proc-viewer-col">
+          <div class="proc-viewer-label">
+            <i class="fas fa-robot" style="color:var(--ocre);"></i>
+            <span id="procViewerLabel">Conteúdo gerado pelo Gemini</span>
+          </div>
+          <div class="proc-viewer-area" id="procViewerArea">
+            <span class="proc-viewer-placeholder">O conteúdo de cada segmento gerado pelo Gemini aparecerá aqui em tempo real, à medida que cada parte for processada.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ HEADER ═══ -->
@@ -1189,7 +1540,7 @@
           <div class="progresso-info"><span id="progressoTexto">Enviando...</span><span id="progressoPct">0%</span></div>
         </div>
 
-        <button class="btn btn-verde" id="btnEnviar" onclick="enviarAudio()" disabled style="width:100%;justify-content:center;">
+        <button class="btn btn-verde" id="btnEnviar" onclick="abrirModalConfigurarEnvio()" disabled style="width:100%;justify-content:center;">
           <i class="fas fa-paper-plane"></i> Processar com IA
         </button>
       </div>
@@ -1209,6 +1560,7 @@
         </div>
         <div class="ata-acoes" id="ataAcoes" style="display:none">
           <button class="btn btn-sm btn-secundario" onclick="copiarAtaAtual()"><i class="fas fa-copy"></i> Copiar</button>
+          <button class="btn btn-sm btn-secundario" onclick="abrirValidacaoAta(ataAtualReunId, ataAtualTexto, '', false)"><i class="fas fa-wand-magic-sparkles"></i> Validar</button>
           <button class="btn btn-sm btn-primario" onclick="abrirEmailAtaAtual()"><i class="fas fa-envelope"></i> Enviar</button>
         </div>
       </div>
@@ -1257,6 +1609,161 @@
 <!-- ══════════════════════════════════════════════
      MODAIS
 ══════════════════════════════════════════════ -->
+
+<!-- Modal Configurar Envio -->
+<div class="modal-overlay" id="modalConfigurarEnvio">
+  <div class="modal-caixa larga">
+    <div class="modal-header">
+      <div class="modal-titulo"><i class="fas fa-sliders" style="color:var(--ocre);margin-right:6px;"></i> Configurar Processamento</div>
+      <button class="modal-fechar" onclick="fecharModal('modalConfigurarEnvio')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="display:flex;gap:1.25rem;padding:1.25rem;overflow:hidden;">
+      <!-- Coluna esquerda: seleção de estilo + instrucao -->
+      <div style="flex:0 0 260px;display:flex;flex-direction:column;gap:1rem;overflow-y:auto;">
+        <div>
+          <p style="color:var(--marrom-claro);font-size:0.82rem;margin-bottom:0.75rem;">Selecione o estilo de ata a gerar:</p>
+          <div style="display:flex;flex-direction:column;gap:0.55rem;">
+            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
+              <input type="radio" name="estiloAta" id="rdoEstiloExecutiva" value="executiva" onchange="carregarPreviewPrompt('executiva')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
+              <span>Ata Executiva<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Decisões e encaminhamentos</small></span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
+              <input type="radio" name="estiloAta" id="rdoEstiloDetalhada" value="detalhada" onchange="carregarPreviewPrompt('detalhada')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
+              <span>Ata Detalhada<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Tópicos, log operacional e feedback</small></span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
+              <input type="radio" name="estiloAta" id="rdoEstiloResponsavel" value="por_responsavel" onchange="carregarPreviewPrompt('por_responsavel')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
+              <span>Por Responsável<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Agrupado por pessoa</small></span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
+              <input type="radio" name="estiloAta" id="rdoEstiloAlinhamento" value="alinhamento" onchange="carregarPreviewPrompt('alinhamento')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
+              <span>Alinhamento Rápido<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Resumo para dailies e syncs</small></span>
+            </label>
+          </div>
+        </div>
+        <div class="form-grupo" style="margin-bottom:0;">
+          <label class="form-label">Instruções adicionais <span style="font-weight:400;color:var(--marrom-claro)">(opcional)</span></label>
+          <textarea class="form-input" id="inputInstrucaoExtra" rows="4" placeholder="Ex: Foque nas decisões financeiras, ignore assuntos de RH..."></textarea>
+        </div>
+      </div>
+      <!-- Divisor vertical -->
+      <div style="width:1px;background:var(--creme-escuro);flex-shrink:0;"></div>
+      <!-- Coluna direita: visualizador do prompt -->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+        <div style="font-size:0.8rem;font-weight:600;color:var(--marrom-claro);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem;">
+          <i class="fas fa-eye" style="color:var(--ocre);"></i> Visualizador do Prompt
+        </div>
+        <div id="previewPromptArea" style="flex:1;background:var(--creme-claro);border:1px solid var(--creme-escuro);border-radius:var(--raio);overflow-y:auto;padding:0.85rem;font-size:0.76rem;font-family:monospace;white-space:pre-wrap;color:var(--marrom-escuro);line-height:1.55;min-height:220px;max-height:420px;"><span style="color:var(--marrom-claro);font-family:inherit;font-style:italic;">← Selecione um estilo para visualizar o prompt que será enviado ao Gemini.</span></div>
+      </div>
+    </div>
+    <div class="modal-rodape" style="justify-content:flex-end;gap:0.5rem;">
+      <button class="btn btn-sm btn-secundario" onclick="fecharModal('modalConfigurarEnvio')">Cancelar</button>
+      <button class="btn btn-sm btn-verde" onclick="confirmarEnvio()"><i class="fas fa-paper-plane"></i> Processar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ VALIDAÇÃO DE ATA ════ -->
+<div class="val-overlay" id="valOverlay">
+  <div class="val-modal">
+    <div class="val-header">
+      <div class="val-header-info">
+        <div class="val-titulo" id="valTitulo"><i class="fas fa-wand-magic-sparkles" style="color:var(--ocre);margin-right:6px;"></i>Validação da Ata</div>
+        <div class="val-subtitulo" id="valSubtitulo">Revise, edite e defina quais seções enviar por email</div>
+      </div>
+      <button class="modal-fechar" onclick="fecharValidacao()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="val-body">
+      <!-- Coluna esquerda: cards de seção -->
+      <div class="val-secoes-col">
+        <div class="val-secoes-header">
+          <span><i class="fas fa-list-ul" style="margin-right:4px;"></i>SEÇÕES DA ATA</span>
+          <div style="display:flex;gap:0.35rem;">
+            <button class="val-btn-mini" onclick="valTodosOn()"><i class="fas fa-check-double"></i> Todos</button>
+            <button class="val-btn-mini" onclick="valTodosOff()"><i class="fas fa-ban"></i> Nenhum</button>
+          </div>
+        </div>
+        <div class="val-secoes-list" id="valSecoesList"></div>
+      </div>
+      <!-- Coluna direita -->
+      <div class="val-right-col">
+        <div class="val-tabs">
+          <button class="val-tab ativo" id="valTabBtnPreview" onclick="valTrocarTab('preview',this)"><i class="fas fa-eye"></i> Preview Final</button>
+          <button class="val-tab" id="valTabBtnCorr" onclick="valTrocarTab('corr',this)"><i class="fas fa-spell-check"></i> Corrigir Texto</button>
+        </div>
+        <!-- Preview -->
+        <div class="val-tab-pane ativo" id="valTabPreview">
+          <div class="val-preview-wrap" id="valPreviewArea"></div>
+        </div>
+        <!-- Correções -->
+        <div class="val-tab-pane" id="valTabCorr">
+          <p style="font-size:0.78rem;color:var(--marrom-claro);margin-bottom:1rem;">Encontre e substitua palavras em <strong>todas as seções</strong> de uma vez:</p>
+          <div class="val-corr-row">
+            <input class="val-corr-input" id="valCorrDe" placeholder="Encontrar..." oninput="valContarOcorrs()">
+            <i class="fas fa-arrow-right" style="color:var(--marrom-claro);flex-shrink:0;"></i>
+            <input class="val-corr-input" id="valCorrPara" placeholder="Substituir por...">
+            <button class="btn btn-sm btn-primario" onclick="valAplicarCorrecao()" style="flex-shrink:0;"><i class="fas fa-wand-magic-sparkles"></i> Aplicar</button>
+          </div>
+          <div id="valCorrContagem" style="font-size:0.73rem;color:var(--marrom-claro);min-height:1.2em;margin-bottom:0.75rem;"></div>
+          <div id="valHistCor"></div>
+          <div style="margin-top:1.5rem;">
+            <div style="font-size:0.71rem;font-weight:700;color:var(--marrom-claro);letter-spacing:0.6px;margin-bottom:0.5rem;text-transform:uppercase;">Nomes Conhecidos — clique para usar como "Substituir por"</div>
+            <div id="valNomesChips"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="val-footer">
+      <div class="val-footer-info" id="valFooterInfo"></div>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <button class="btn btn-sm btn-secundario" onclick="fecharValidacao()">Fechar sem salvar</button>
+        <button class="btn btn-sm btn-secundario" onclick="valSalvar()"><i class="fas fa-floppy-disk"></i> Salvar ATA</button>
+        <button class="btn btn-sm btn-verde" onclick="valEnviarEmail()"><i class="fas fa-envelope"></i> Salvar e Enviar Email</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Seção da Ata -->
+<div class="val-edit-overlay" id="valEditOverlay" style="display:none;" onclick="if(event.target===this)_valFecharEditModal()">
+  <div class="val-edit-modal">
+    <div class="val-edit-header">
+      <div class="val-edit-titulo"><i class="fas fa-pen-to-square" style="color:var(--ocre);margin-right:6px;"></i><span id="valEditTituloSpan">Editar Seção</span></div>
+      <button class="modal-fechar" onclick="_valFecharEditModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="val-edit-body">
+      <div class="val-edit-rich-editor" id="valEditRichEditor" contenteditable="true" spellcheck="false"></div>
+      <div style="display:flex;align-items:center;justify-content:flex-end;">
+        <button class="val-edit-raw-toggle" id="valEditRawToggle" onclick="_valToggleRawEdit()">
+          <i class="fas fa-code"></i> <span id="valEditRawToggleLabel">Editar Markdown</span>
+        </button>
+      </div>
+      <div class="val-edit-raw-wrap" id="valEditRawWrap">
+        <textarea class="val-edit-textarea" id="valEditTextarea" placeholder="Conteúdo em markdown..." oninput="_valEditRawSincronizar()"></textarea>
+      </div>
+      <!-- Bloco de IA -->
+      <div class="val-ai-box">
+        <div class="val-ai-box-label"><i class="fas fa-wand-magic-sparkles"></i> Aprimorar com IA</div>
+        <p style="font-size:0.72rem;color:var(--marrom-claro);margin:0;">Descreva o que quer melhorar e a IA refinará esta seção usando a transcrição da reunião como base.</p>
+        <div class="val-ai-input-row">
+          <textarea class="val-ai-input" id="valAiInstrucao" placeholder='Ex: "Ficou muito rasa a informação", "Detalhe as decisões tomadas"...' rows="2"></textarea>
+          <button class="btn btn-sm btn-primario" id="valAiBtnEnviar" onclick="_valRefinarComIA()" style="flex-shrink:0;white-space:nowrap;"><i class="fas fa-paper-plane"></i> Enviar</button>
+        </div>
+        <div id="valAiResultadoWrap" style="display:none;">
+          <div class="val-ai-result" id="valAiResultado"></div>
+          <div class="val-ai-result-actions">
+            <button class="btn btn-sm btn-verde" onclick="_valAplicarResultadoIA()"><i class="fas fa-check"></i> Aplicar sugestão</button>
+            <button class="btn btn-sm btn-secundario" onclick="_valDescartarResultadoIA()"><i class="fas fa-xmark"></i> Descartar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="val-edit-footer">
+      <button class="btn btn-sm btn-secundario" onclick="_valFecharEditModal()">Cancelar</button>
+      <button class="btn btn-sm btn-verde" onclick="_valSalvarEditModal()"><i class="fas fa-check"></i> Salvar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal Console -->
 <div class="modal-overlay" id="modalConsole">
@@ -1405,6 +1912,10 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarCatalogo();
     setupDropzone();
     log('INFO', '🚀 Smart Meeting inicializado');
+    // Aviso proativo se estiver em iframe (bloqueio de microfone)
+    if (_emIframe()) {
+      setTimeout(_mostrarBannerIframe, 800);
+    }
   } else {
     _redirecionarLogin();
   }
@@ -1444,7 +1955,7 @@ function verificarConfig() {
       if (r && r.departamentos) popularSelectDepartamentosReunioes(r.departamentos);
     })
     .withFailureHandler(() => setPill('pillChave', false, 'Erro'))
-    .verificarConfiguracaoReunioes();
+    .verificarConfiguracaoReunioes(typeof SESSAO_TOKEN !== 'undefined' ? SESSAO_TOKEN : null);
 }
 
 function setPill(id, ok, label) {
@@ -1457,10 +1968,60 @@ function setPill(id, ok, label) {
 // ═══════════════════════════════════════
 //  GRAVAÇÃO
 // ═══════════════════════════════════════
+function _emIframe() {
+  try { return window.self !== window.top; } catch(_) { return true; }
+}
+
+function _abrirNovaAba() {
+  const url = window.location.href;
+  const nova = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!nova || nova.closed || typeof nova.closed === 'undefined') {
+    toast('Popup bloqueado. Copie o endereço da barra de URL e abra em uma nova aba manualmente.', 'aviso');
+  } else {
+    toast('Abrindo em nova aba — conceda permissão ao microfone na nova janela.', 'ok');
+  }
+}
+
+function _mostrarBannerIframe() {
+  if (document.getElementById('bannerIframe')) return;
+  const banner = document.createElement('div');
+  banner.id = 'bannerIframe';
+  banner.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 16px;margin:0 0 12px;font-size:.83rem;display:flex;align-items:center;gap:10px;';
+  banner.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e65100;flex-shrink:0"></i>'
+    + '<span>O navegador bloqueia microfone neste contexto. Para gravar, abra em nova aba.</span>'
+    + '<button onclick="_abrirNovaAba()" style="margin-left:auto;background:#e65100;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:.82rem;white-space:nowrap;"><i class="fas fa-external-link-alt"></i> Abrir em nova aba</button>';
+  const cardGrav = document.querySelector('.controles-grav');
+  if (cardGrav) cardGrav.closest('.card-body').insertAdjacentElement('afterbegin', banner);
+}
+
 async function iniciarGravacao() {
   try {
     log('INFO', '🎙️ Solicitando microfone...');
-    streamAudio = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true } });
+
+    // Detecta iframe e tenta verificar permissão
+    const noIframe = _emIframe();
+    if (noIframe && navigator.permissions) {
+      try {
+        const perm = await navigator.permissions.query({ name: 'microphone' });
+        log('INFO', '🔑 Permissão microfone: ' + perm.state + ' | iframe: ' + noIframe);
+        if (perm.state === 'denied') {
+          _mostrarBannerIframe();
+          log('ERRO', '❌ Microfone bloqueado pela política do iframe (Permissions Policy)');
+          _abrirNovaAba();
+          return;
+        }
+      } catch(_) {}
+    }
+
+    // Tenta com constraints completas; se falhar por constraints, tenta simplificado
+    try {
+      streamAudio = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true } });
+    } catch(e1) {
+      if (e1.name === 'NotAllowedError' || e1.name === 'PermissionDeniedError') throw e1;
+      log('INFO', '⚠️ Fallback: tentando sem constraints avançadas...');
+      streamAudio = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+
     setupVisualizador(streamAudio);
 
     const tipos = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
@@ -1482,8 +2043,17 @@ async function iniciarGravacao() {
     setUIGrav('gravando');
     log('INFO', '🔴 Gravando...');
   } catch(e) {
-    log('ERRO', '❌ ' + e.message);
-    toast('Erro ao acessar microfone', 'erro');
+    const negado = e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError';
+    log('ERRO', '❌ Microfone [' + e.name + ']: ' + e.message + ' | iframe: ' + _emIframe());
+    if (negado && _emIframe()) {
+      _mostrarBannerIframe();
+      toast('🎤 Microfone bloqueado pelo navegador neste contexto. Clique em "Abrir em nova aba" acima.', 'erro');
+      _abrirNovaAba();
+    } else if (negado) {
+      toast('🎤 Permissão de microfone negada. Clique no cadeado na barra de endereço e permita o microfone.', 'erro');
+    } else {
+      toast('Erro ao acessar microfone [' + e.name + ']: ' + e.message, 'erro');
+    }
   }
 }
 
@@ -1617,89 +2187,223 @@ function removerArquivo() {
 // ═══════════════════════════════════════
 //  ENVIO DE ÁUDIO
 // ═══════════════════════════════════════
-async function enviarAudio() {
+function abrirModalConfigurarEnvio() {
+  if (!arquivoAtual) { toast('Selecione um arquivo', 'aviso'); return; }
+  // Reset radio buttons, instrucao e preview
+  document.querySelectorAll('input[name="estiloAta"]').forEach(r => r.checked = false);
+  document.getElementById('inputInstrucaoExtra').value = '';
+  document.getElementById('previewPromptArea').innerHTML = '<span style="color:var(--marrom-claro);font-family:inherit;font-style:italic;">← Selecione um estilo para visualizar o prompt que será enviado ao Gemini.</span>';
+  document.getElementById('modalConfigurarEnvio').classList.add('visivel');
+}
+
+function confirmarEnvio() {
+  const rdoSelecionado = document.querySelector('input[name="estiloAta"]:checked');
+  if (!rdoSelecionado) { toast('Selecione um estilo de ata', 'aviso'); return; }
+
+  const instrucaoExtra = document.getElementById('inputInstrucaoExtra').value.trim();
+  fecharModal('modalConfigurarEnvio');
+  _executarEnvio([rdoSelecionado.value], instrucaoExtra);
+}
+
+function carregarPreviewPrompt(estilo) {
+  const area = document.getElementById('previewPromptArea');
+  area.innerHTML = '<span style="color:var(--marrom-claro);font-family:inherit;"><i class="fas fa-spinner fa-spin"></i> Carregando prompt...</span>';
+  const titulo = (document.getElementById('inputTitulo') || {}).value || '';
+  const participantes = (document.getElementById('inputParticipantes') || {}).value || '';
+  const instrucaoExtra = document.getElementById('inputInstrucaoExtra').value.trim();
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (r && r.sucesso) {
+        area.textContent = r.prompt;
+      } else {
+        area.textContent = 'Erro ao carregar preview: ' + (r ? r.mensagem : 'desconhecido');
+      }
+    })
+    .withFailureHandler(function(e) {
+      area.textContent = 'Erro: ' + e.message;
+    })
+    .obterPreviewPromptAta(SESSAO_TOKEN, { estilo: estilo, titulo: titulo, participantes: participantes, instrucaoExtra: instrucaoExtra });
+}
+
+async function _executarEnvio(estilosAta, instrucaoExtra) {
   if (!arquivoAtual) { toast('Selecione um arquivo', 'aviso'); return; }
   const titulo = document.getElementById('inputTitulo').value || 'Reunião ' + new Date().toLocaleDateString('pt-BR');
   const participantes = document.getElementById('inputParticipantes').value || '';
+  const estilo = estilosAta[0] || 'executiva';
+
+  let arq = arquivoAtual;
+  const precisaComprimir = arq.size > 15*1024*1024;
+  const ehGrandeEstimado = arq.size >= 12*1024*1024;
+
+  // Define etapas conforme o pipeline
+  const etapasDef = ehGrandeEstimado || precisaComprimir
+    ? [
+        { id:'prep',           nome:'Preparação e otimização'           },
+        { id:'upload_srv',     nome:'Envio ao servidor'                 },
+        { id:'upload_gemini',  nome:'Upload para o Gemini'             },
+        { id:'aguardar_gemini',nome:'Aguardando processamento Gemini'  },
+        { id:'transcricao',    nome:'Transcrição do áudio'             },
+        { id:'ata',            nome:'Geração da ATA'                   },
+        { id:'salvar',         nome:'Salvando resultado'               }
+      ]
+    : [
+        { id:'prep',       nome:'Preparação'           },
+        { id:'transcricao',nome:'Transcrição do áudio' },
+        { id:'ata',        nome:'Geração da ATA'       },
+        { id:'salvar',     nome:'Salvando resultado'   }
+      ];
+
+  procIniciar(titulo, etapasDef);
+
+  // Pré-adiciona segmentos da ATA para visualização antecipada
+  (CONFIG_ESTILOS_SEGMENTOS[estilo] || []).forEach(s =>
+    procSegmento('ata', s.id, s.nome, 'aguardando', '')
+  );
 
   try {
-    mostrarLoading('Preparando áudio...');
-    log('INFO', `📤 Iniciando envio: ${fmtBytes(arquivoAtual.size)}`);
+    procEtapa('prep', 'ativa', 0);
+    log('INFO', `📤 Iniciando: ${fmtBytes(arquivoAtual.size)}`);
 
-    let arq = arquivoAtual;
-    if (arq.size > 15*1024*1024) {
-      atualizarLoading('Otimizando áudio...');
-      arq = await comprimirAudio(arquivoAtual, p => atualizarLoading(`Otimizando (${p}%)...`));
+    if (precisaComprimir) {
+      arq = await comprimirAudio(arquivoAtual, p => { atualizarLoading(`Otimizando (${p}%)...`); procEtapa('prep', 'ativa', p); });
     }
+    procEtapa('prep', 'concluida', 100);
 
     if (arq.size < 12*1024*1024) {
       log('INFO', '📦 Arquivo pequeno — envio direto');
       const b64 = await arqParaBase64(arq);
-      await enviarDireto(b64, titulo, participantes);
+      await _fluxoDireto(b64, titulo, participantes, estilosAta, instrucaoExtra);
     } else {
-      log('INFO', `📦 Arquivo grande — pipeline chunks`);
+      log('INFO', '📦 Arquivo grande — pipeline chunks');
       const bkp = arquivoAtual; arquivoAtual = arq;
-      await enviarGrande(titulo, participantes);
+      await _fluxoGrande(titulo, participantes, estilosAta, instrucaoExtra);
       arquivoAtual = bkp;
     }
   } catch(e) {
-    esconderLoading();
+    procFinalizar();
     log('ERRO', '❌ ' + e.message);
     toast('Erro: ' + e.message, 'erro');
   }
 }
 
-async function enviarDireto(b64, titulo, participantes) {
-  atualizarLoading('Enviando para IA...');
+// Gera ATA segmento a segmento a partir do frontend (comum aos dois pipelines)
+async function _gerarAtaFrontend(transcricao, estilosAta, instrucaoExtra, titulo, participantes) {
+  const ataEstilos = {};
+  procEtapa('ata', 'ativa', 0);
+
+  for (let e = 0; e < estilosAta.length; e++) {
+    const estilo = estilosAta[e];
+    const segs   = CONFIG_ESTILOS_SEGMENTOS[estilo] || [];
+    const nSegs  = segs.length;
+
+    for (let s = 0; s < nSegs; s++) {
+      const seg = segs[s];
+      procSegmento('ata', seg.id, seg.nome, 'ativa', '');
+      procEtapa('ata', 'ativa', Math.round(((e * nSegs + s) / (estilosAta.length * nSegs)) * 100));
+      atualizarLoading(`Gerando ATA — ${seg.nome}...`);
+      log('INFO', `📋 Segmento: ${seg.nome}`);
+
+      const r = await chamarServidor('gerarSegmentoAtaSingle', {
+        estilo, segmentoId: seg.id, titulo, participantes, instrucaoExtra, transcricao
+      });
+      (r.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+
+      if (r.sucesso) {
+        procSegmento('ata', seg.id, seg.nome, 'concluida', r.texto);
+        ataEstilos[estilo] = (ataEstilos[estilo] || '') + (ataEstilos[estilo] ? '\n\n' : '') + r.texto;
+        log('SUCESSO', `✅ ${seg.nome}: ${r.texto.length} chars`);
+      } else {
+        procSegmento('ata', seg.id, seg.nome, 'erro', '');
+        log('ALERTA', `⚠️ ${seg.nome}: ${r.mensagem}`);
+      }
+    }
+  }
+  procEtapa('ata', 'concluida', 100);
+  return ataEstilos;
+}
+
+// Pipeline pequeno: transcreve inline → ATA por segmento → salva
+async function _fluxoDireto(b64, titulo, participantes, estilosAta, instrucaoExtra) {
   var depSel = document.getElementById('inputDepartamento');
-  var departamentoId = depSel ? depSel.value : '';
+  var departamentoId   = depSel ? depSel.value : '';
   var departamentoNome = depSel && depSel.selectedIndex >= 0 ? depSel.options[depSel.selectedIndex].text : '';
-  google.script.run
-    .withSuccessHandler(r => trataResposta(r, titulo))
-    .withFailureHandler(e => {
-  esconderLoading();
-  log('ERRO','❌ '+e.message);
-  toast('Erro no servidor','erro');
-  // ✅ Cleanup proteção
-  if (typeof processamentoConcluido === 'function') {
-    processamentoConcluido(false, typeof estadoProtecao !== 'undefined' ? estadoProtecao.sessaoId : null);
-  }
-})
-    .processarAudioReuniao({ audioBase64:b64, tipoMime:arquivoAtual.type, tamanhoBytes:arquivoAtual.size, titulo, participantes, dataInicio:new Date().toISOString(), duracaoMinutos:Math.ceil(segsGravados/60), departamentoId, departamentoNome });
-}
 
-function trataResposta(r, titulo) {
-  esconderLoading();
-  if (!r) { log('ERRO','❌ Resposta vazia'); return; }
-  (r.logs||[]).forEach(l => log(l.tipo, l.mensagem));
-  if (r.sucesso) {
-    log('SUCESSO','🎉 Concluído!'); toast('Processamento concluído!','sucesso');
-    if (r.ata) exibirAtaPainel(r.reuniaoId, r.ata, titulo, true);
-    carregarCatalogo();
-    limparForm();
-    if (r.ata && r.reuniaoId) setTimeout(() => abrirModalEmail(r.reuniaoId, r.ata), 600);
+  // Transcrição
+  procEtapa('transcricao', 'ativa', 0);
+  atualizarLoading('Transcrevendo...');
+  log('ALERTA', '⏳ Transcrição pode levar alguns minutos...');
+
+  const rT = await chamarServidor('etapa_TranscreverInline', {
+    audioBase64: b64, tipoMime: arquivoAtual.type, tamanhoBytes: arquivoAtual.size,
+    titulo, participantes, dataInicio: new Date().toISOString(),
+    duracaoMinutos: Math.ceil(segsGravados/60), departamentoId, departamentoNome
+  });
+  (rT.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+  if (!rT.sucesso) {
+    procEtapa('transcricao', 'erro', 0);
+    toast('Erro na transcrição: ' + rT.mensagem, 'erro');
+    procFinalizar(); return;
+  }
+  procEtapa('transcricao', 'concluida', 100);
+  log('SUCESSO', `✅ Transcrição: ${rT.transcricao.length} chars`);
+
+  // ATA (por segmento, via frontend)
+  const ataEstilos = await _gerarAtaFrontend(rT.transcricao, estilosAta, instrucaoExtra, titulo, participantes);
+  const ataBase = Object.values(ataEstilos)[0] || '';
+
+  // Salvar
+  procEtapa('salvar', 'ativa', 0);
+  atualizarLoading('Salvando...');
+  const [rRel, rSalvar] = await Promise.all([
+    chamarServidor('etapa_SoRelatorioIdentificacoes', { transcricao: rT.transcricao, titulo, departamentoNome }).catch(() => ({ sucesso:false })),
+    chamarServidor('etapa_SalvarReuniao', {
+      titulo, participantes, transcricao: rT.transcricao, ata: ataBase, ataEstilos,
+      sugestoes: '', dataInicio: new Date().toISOString(), duracaoMinutos: Math.ceil(segsGravados/60),
+      linkAudio: rT.linkAudio || '', departamentoId
+    })
+  ]);
+  (rRel?.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+  (rSalvar?.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+  procEtapa('salvar', 'concluida', 100);
+  procFinalizar();
+
+  if (rSalvar?.sucesso) {
+    log('SUCESSO', '🎉 Concluído!'); toast('Processamento concluído!', 'sucesso');
+    if (ataBase) exibirAtaPainel(rSalvar.reuniaoId, ataBase, titulo, true);
+    carregarCatalogo(); limparForm();
+    if (ataBase) setTimeout(() => abrirValidacaoAta(rSalvar.reuniaoId, ataBase, titulo, true), 400);
   } else {
-    log('ERRO','❌ ' + (r.mensagem||'erro')); toast('Falha: '+(r.mensagem||'erro'),'erro');
+    log('ERRO', '❌ ' + (rSalvar?.mensagem||'erro'));
+    toast('Erro ao salvar: ' + (rSalvar?.mensagem||'erro'), 'erro');
+    if (ataBase) exibirAtaPainel(null, ataBase, titulo, false);
   }
 }
 
-// Pipeline grande (chunks)
-async function enviarGrande(titulo, participantes) {
+// Pipeline grande: chunks → upload Gemini → transcrição → ATA por segmento → salva
+async function _fluxoGrande(titulo, participantes, estilosAta, instrucaoExtra) {
   const tipo = arquivoAtual.type || 'audio/webm';
-  const tam = arquivoAtual.size;
+  const tam  = arquivoAtual.size;
   const nChunks = Math.ceil(tam / FATIA_MB);
   const idUpload = 'up_' + Date.now().toString(36);
 
+  // Upload servidor
+  procEtapa('upload_srv', 'ativa', 0);
   log('INFO', `📦 ${nChunks} partes de ~${(FATIA_MB/1024/1024).toFixed(0)}MB`);
-  atualizarLoading('Enviando ao servidor (0%)...');
-
   let enviados = 0;
   async function enviarChunk(i) {
-    const ini = i*FATIA_MB, fim = Math.min(ini+FATIA_MB,tam);
-    const b64 = await lerFatia(arquivoAtual.slice(ini,fim));
+    const ini = i*FATIA_MB, fim = Math.min(ini+FATIA_MB, tam);
+    const b64 = await lerFatia(arquivoAtual.slice(ini, fim));
     return new Promise((res,rej) => {
       google.script.run
-        .withSuccessHandler(r => { if(r?.sucesso){enviados++;atualizarLoading(`Enviando (${Math.round(enviados/nChunks*100)}%)...`);res();} else rej(new Error(r?.mensagem)); })
+        .withSuccessHandler(r => {
+          if (r?.sucesso) {
+            enviados++;
+            const p = Math.round(enviados/nChunks*100);
+            procEtapa('upload_srv', 'ativa', p);
+            atualizarLoading(`Enviando (${p}%)...`);
+            res();
+          } else rej(new Error(r?.mensagem));
+        })
         .withFailureHandler(e => rej(new Error(e?.message)))
         .receberChunkAudio({ idUpload, indiceChunk:i, totalChunks:nChunks, chunkBase64:b64, tipoMime:tipo });
     });
@@ -1708,89 +2412,81 @@ async function enviarGrande(titulo, participantes) {
     const ps = []; for (let j=0; j<CHUNKS_PAR && (i+j)<nChunks; j++) ps.push(enviarChunk(i+j));
     await Promise.all(ps);
   }
-  log('SUCESSO','✅ Todos os chunks enviados!');
+  procEtapa('upload_srv', 'concluida', 100);
+  log('SUCESSO', '✅ Todos os chunks enviados!');
 
-  // Etapa 1a: iniciar sessões
+  // Upload Gemini (etapa 1a + 1b)
+  procEtapa('upload_gemini', 'ativa', 0);
   atualizarLoading('Iniciando upload Gemini...');
   const r1a = await chamarServidor('etapa1a_IniciarSessoesUpload', { idUpload, tipoMime:tipo, titulo });
-  (r1a.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
-  if (!r1a.sucesso) { esconderLoading(); log('ERRO','❌ Etapa 1a: '+r1a.mensagem); return; }
+  (r1a.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+  if (!r1a.sucesso) { procEtapa('upload_gemini','erro',0); log('ERRO','❌ '+r1a.mensagem); procFinalizar(); return; }
 
-  // Etapa 1b: lotes
   let offG=0, offD=0, gemUri='', gemName='', proxChunk=0, nlote=0;
   while (proxChunk < nChunks) {
     const ci=proxChunk, cf=Math.min(ci+LOTE_UPLOAD-1,nChunks-1), ultimo=(cf>=nChunks-1);
     nlote++;
-    atualizarLoading(`Gemini ${Math.round((cf+1)/nChunks*100)}% — lote ${nlote}`);
+    const p = Math.round((cf+1)/nChunks*100);
+    procEtapa('upload_gemini', 'ativa', p);
+    atualizarLoading(`Upload Gemini ${p}%...`);
     const r1b = await chamarServidor('etapa1b_EnviarLoteParaGemini', { idUpload, geminiUrl:r1a.geminiUrl, driveUrl:r1a.driveUrl, chunkInicio:ci, chunkFim:cf, offsetGemini:offG, offsetDrive:offD, totalBytes:r1a.totalBytes, ehUltimoLote:ultimo });
-    (r1b.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
-    if (!r1b.sucesso) { esconderLoading(); log('ERRO','❌ Lote '+nlote+': '+r1b.mensagem); return; }
+    (r1b.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+    if (!r1b.sucesso) { procEtapa('upload_gemini','erro',0); log('ERRO','❌ Lote '+nlote+': '+r1b.mensagem); procFinalizar(); return; }
     offG=r1b.offsetGemini; offD=r1b.offsetDrive;
     if (r1b.finalizado) { gemUri=r1b.geminiFileUri; gemName=r1b.geminiFileName; break; }
     proxChunk = (r1b.interrompidoPorTempo && r1b.proximoChunkInicio!==undefined) ? r1b.proximoChunkInicio : cf+1;
   }
-  if (!gemUri) { esconderLoading(); log('ERRO','❌ Upload não finalizado'); return; }
+  if (!gemUri) { procEtapa('upload_gemini','erro',0); log('ERRO','❌ Upload não finalizado'); procFinalizar(); return; }
+  procEtapa('upload_gemini', 'concluida', 100);
 
-  // Etapa 1c
+  // Aguardar Gemini (etapa 1c)
+  procEtapa('aguardar_gemini', 'ativa', 0);
   atualizarLoading('Aguardando Gemini...');
   const r1c = await chamarServidor('etapa1c_AguardarProcessamentoGemini', { geminiFileName:gemName, geminiFileUri:gemUri, nomeAudio:r1a.nomeAudio, idUpload, totalBytes:r1a.totalBytes });
-  (r1c.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
-  if (!r1c.sucesso) { esconderLoading(); log('ERRO','❌ '+r1c.mensagem); return; }
+  (r1c.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+  if (!r1c.sucesso) { procEtapa('aguardar_gemini','erro',0); log('ERRO','❌ '+r1c.mensagem); procFinalizar(); return; }
+  procEtapa('aguardar_gemini', 'concluida', 100);
 
-  // Etapa 2: transcrição
+  // Transcrição (etapa 2)
+  procEtapa('transcricao', 'ativa', 0);
   atualizarLoading('Transcrevendo...');
-  log('ALERTA','⏳ Pode demorar alguns minutos para áudios longos');
+  log('ALERTA', '⏳ Pode demorar alguns minutos para áudios longos');
   const r2 = await chamarServidor('etapa2_TranscreverAudio', { fileUri:r1c.fileUri, tipoMime:tipo });
-  (r2.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
-  if (!r2.sucesso) { esconderLoading(); log('ERRO','❌ '+r2.mensagem); return; }
+  (r2.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+  if (!r2.sucesso) { procEtapa('transcricao','erro',0); log('ERRO','❌ '+r2.mensagem); procFinalizar(); return; }
+  procEtapa('transcricao', 'concluida', 100);
   const transcricao = r2.transcricao;
 
-  // Etapa 3: ATA
-  atualizarLoading('Gerando ATA...');
-  const LIMITE_MR = 100000, SEG_TAM = 100000;
-  let rAta;
-  if (transcricao.length < LIMITE_MR) {
-    rAta = await chamarServidor('etapa3_GerarAta', { transcricao, titulo, participantes });
-  } else {
-    atualizarLoading('Gerando ATA (Map-Reduce)...');
-    const segs = dividirSegs(transcricao, SEG_TAM);
-    log('INFO', `📦 ${segs.length} segmentos para extração paralela`);
-    const ress = await Promise.all(segs.map((s,i) => chamarServidor('extrairPontosSegmentoServidor', { segmento:s, numSegmento:i+1, totalSegmentos:segs.length })));
-    const pts = ress.map((r,i) => `\n\n=== SEGMENTO ${i+1}/${segs.length} ===\n\n` + (r.pontosChave || segs[i].substring(0,15000)));
-    ress.forEach(r => (r.logs||[]).forEach(l=>log(l.tipo,l.mensagem)));
-    rAta = await chamarServidor('gerarAtaDesdeExtracoes', { pontosConsolidados:pts.join(''), titulo, participantes });
-  }
-  (rAta?.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
-  const ataFinal = rAta?.sucesso && rAta.ata?.length > 50 ? rAta.ata : '';
-  if (ataFinal) log('SUCESSO','✅ ATA gerada: '+ataFinal.length+' chars');
+  // ATA (por segmento, via frontend)
+  const ataEstilos = await _gerarAtaFrontend(transcricao, estilosAta, instrucaoExtra, titulo, participantes);
+  const ataFinal = Object.values(ataEstilos)[0] || '';
 
-  // Relatório e salvar em paralelo
-  atualizarLoading('Finalizando...');
+  // Salvar
+  procEtapa('salvar', 'ativa', 0);
+  atualizarLoading('Salvando...');
   var depSel = document.getElementById('inputDepartamento');
-  var departamentoId = depSel ? depSel.value : '';
+  var departamentoId   = depSel ? depSel.value : '';
   var departamentoNome = depSel && depSel.selectedIndex >= 0 ? depSel.options[depSel.selectedIndex].text : '';
   const [rRel, rSalvar] = await Promise.all([
     chamarServidor('etapa_SoRelatorioIdentificacoes', { transcricao, titulo, departamentoNome }).catch(e => ({ sucesso:false, mensagem:e.message })),
-    chamarServidor('etapa_SalvarReuniao', { titulo, participantes, transcricao, ata:ataFinal, sugestoes:rAta?.sugestoes||'', dataInicio:new Date().toISOString(), duracaoMinutos:Math.ceil(segsGravados/60), fileName:gemName, idUpload, linkAudio:r1c.linkAudio||'', departamentoId })
+    chamarServidor('etapa_SalvarReuniao', { titulo, participantes, transcricao, ata:ataFinal, ataEstilos, sugestoes:'', dataInicio:new Date().toISOString(), duracaoMinutos:Math.ceil(segsGravados/60), fileName:gemName, idUpload, linkAudio:r1c.linkAudio||'', departamentoId })
   ]);
-  (rRel?.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
-  (rSalvar?.logs||[]).forEach(l=>log(l.tipo,l.mensagem));
+  (rRel?.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+  (rSalvar?.logs||[]).forEach(l => log(l.tipo, l.mensagem));
+  procEtapa('salvar', 'concluida', 100);
+  procFinalizar();
 
-  esconderLoading();
   if (rSalvar?.sucesso) {
-    log('SUCESSO','🎉 Processamento completo!'); toast('Concluído com sucesso!','sucesso');
+    log('SUCESSO', '🎉 Processamento completo!'); toast('Concluído com sucesso!', 'sucesso');
     if (ataFinal) exibirAtaPainel(rSalvar.reuniaoId, ataFinal, titulo, true);
-    if (typeof processamentoConcluido === 'function') {
-  processamentoConcluido(true, typeof estadoProtecao !== 'undefined' ? estadoProtecao.sessaoId : null);
-}
+    if (typeof processamentoConcluido === 'function') processamentoConcluido(true, typeof estadoProtecao !== 'undefined' ? estadoProtecao.sessaoId : null);
     carregarCatalogo(); limparForm();
-    if (ataFinal && rSalvar.reuniaoId) setTimeout(() => abrirModalEmail(rSalvar.reuniaoId, ataFinal), 600);
+    if (ataFinal) setTimeout(() => abrirValidacaoAta(rSalvar.reuniaoId, ataFinal, titulo, true), 400);
   } else {
-    log('ERRO','❌ Salvar: '+(rSalvar?.mensagem||'erro'));
+    log('ERRO', '❌ Salvar: ' + (rSalvar?.mensagem||'erro'));
+    toast('Erro ao salvar: ' + (rSalvar?.mensagem||'erro'), 'erro');
     if (ataFinal) exibirAtaPainel(null, ataFinal, titulo, false);
-    if (typeof processamentoConcluido === 'function') {
-  processamentoConcluido(false, typeof estadoProtecao !== 'undefined' ? estadoProtecao.sessaoId : null);
-}
+    if (typeof processamentoConcluido === 'function') processamentoConcluido(false, typeof estadoProtecao !== 'undefined' ? estadoProtecao.sessaoId : null);
   }
 }
 
@@ -2173,6 +2869,7 @@ function abrirModalReuniao(id, tabInicial) {
   let rod = '';
   if (r.temAta) rod += `<button class="btn btn-sm btn-secundario" onclick="copiarModal('ata')"><i class="fas fa-copy"></i> Copiar Ata</button>`;
   if (r.temTranscricao) rod += `<button class="btn btn-sm btn-secundario" onclick="copiarModal('transcricao')"><i class="fas fa-copy"></i> Copiar Transcrição</button>`;
+  if (r.temAta) rod += `<button class="btn btn-sm btn-secundario" onclick="abrirValidacaoAta(reuniaoModalAtual.id, reuniaoModalAtual.ata||'', reuniaoModalAtual.titulo||'', false)"><i class="fas fa-wand-magic-sparkles"></i> Validar Ata</button>`;
   if (r.temAta) rod += `<button class="btn btn-sm btn-primario" onclick="emailRapido('${r.id}')"><i class="fas fa-envelope"></i> Enviar Email</button>`;
   rod += `<button class="btn btn-sm btn-secundario" onclick="fecharModal('modalReuniao')">Fechar</button>`;
   document.getElementById('modalReuniaoRodape').innerHTML = rod;
@@ -2393,9 +3090,114 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 // ═══════════════════════════════════════
 //  LOADING
 // ═══════════════════════════════════════
-function mostrarLoading(txt) { document.getElementById('loadingTexto').textContent = txt||'Processando'; document.getElementById('loadingOverlay').classList.add('visivel'); }
-function atualizarLoading(txt) { document.getElementById('loadingTexto').textContent = txt; }
-function esconderLoading() { document.getElementById('loadingOverlay').classList.remove('visivel'); }
+// ═══════════════════════════════════════════════════════════════
+//  MÁQUINA DE ESTADO — TELA DE PROCESSAMENTO
+// ═══════════════════════════════════════════════════════════════
+// Segmentos de cada estilo (espelha CONFIG_PROMPTS_REUNIAO.ESTILOS no backend)
+var CONFIG_ESTILOS_SEGMENTOS = {
+  executiva:      [{ id:'decisoes', nome:'Cabeçalho e Decisões Tomadas' }, { id:'encaminhamentos', nome:'Encaminhamentos e Próximos Passos' }],
+  detalhada:      [{ id:'cabecalho', nome:'Cabeçalho e Síntese Executiva' }, { id:'topicos', nome:'Tópicos de Gestão e Matriz de Ação' }, { id:'log_compliance', nome:'Log Operacional e Compliance' }, { id:'feedback', nome:'Relatório de Feedback (Privado)' }],
+  por_responsavel:[{ id:'cabecalho', nome:'Cabeçalho' }, { id:'participacao', nome:'Participação por Pessoa' }, { id:'consolidado', nome:'Responsabilidades Consolidadas' }],
+  alinhamento:    [{ id:'completo', nome:'Ata de Alinhamento Rápido' }]
+};
+
+var _procState = { etapas: [] };
+
+function _procIcone(estado) {
+  if (estado === 'ativa')    return '<i class="fas fa-spinner fa-spin" style="color:var(--ocre);font-size:0.78rem;"></i>';
+  if (estado === 'concluida') return '<span style="color:#5cb85c;">✓</span>';
+  if (estado === 'erro')      return '<span style="color:#e05c5c;">✕</span>';
+  return '<span style="color:rgba(245,239,224,0.2);">○</span>';
+}
+function _procSubIcone(estado) {
+  if (estado === 'ativa')    return '<i class="fas fa-spinner fa-spin" style="color:var(--ocre);font-size:0.68rem;"></i>';
+  if (estado === 'concluida') return '<span style="color:#5cb85c;font-size:0.7rem;">✓</span>';
+  if (estado === 'erro')      return '<span style="color:#e05c5c;font-size:0.7rem;">✕</span>';
+  return '<span style="color:rgba(245,239,224,0.15);font-size:0.7rem;">○</span>';
+}
+function _escHTML(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function _procRenderEtapa(et) {
+  const barraW  = et.estado === 'concluida' ? 100 : et.pct;
+  const indet   = et.estado === 'ativa' && et.pct === 0;
+  const pctStr  = et.estado === 'aguardando' ? '' : (et.estado === 'concluida' ? '100%' : (et.pct > 0 ? et.pct + '%' : ''));
+  const subsHTML = et.segmentos && et.segmentos.length
+    ? '<div class="proc-subs">' + et.segmentos.map(s =>
+        `<div class="proc-sub ${s.estado} ${s.estado==='ativa'?'ativo':''} ${s.estado==='concluida'?'concluido':''}" onclick="procVerSegmento('${et.id}','${s.id}')">
+          <span class="proc-sub-st">${_procSubIcone(s.estado)}</span>
+          <span class="proc-sub-nome">${_escHTML(s.nome)}</span>
+        </div>`
+      ).join('') + '</div>' : '';
+  return `<div class="proc-etapa ${et.estado}" id="procEtapa-${et.id}">
+    <div class="proc-etapa-top">
+      <div class="proc-etapa-icone">${_procIcone(et.estado)}</div>
+      <div class="proc-etapa-nome">${_escHTML(et.nome)}</div>
+      <div class="proc-etapa-pct">${pctStr}</div>
+    </div>
+    <div class="proc-barra"><div class="proc-barra-fill${indet?' indet':''}" style="width:${barraW}%"></div></div>
+    ${subsHTML}
+  </div>`;
+}
+
+function procIniciar(titulo, definicoes) {
+  _procState.etapas = definicoes.map(d => ({ id:d.id, nome:d.nome, estado:'aguardando', pct:0, segmentos:[] }));
+  document.getElementById('procTituloReuniao').textContent = titulo || 'Processando com IA...';
+  document.getElementById('procFaseAtual').textContent = 'Iniciando...';
+  document.getElementById('procViewerArea').innerHTML = '<span class="proc-viewer-placeholder">O conteúdo de cada segmento gerado pelo Gemini aparecerá aqui em tempo real, à medida que cada parte for processada.</span>';
+  document.getElementById('procViewerLabel').textContent = 'Conteúdo gerado pelo Gemini';
+  document.getElementById('procEtapas').innerHTML = _procState.etapas.map(_procRenderEtapa).join('');
+  document.getElementById('loadingOverlay').classList.add('visivel');
+}
+
+function procEtapa(id, estado, pct) {
+  const et = _procState.etapas.find(e => e.id === id);
+  if (!et) return;
+  et.estado = estado;
+  if (pct !== undefined) et.pct = pct;
+  const el = document.getElementById('procEtapa-' + id);
+  if (el) el.outerHTML = _procRenderEtapa(et);
+  if (estado === 'ativa') document.getElementById('procFaseAtual').textContent = et.nome + '...';
+}
+
+function procSegmento(etapaId, segId, nome, estado, texto) {
+  const et = _procState.etapas.find(e => e.id === etapaId);
+  if (!et) return;
+  let seg = et.segmentos.find(s => s.id === segId);
+  if (!seg) { seg = { id:segId, nome, estado:'aguardando', texto:'' }; et.segmentos.push(seg); }
+  seg.estado = estado;
+  if (texto !== undefined) seg.texto = texto;
+  const el = document.getElementById('procEtapa-' + etapaId);
+  if (el) el.outerHTML = _procRenderEtapa(et);
+  if (texto && (estado === 'ativa' || estado === 'concluida')) {
+    document.getElementById('procViewerLabel').textContent = nome;
+    const area = document.getElementById('procViewerArea');
+    area.innerHTML = '<div class="proc-viewer-seg-header">📝 ' + _escHTML(nome) + '</div>' + _escHTML(texto);
+    area.scrollTop = 0;
+  }
+}
+
+function procVerSegmento(etapaId, segId) {
+  const et = _procState.etapas.find(e => e.id === etapaId);
+  if (!et) return;
+  const seg = et.segmentos.find(s => s.id === segId);
+  if (!seg || !seg.texto) return;
+  document.getElementById('procViewerLabel').textContent = seg.nome;
+  const area = document.getElementById('procViewerArea');
+  area.innerHTML = '<div class="proc-viewer-seg-header">📝 ' + _escHTML(seg.nome) + '</div>' + _escHTML(seg.texto);
+  area.scrollTop = 0;
+}
+
+function procFinalizar() { document.getElementById('loadingOverlay').classList.remove('visivel'); }
+
+// Compat wrappers para código que ainda usa os nomes antigos
+function mostrarLoading(txt) {
+  document.getElementById('procTituloReuniao').textContent = txt || 'Processando...';
+  document.getElementById('procFaseAtual').textContent = '';
+  document.getElementById('procEtapas').innerHTML = '';
+  document.getElementById('loadingOverlay').classList.add('visivel');
+}
+function atualizarLoading(txt) { document.getElementById('procFaseAtual').textContent = txt || ''; }
+function esconderLoading() { procFinalizar(); }
 
 // ═══════════════════════════════════════
 //  TOAST
@@ -2414,6 +3216,340 @@ function toast(msg, tipo, dur) {
 // ═══════════════════════════════════════
 //  MARKDOWN → HTML
 // ═══════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  VALIDAÇÃO DE ATA — estado e funções
+// ══════════════════════════════════════════════════════════════
+var NOMES_CONHECIDOS = ['Murilo','Adeline','Ana','Anne','Bráulio','Dr. André','Cristina','Cymara','Dânia','David','Dayanne','Diana','Diógenes','Elisa','Fernando','Filipe','Gil','Ítalo','Jaiane','Josi','Kauã','Luzia','Dr. Marcos','Mayra','Monalisa','Melissa','Priscila','Ramon','Raquel','Rayanne','Rayssa','Rebecca','Renan','Sânia','Saskia','Silvaney','Thaís','Torquato','Werysson','Wesley'];
+
+var _val = { reuniaoId:null, titulo:'', ataBruta:'', secoes:[], historico:[], aposProcessamento:false };
+var _valEditId = null;        // id da seção sendo editada no modal
+var _valAiResultadoRaw = ''; // texto bruto (markdown) do último resultado da IA
+
+function _valParsear(md) {
+  if (!md || !md.trim()) return [];
+  const linhas = md.split('\n');
+  const secoes = [];
+  let atual = null, idx = 0;
+  for (const linha of linhas) {
+    const mH = linha.match(/^(#{1,3})\s+(.+)$/);
+    if (mH) {
+      if (atual) secoes.push(atual);
+      atual = { id:'vs'+(idx++), nivel:mH[1].length, tituloMd:linha, titulo:mH[2].trim(), conteudo:'', incluirEmail:true, editando:false, expandido:false };
+    } else if (atual) {
+      atual.conteudo += (atual.conteudo ? '\n' : '') + linha;
+    }
+  }
+  if (atual) secoes.push(atual);
+  if (!secoes.length && md.trim()) {
+    secoes.push({ id:'vs0', nivel:2, tituloMd:'## Ata', titulo:'Ata Completa', conteudo:md.trim(), incluirEmail:true, editando:false, expandido:false });
+  }
+  return secoes;
+}
+
+function _valMontarFinal() {
+  return _val.secoes.filter(s => s.incluirEmail).map(s => s.tituloMd + '\n' + s.conteudo).join('\n\n');
+}
+
+function _valRenderCard(s) {
+  const on = s.incluirEmail;
+  const temConteudo = s.conteudo && s.conteudo.trim();
+  const expandIcon = s.expandido ? 'fa-chevron-up' : 'fa-chevron-down';
+  const expandTitle = s.expandido ? 'Recolher' : 'Expandir';
+  let previewArea = '';
+  if (temConteudo) {
+    if (s.expandido) {
+      // Render completo como HTML — tabelas e listas ficam visíveis
+      previewArea = `<div class="val-card-preview expandido" id="vcp-${s.id}">${md2html(s.conteudo)}</div>`;
+    } else {
+      // Preview colapsado: renderizado como HTML, limitado a 72px por CSS
+      previewArea = `<div class="val-card-preview" id="vcp-${s.id}">${md2html(s.conteudo)}</div>`;
+    }
+  }
+  const prefix = s.nivel === 1 ? '' : s.nivel === 2 ? '' : '↳ ';
+  return `<div class="val-card ${on?'':'excluida'}" id="vc-${s.id}">
+    <div class="val-card-top">
+      <button class="val-toggle-btn ${on?'on':'off'}" title="${on?'Excluir do email':'Incluir no email'}" onclick="_valToggle('${s.id}')"></button>
+      <div class="val-card-titulo">${prefix}${_escHTML(s.titulo)}</div>
+      ${temConteudo ? `<button class="val-card-expand-btn" title="${expandTitle}" onclick="_valExpandir('${s.id}')"><i class="fas ${expandIcon}"></i></button>` : ''}
+      ${on ? `<button class="val-btn-mini" title="Editar seção" onclick="_valAbrirEditModal('${s.id}')"><i class="fas fa-pen-to-square"></i></button>`
+           : `<span class="val-card-excluido">excluído do email</span>`}
+    </div>${previewArea}
+  </div>`;
+}
+
+function _valRenderSecoes() {
+  const el = document.getElementById('valSecoesList');
+  if (el) el.innerHTML = _val.secoes.map(_valRenderCard).join('');
+  _valAtualizarFooter();
+}
+
+function _valToggle(id) {
+  const s = _val.secoes.find(x => x.id===id); if (!s) return;
+  s.incluirEmail = !s.incluirEmail; s.editando = false;
+  const el = document.getElementById('vc-'+id); if (el) el.outerHTML = _valRenderCard(s);
+  _valAtualizarPreview(); _valAtualizarFooter();
+}
+
+function _valExpandir(id) {
+  const s = _val.secoes.find(x => x.id===id); if (!s) return;
+  s.expandido = !s.expandido;
+  const el = document.getElementById('vc-'+id); if (el) el.outerHTML = _valRenderCard(s);
+}
+
+function _valAbrirEditModal(id) {
+  const s = _val.secoes.find(x => x.id===id); if (!s) return;
+  _valEditId = id;
+  document.getElementById('valEditTituloSpan').textContent = s.titulo;
+  // Rich editor mostra HTML renderizado
+  document.getElementById('valEditRichEditor').innerHTML = md2html(s.conteudo || '');
+  // Textarea raw fica oculto com o markdown bruto
+  document.getElementById('valEditTextarea').value = s.conteudo || '';
+  document.getElementById('valEditRawWrap').classList.remove('aberto');
+  document.getElementById('valEditRawToggleLabel').textContent = 'Editar Markdown';
+  document.getElementById('valAiInstrucao').value = '';
+  _valAiResultadoRaw = '';
+  document.getElementById('valAiResultadoWrap').style.display = 'none';
+  document.getElementById('valAiResultado').innerHTML = '';
+  document.getElementById('valEditOverlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('valEditRichEditor').focus(), 50);
+}
+
+function _valToggleRawEdit() {
+  const wrap = document.getElementById('valEditRawWrap');
+  const label = document.getElementById('valEditRawToggleLabel');
+  const aberto = wrap.classList.toggle('aberto');
+  label.textContent = aberto ? 'Ocultar Markdown' : 'Editar Markdown';
+  if (aberto) {
+    // Quando abre o raw, sincroniza textarea com html2md do editor rico
+    document.getElementById('valEditTextarea').value = html2md(document.getElementById('valEditRichEditor').innerHTML);
+  } else {
+    // Quando fecha, re-renderiza o editor rico com o markdown editado
+    const md = document.getElementById('valEditTextarea').value;
+    document.getElementById('valEditRichEditor').innerHTML = md2html(md);
+  }
+}
+
+function _valEditRawSincronizar() {
+  // Enquanto o usuário digita no raw, re-renderiza o rich editor em tempo real
+  const md = document.getElementById('valEditTextarea').value;
+  document.getElementById('valEditRichEditor').innerHTML = md2html(md);
+}
+
+function _valFecharEditModal() {
+  document.getElementById('valEditOverlay').style.display = 'none';
+  document.getElementById('valEditRawWrap').classList.remove('aberto');
+  _valEditId = null;
+}
+
+function _valSalvarEditModal() {
+  if (!_valEditId) return;
+  const s = _val.secoes.find(x => x.id===_valEditId); if (!s) return;
+  // Se o raw está aberto, usa o markdown do textarea; caso contrário, converte do rich editor
+  const rawAberto = document.getElementById('valEditRawWrap').classList.contains('aberto');
+  s.conteudo = rawAberto
+    ? document.getElementById('valEditTextarea').value
+    : html2md(document.getElementById('valEditRichEditor').innerHTML);
+  s.editando = false;
+  const sid = _valEditId;
+  _valFecharEditModal();
+  const el = document.getElementById('vc-'+sid); if (el) el.outerHTML = _valRenderCard(s);
+  _valAtualizarPreview();
+}
+
+function _valRefinarComIA() {
+  if (!_valEditId) return;
+  const instrucao = (document.getElementById('valAiInstrucao').value || '').trim();
+  if (!instrucao) { toast('Descreva o que a IA deve melhorar','aviso'); return; }
+  // Extrai markdown atual: preferência pelo raw se aberto, senão converte do rich editor
+  const rawAberto = document.getElementById('valEditRawWrap').classList.contains('aberto');
+  const conteudo = rawAberto
+    ? document.getElementById('valEditTextarea').value
+    : html2md(document.getElementById('valEditRichEditor').innerHTML);
+  const s = _val.secoes.find(x => x.id===_valEditId);
+  const titulo = s ? s.titulo : '';
+  const btn = document.getElementById('valAiBtnEnviar');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  document.getElementById('valAiResultadoWrap').style.display = 'none';
+  google.script.run
+    .withSuccessHandler(res => {
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
+      if (res && res.sucesso) {
+        _valAiResultadoRaw = res.conteudoRefinado;
+        document.getElementById('valAiResultado').innerHTML = md2html(res.conteudoRefinado);
+        document.getElementById('valAiResultadoWrap').style.display = 'block';
+      } else {
+        toast('Erro da IA: ' + (res?.mensagem || 'desconhecido'), 'erro');
+      }
+    })
+    .withFailureHandler(e => {
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar';
+      toast('Erro: ' + e.message, 'erro');
+    })
+    .refinarSecaoAta(SESSAO_TOKEN, _val.reuniaoId || '', titulo, conteudo, instrucao);
+}
+
+function _valAplicarResultadoIA() {
+  if (_valAiResultadoRaw) {
+    // Aplica no rich editor (renderizado) e sincroniza o textarea raw
+    document.getElementById('valEditRichEditor').innerHTML = md2html(_valAiResultadoRaw);
+    document.getElementById('valEditTextarea').value = _valAiResultadoRaw;
+  }
+  _valAiResultadoRaw = '';
+  document.getElementById('valAiResultadoWrap').style.display = 'none';
+  document.getElementById('valAiInstrucao').value = '';
+  toast('Sugestão aplicada — clique em Salvar para confirmar', 'info');
+}
+
+function _valDescartarResultadoIA() {
+  _valAiResultadoRaw = '';
+  document.getElementById('valAiResultadoWrap').style.display = 'none';
+  document.getElementById('valAiResultado').innerHTML = '';
+}
+
+function _valAtualizarPreview() {
+  const area = document.getElementById('valPreviewArea'); if (!area) return;
+  const txt = _valMontarFinal();
+  area.innerHTML = txt.trim() ? md2html(txt) : '<p style="color:var(--marrom-claro);text-align:center;padding:2rem;font-style:italic;">Nenhuma seção selecionada.</p>';
+}
+
+function _valAtualizarFooter() {
+  const n = _val.secoes.filter(s=>s.incluirEmail).length;
+  const el = document.getElementById('valFooterInfo');
+  if (el) el.innerHTML = `<i class="fas fa-envelope" style="margin-right:4px;color:var(--ocre);"></i>${n} de ${_val.secoes.length} seções incluídas no email`;
+}
+
+function valTrocarTab(tab, btn) {
+  document.querySelectorAll('.val-tab').forEach(t=>t.classList.remove('ativo'));
+  document.querySelectorAll('.val-tab-pane').forEach(p=>p.classList.remove('ativo'));
+  if (btn) btn.classList.add('ativo');
+  document.getElementById(tab==='preview'?'valTabPreview':'valTabCorr')?.classList.add('ativo');
+}
+
+function valTodosOn()  { _val.secoes.forEach(s=>{s.incluirEmail=true;s.editando=false;}); _valRenderSecoes(); _valAtualizarPreview(); }
+function valTodosOff() { _val.secoes.forEach(s=>{s.incluirEmail=false;s.editando=false;}); _valRenderSecoes(); _valAtualizarPreview(); }
+
+function valContarOcorrs() {
+  const de = (document.getElementById('valCorrDe')||{}).value?.trim();
+  const el = document.getElementById('valCorrContagem'); if (!el) return;
+  if (!de) { el.textContent=''; return; }
+  const re = new RegExp(de.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+  let n=0; _val.secoes.forEach(s => { n += (s.conteudo.match(re)||[]).length; });
+  el.textContent = n>0 ? `${n} ocorrência(s) encontrada(s)` : 'Nenhuma ocorrência encontrada';
+  el.style.color = n>0 ? 'var(--ocre)' : 'var(--marrom-claro)';
+}
+
+function valAplicarCorrecao() {
+  const de   = (document.getElementById('valCorrDe')||{}).value?.trim();
+  const para = (document.getElementById('valCorrPara')||{}).value ?? '';
+  if (!de) { toast('Digite o texto a encontrar','aviso'); return; }
+  const re = new RegExp(de.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+  let total=0;
+  _val.secoes.forEach(s => {
+    const antes=s.conteudo; s.conteudo=s.conteudo.replace(re,para);
+    if (s.conteudo!==antes) total += (antes.match(re)||[]).length;
+  });
+  if (total>0) {
+    _val.historico.unshift({de,para,count:total});
+    toast(`${total} substituição(ões) aplicada(s)`,'sucesso');
+    _valRenderSecoes(); _valAtualizarPreview(); _valRenderHistorico();
+    document.getElementById('valCorrDe').value='';
+    document.getElementById('valCorrPara').value='';
+    document.getElementById('valCorrContagem').textContent='';
+  } else { toast('Nenhuma ocorrência encontrada','aviso'); }
+}
+
+function _valRenderHistorico() {
+  const el = document.getElementById('valHistCor'); if (!el) return;
+  if (!_val.historico.length) {
+    el.innerHTML='<div style="font-size:0.73rem;color:var(--marrom-claro);font-style:italic;">Nenhuma correção aplicada ainda.</div>'; return;
+  }
+  el.innerHTML = `<div style="font-size:0.71rem;font-weight:700;color:var(--marrom-claro);letter-spacing:0.6px;margin-bottom:0.4rem;text-transform:uppercase;">Histórico de correções</div>` +
+    _val.historico.slice(0,10).map(h =>
+      `<div class="val-hist-item">
+        <strong style="color:var(--marrom-escuro);">"${_escHTML(h.de)}"</strong>
+        <i class="fas fa-arrow-right" style="color:var(--marrom-claro);font-size:0.7rem;"></i>
+        <strong style="color:var(--verde-vintage);">"${_escHTML(h.para)}"</strong>
+        <span style="margin-left:auto;color:var(--marrom-claro);">${h.count}×</span>
+      </div>`).join('');
+}
+
+function _valRenderNomesChips() {
+  const el = document.getElementById('valNomesChips'); if (!el) return;
+  el.innerHTML = NOMES_CONHECIDOS.map(n =>
+    `<span class="val-nome-chip" onclick="valUsarNome('${_escHTML(n)}')">${_escHTML(n)}</span>`).join('');
+}
+
+function valUsarNome(nome) {
+  const inp = document.getElementById('valCorrPara');
+  if (inp) { inp.value = nome; inp.focus(); }
+}
+
+function abrirValidacaoAta(reunId, ataMd, titulo, aposProcessamento) {
+  _val.reuniaoId = reunId || null;
+  _val.titulo    = titulo || 'Ata da Reunião';
+  _val.ataBruta  = ataMd || '';
+  _val.secoes    = _valParsear(ataMd);
+  _val.historico = [];
+  _val.aposProcessamento = !!aposProcessamento;
+  // Seções de feedback/privado: excluídas do email por padrão
+  _val.secoes.forEach(s => { if (/feedback|privado/i.test(s.titulo)) s.incluirEmail = false; });
+
+  document.getElementById('valTitulo').innerHTML = '<i class="fas fa-wand-magic-sparkles" style="color:var(--ocre);margin-right:6px;"></i>' + _escHTML(titulo);
+  document.getElementById('valSubtitulo').textContent = 'Revise, edite e defina quais seções enviar por email.';
+
+  // Reset tabs
+  valTrocarTab('preview', document.getElementById('valTabBtnPreview'));
+
+  _valRenderSecoes();
+  _valAtualizarPreview();
+  _valRenderHistorico();
+  _valRenderNomesChips();
+  document.getElementById('valCorrDe').value = '';
+  document.getElementById('valCorrPara').value = '';
+  document.getElementById('valCorrContagem').textContent = '';
+
+  document.getElementById('valOverlay').classList.add('visivel');
+}
+
+function fecharValidacao() {
+  document.getElementById('valOverlay').classList.remove('visivel');
+  document.getElementById('valEditOverlay').style.display = 'none';
+  _valEditId = null;
+}
+
+function valSalvar(callback) {
+  if (!_val.reuniaoId) { toast('Sem reunião associada para salvar','aviso'); return; }
+  const ataFinal = _valMontarFinal();
+  mostrarLoading('Salvando ata...');
+  google.script.run
+    .withSuccessHandler(r => {
+      esconderLoading();
+      if (r?.sucesso) {
+        toast('Ata salva com sucesso!','sucesso');
+        const rC = cacheReuniao.find(x=>String(x.id)===String(_val.reuniaoId));
+        if (rC) rC.temAta = true;
+        if (ataAtualReunId === _val.reuniaoId) exibirAtaPainel(_val.reuniaoId, ataFinal, _val.titulo, true);
+        if (typeof callback === 'function') callback(ataFinal);
+      } else { toast('Erro: '+(r?.mensagem||'desconhecido'),'erro'); }
+    })
+    .withFailureHandler(e => { esconderLoading(); toast('Erro: '+e.message,'erro'); })
+    .salvarEdicaoAta(SESSAO_TOKEN, _val.reuniaoId, ataFinal);
+}
+
+function valEnviarEmail() {
+  const ataFinal = _valMontarFinal();
+  if (!ataFinal.trim()) { toast('Selecione ao menos uma seção','aviso'); return; }
+  fecharValidacao();
+  if (_val.reuniaoId) {
+    // Salva silenciosamente e abre email
+    google.script.run
+      .withSuccessHandler(() => {})
+      .withFailureHandler(() => {})
+      .salvarEdicaoAta(SESSAO_TOKEN, _val.reuniaoId, ataFinal);
+  }
+  abrirModalEmail(_val.reuniaoId, ataFinal);
+}
+
 function renderMd(txt) {
   if (!txt) return '';
   return md2html(txt);
@@ -2424,8 +3560,69 @@ function renderMdConteudo(txt) {
   return `<div class="conteudo-texto">${md2html(txt)}</div>`;
 }
 
+function html2md(html) {
+  if (!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  function n2md(node) {
+    if (node.nodeType === 3) return node.textContent;
+    if (node.nodeType !== 1) return '';
+    const tag = node.tagName.toLowerCase();
+    const inner = () => Array.from(node.childNodes).map(n2md).join('');
+    switch (tag) {
+      case 'h1': return '# ' + inner().trim() + '\n';
+      case 'h2': return '## ' + inner().trim() + '\n';
+      case 'h3': return '### ' + inner().trim() + '\n';
+      case 'h4': return '#### ' + inner().trim() + '\n';
+      case 'strong': case 'b': return '**' + inner() + '**';
+      case 'em': case 'i': return '*' + inner() + '*';
+      case 'br': return '\n';
+      case 'hr': return '\n---\n';
+      case 'blockquote': return '> ' + inner().trim() + '\n';
+      case 'code': return '`' + inner() + '`';
+      case 'p': { const t = inner().trim(); return t ? t + '\n\n' : ''; }
+      case 'ul': case 'ol':
+        return Array.from(node.querySelectorAll(':scope > li')).map(li => '- ' + li.innerText.trim()).join('\n') + '\n';
+      case 'li': return '- ' + inner().trim() + '\n';
+      case 'table': {
+        const rows = Array.from(node.querySelectorAll('tr'));
+        if (!rows.length) return '';
+        const toLine = (row) => {
+          const cells = Array.from(row.querySelectorAll('th, td')).map(c => c.innerText.trim());
+          return '| ' + cells.join(' | ') + ' |';
+        };
+        const header = toLine(rows[0]);
+        const sep = '| ' + Array.from(rows[0].querySelectorAll('th,td')).map(() => '---').join(' | ') + ' |';
+        const body = rows.slice(1).map(toLine).join('\n');
+        return '\n' + header + '\n' + sep + (body ? '\n' + body : '') + '\n';
+      }
+      case 'div': case 'span': case 'section': {
+        const t = inner();
+        // div/span from contenteditable editing often need a newline
+        return tag === 'div' ? (t.endsWith('\n') ? t : t + '\n') : t;
+      }
+      default: return inner();
+    }
+  }
+  return Array.from(tmp.childNodes).map(n2md).join('').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function md2html(txt) {
-  // Converte markdown para HTML rico
+  if (!txt) return '';
+  // Pré-processa tabelas antes do restante do pipeline
+  // Extrai blocos de tabela markdown e converte para <table class="md-table">
+  txt = txt.replace(/((?:^\|.+\|\s*\n?)+)/gm, (bloco) => {
+    const linhas = bloco.trim().split('\n').map(l => l.trim()).filter(l => l);
+    if (!linhas.length) return bloco;
+    const linhasValidas = linhas.filter(l => !/^\|[\s\-\|:]+\|$/.test(l));
+    if (linhasValidas.length < 1) return '';
+    const parseCells = (l) => l.replace(/^\||\|$/g,'').split('|').map(c => c.trim());
+    const [headerRow, ...bodyRows] = linhasValidas;
+    const ths = parseCells(headerRow).map(c => `<th>${c}</th>`).join('');
+    const trs = bodyRows.map(r => '<tr>' + parseCells(r).map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+    return `\n<table class="md-table"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>\n`;
+  });
+  // Restante do pipeline
   return txt
     .replace(/^#{4}\s+(.+)$/gm, '<h4>$1</h4>')
     .replace(/^#{3}\s+(.+)$/gm, '<h3>$1</h3>')
@@ -2437,17 +3634,6 @@ function md2html(txt) {
     .replace(/`([^`]+)`/g, '<code style="font-family:monospace;background:var(--creme-medio);padding:1px 5px;border-radius:3px;font-size:0.9em;">$1</code>')
     .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
     .replace(/^---+$/gm, '<hr>')
-    .replace(/^\| (.+) \|$/gm, (_, row) => {
-      const cells = row.split(' | ');
-      return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
-    })
-    .replace(/(<tr>.*<\/tr>)/gs, (m) => {
-      const rows = m.match(/<tr>.*?<\/tr>/gs) || [];
-      if (!rows.length) return m;
-      const header = rows[0].replace(/<td>/g,'<th>').replace(/<\/td>/g,'</th>');
-      const body = rows.slice(1).join('');
-      return `<table><thead>${header}</thead><tbody>${body}</tbody></table>`;
-    })
     .replace(/^[\*\-]\s+(.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
     .replace(/<\/ul>\s*<ul>/g, '')
