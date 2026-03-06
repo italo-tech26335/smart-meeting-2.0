@@ -741,8 +741,7 @@ function interceptarGravacao() {
   // Guarda referências originais
   var _iniciarOriginal = window.iniciarGravacao;
   var _pararOriginal = window.pararGravacao;
-  var _enviarOriginal = window.enviarAudio;
-  var _trataRespostaOriginal = window.trataResposta;
+  var _executarEnvioOriginal = window._executarEnvio; // pipeline real de envio
 
   // ── INTERCEPTA: iniciarGravacao ──
   window.iniciarGravacao = async function() {
@@ -765,32 +764,40 @@ function interceptarGravacao() {
       dataInicio: new Date().toISOString()
     });
 
-    // Chama original
+    // Chama original — pode falhar silenciosamente (ex: getUserMedia bloqueado)
     await _iniciarOriginal.call(window);
 
-    // ✅ FIX 3: Usa polling para interceptar ondataavailable
-    // O MediaRecorder pode não estar pronto imediatamente
+    // Polling para instalar hook no ondataavailable.
+    // Se mediaRecorder nunca aparecer, a gravação falhou: desfaz as proteções
+    // para não deixar a navegação bloqueada indefinidamente.
     var tentativas = 0;
     var maxTentativas = 20; // 20 × 200ms = 4s máximo
     var intervaloHook = setInterval(function() {
       tentativas++;
 
-      // ✅ FIX 1: Acessa via window.mediaRecorder (exige var no script principal)
       if (window.mediaRecorder && window.mediaRecorder.state !== 'inactive') {
         clearInterval(intervaloHook);
         hookOnDataAvailable();
+        iniciarAutoSave();
         console.log('[Proteção] ✅ Hook no ondataavailable instalado (tentativa ' + tentativas + ')');
         if (typeof log === 'function') {
           log('INFO', '🛡️ Proteções ativas: backup local + wake lock + heartbeat');
         }
       } else if (tentativas >= maxTentativas) {
         clearInterval(intervaloHook);
-        console.warn('[Proteção] ⚠️ Não conseguiu hookear ondataavailable após ' + maxTentativas + ' tentativas');
+        // Gravação não iniciou (getUserMedia falhou) — reverte estado para não
+        // bloquear navegação e não deixar operação crítica "presa".
+        console.warn('[Proteção] ⚠️ Gravação não iniciou após ' + maxTentativas + ' tentativas — revertendo proteções');
+        pararAutoSave();
+        liberarWakeLock();
+        pararHeartbeat();
+        finalizarOperacaoCritica();
+        if (estadoProtecao.sessaoId) {
+          limparSessaoLocal(estadoProtecao.sessaoId);
+          estadoProtecao.sessaoId = null;
+        }
       }
     }, 200);
-
-    // ✅ FIX 7: Auto-save periódico como camada extra de segurança
-    iniciarAutoSave();
   };
 
   // ── INTERCEPTA: pararGravacao ──
@@ -818,8 +825,10 @@ function interceptarGravacao() {
     }
   };
 
-  // ── INTERCEPTA: enviarAudio ──
-  window.enviarAudio = async function() {
+  // ── INTERCEPTA: _executarEnvio (ponto de entrada real do pipeline de envio) ──
+  // Obs.: enviarAudio não existe neste app — o fluxo passa por _executarEnvio → _fluxoDireto/_fluxoGrande.
+  // O cleanup (processamentoConcluido) já é chamado internamente por _fluxoDireto e _fluxoGrande.
+  window._executarEnvio = async function(estilosAta, instrucaoExtra) {
     if (estadoProtecao.envioEmAndamento) {
       if (typeof toast === 'function') toast('Envio já em andamento!', 'aviso');
       return;
@@ -833,7 +842,7 @@ function interceptarGravacao() {
     iniciarOperacaoCritica('processando');
     iniciarHeartbeat();
 
-    // Salva estado no sessionStorage para detectar refresh
+    // Salva estado no sessionStorage para detectar refresh durante envio
     try {
       sessionStorage.setItem(PROTECAO_CONFIG.CHAVE_ESTADO_PROC, JSON.stringify({
         sessaoId: estadoProtecao.sessaoId,
@@ -842,21 +851,12 @@ function interceptarGravacao() {
       }));
     } catch (e) {}
 
-    // ✅ FIX 4: Envolve a chamada original com try/finally
     try {
-      await _enviarOriginal.call(window);
+      await _executarEnvioOriginal.call(window, estilosAta, instrucaoExtra);
     } catch (erro) {
       console.error('[Proteção] Erro no envio:', erro);
       processamentoConcluido(false, estadoProtecao.sessaoId);
     }
-  };
-
-  // ── INTERCEPTA: trataResposta (callback do envio direto/pequeno) ──
-  window.trataResposta = function(r, titulo) {
-    _trataRespostaOriginal.call(window, r, titulo);
-
-    // ✅ FIX 4: Garante cleanup após processamento direto
-    processamentoConcluido(r && r.sucesso, estadoProtecao.sessaoId);
   };
 
   console.log('[Proteção] ✅ Funções interceptadas com sucesso');
@@ -1040,7 +1040,7 @@ function atualizarPillProtecao() {
   function tentarInterceptar() {
     if (typeof window.iniciarGravacao === 'function' &&
         typeof window.pararGravacao === 'function' &&
-        typeof window.enviarAudio === 'function') {
+        typeof window._executarEnvio === 'function') {
       interceptarGravacao();
     } else {
       console.log('[Proteção] Aguardando funções do script principal...');

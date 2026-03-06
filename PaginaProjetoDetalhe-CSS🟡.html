@@ -422,6 +422,7 @@ body {
 .metrica-card.andamento { border-left-color: var(--cor-info); }
 .metrica-card.aguardando { border-left-color: var(--cor-aguardando); }
 .metrica-card.concluida { border-left-color: var(--cor-sucesso); }
+.metrica-card.suspenso { border-left-color: #7c5cbf; }
 .metrica-card:hover { transform: translateX(2px); box-shadow: var(--sombra); }
 .metrica-card.selecionado { border: 1px solid var(--cor-primaria); border-left-width: 3px; box-shadow: 0 0 0 2px var(--cor-primaria-bg); }
 .metrica-card-content { display: flex; align-items: center; gap: 8px; }
@@ -431,6 +432,7 @@ body {
 .metrica-card.andamento .metrica-icone { color: var(--cor-info); }
 .metrica-card.aguardando .metrica-icone { color: var(--cor-aguardando); }
 .metrica-card.concluida .metrica-icone { color: var(--cor-sucesso); }
+.metrica-card.suspenso .metrica-icone { color: #7c5cbf; }
 .metrica-info { text-align: left; flex: 1; }
 .metrica-valor { font-size: 1.25rem; font-weight: 700; line-height: 1; }
 .metrica-card.total .metrica-valor { color: var(--cor-primaria); }
@@ -438,6 +440,7 @@ body {
 .metrica-card.andamento .metrica-valor { color: var(--cor-info); }
 .metrica-card.aguardando .metrica-valor { color: var(--cor-aguardando); }
 .metrica-card.concluida .metrica-valor { color: var(--cor-sucesso); }
+.metrica-card.suspenso .metrica-valor { color: #7c5cbf; }
 .metrica-label { font-size: 0.65rem; font-weight: 600; color: var(--cor-texto-secundario); text-transform: uppercase; letter-spacing: 0.02em; margin-top: 1px; }
 
 .grafico-header { margin-bottom: 10px; }
@@ -456,6 +459,8 @@ body {
 .grafico-filtro-chip.aguardando.ativo { border-color: var(--cor-aguardando); box-shadow: 0 0 0 2px rgba(194, 133, 90, 0.15); }
 .grafico-filtro-chip.concluida { background: #e4efdf; color: var(--cor-sucesso); border-color: #c5dbb8; }
 .grafico-filtro-chip.concluida.ativo { border-color: var(--cor-sucesso); box-shadow: 0 0 0 2px rgba(90, 114, 71, 0.15); }
+.grafico-filtro-chip.suspenso { background: #ede9f7; color: #7c5cbf; border-color: #cfc0e8; }
+.grafico-filtro-chip.suspenso.ativo { border-color: #7c5cbf; box-shadow: 0 0 0 2px rgba(124, 92, 191, 0.15); }
 .grafico-filtro-chip:not(.ativo) { opacity: 0.5; }
 .grafico-filtro-chip:hover { opacity: 1; }
 .grafico-filtro-chip i { font-size: 0.6rem; }
@@ -497,12 +502,14 @@ body {
 .lista-projeto-item.andamento { border-left-color: var(--cor-info); }
 .lista-projeto-item.aguardando { border-left-color: var(--cor-aguardando); }
 .lista-projeto-item.concluida { border-left-color: var(--cor-sucesso); }
+.lista-projeto-item.suspenso { border-left-color: #7c5cbf; }
 .lista-projeto-item.selecionado { background: var(--cor-primaria-bg) !important; border-left-color: var(--cor-primaria) !important; border-left-width: 3px; }
 .lista-projeto-icone { width: 26px; height: 26px; border-radius: var(--raio); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #faf6ee; flex-shrink: 0; }
 .lista-projeto-icone.afazer { background: linear-gradient(135deg, var(--cor-aviso), #9a7209); }
 .lista-projeto-icone.andamento { background: linear-gradient(135deg, var(--cor-info), #3a5a8c); }
 .lista-projeto-icone.aguardando { background: linear-gradient(135deg, var(--cor-aguardando), #a06f45); }
 .lista-projeto-icone.concluida { background: linear-gradient(135deg, var(--cor-sucesso), #45603a); }
+.lista-projeto-icone.suspenso { background: linear-gradient(135deg, #7c5cbf, #5a3e9e); }
 .lista-projeto-info { flex: 1; min-width: 0; }
 .lista-projeto-nome { font-size: 0.78rem; font-weight: 600; color: var(--cor-texto); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lista-projeto-meta { font-size: 0.65rem; color: var(--cor-texto-secundario); margin-top: 1px; }
@@ -663,6 +670,7 @@ body {
 .badge-aguardando { background: #fde8d8; color: var(--cor-aguardando); }
 .badge-bloqueada { background: #f9e0e0; color: var(--cor-perigo); }
 .badge-concluida { background: #e4efdf; color: var(--cor-sucesso); }
+.badge-suspenso { background: #ede9f7; color: #7c5cbf; }
 .badge-valor-prioridade { padding: 2px 7px; border-radius: 3px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; gap: 3px; }
 .badge-valor-prioridade.alta { background: rgba(166, 61, 64, 0.1); color: var(--cor-perigo); }
 .badge-valor-prioridade.media { background: rgba(184, 134, 11, 0.1); color: var(--cor-aviso); }
@@ -1211,6 +1219,7 @@ textarea { resize: vertical; min-height: 65px; }
 .badge-hero.andamento { background: rgba(74,111,165,0.3);  border-color: rgba(74,111,165,0.55); }
 .badge-hero.aguardando{ background: rgba(194,133,90,0.3);  border-color: rgba(194,133,90,0.55); }
 .badge-hero.concluida { background: rgba(90,114,71,0.35);  border-color: rgba(90,114,71,0.6);  }
+.badge-hero.suspenso  { background: rgba(124,92,191,0.25); border-color: rgba(124,92,191,0.5); }
 
 .badge-gut-hero {
   padding: 3px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 700;
@@ -1596,10 +1605,10 @@ textarea { resize: vertical; min-height: 65px; }
   overflow: hidden;
 }
 
-/* ── Coluna de métricas acompanha a mesma altura ── */
+/* ── Coluna de métricas cresce conforme o número de status ── */
 .dashboard-col-metricas {
-  max-height: 310px;
-  overflow: visible;   /* remove a barra de rolagem */
+  align-self: start;
+  overflow: visible;
 }
 
 /* ── Container do donut ── */

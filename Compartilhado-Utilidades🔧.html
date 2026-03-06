@@ -69,7 +69,9 @@
     } else {
       sessionStorage.setItem('_sm_redir', tentativas + 1);
     }
-    var url = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
+    var url = (typeof BASE_URL !== 'undefined' && BASE_URL)
+      ? BASE_URL
+      : (window.location.origin + window.location.pathname);
     window.location.replace(url + '?pagina=login');
   }
 
@@ -81,6 +83,22 @@
   function ehAdmin() {
     return typeof USUARIO_PERFIL !== 'undefined' && USUARIO_PERFIL === PERFIS.ADMIN;
   }
+
+  // ── Controle de visibilidade da navegação por permissão de página ─────────
+  // Oculta links [data-pagina] que o usuário não tem permissão de acessar.
+  // PAGINAS_PERMITIDAS deve ser declarada na página ([] = sem restrição).
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof PAGINAS_PERMITIDAS === 'undefined' ||
+        !Array.isArray(PAGINAS_PERMITIDAS) ||
+        PAGINAS_PERMITIDAS.length === 0) return; // sem restrição
+
+    document.querySelectorAll('[data-pagina]').forEach(function(el) {
+      var pag = el.getAttribute('data-pagina');
+      if (pag && !PAGINAS_PERMITIDAS.includes(pag)) {
+        el.style.display = 'none';
+      }
+    });
+  });
 
   // ── Utilitários de data ───────────────────────────────────────────────────
 

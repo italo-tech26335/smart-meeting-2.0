@@ -14,10 +14,11 @@
   <?!= include('TemaPadrao-CSS'); ?>
   <script>
     const MODO_ADMIN_URL = <?= modoAdmin ?>;
-    var SESSAO_TOKEN   = '<?= sessaoToken ?>';
-    var USUARIO_NOME   = '<?= usuarioNome ?>';
-    var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
-    var BASE_URL       = '<?= baseUrl ?>';
+    var SESSAO_TOKEN       = '<?= sessaoToken ?>';
+    var USUARIO_NOME       = '<?= usuarioNome ?>';
+    var USUARIO_PERFIL     = '<?= usuarioPerfil ?>';
+    var BASE_URL           = '<?= baseUrl ?>';
+    var PAGINAS_PERMITIDAS = <?= paginasPermitidas ?>; // [] = acesso total
   </script>
 
   <!-- Chart.js -->
@@ -495,6 +496,7 @@
               <option value="Em Andamento">Em Andamento</option>
               <option value="Aguardando Setor">Aguardando Setor</option>
               <option value="Concluída">Concluída</option>
+              <option value="Suspenso">Suspenso</option>
             </select>
           </div>
         </div>
@@ -565,6 +567,16 @@
             <option value="">Selecione...</option>
           </select>
           <small class="campo-hint">Departamento responsável pelo projeto</small>
+        </div>
+
+        <div class="campo-grupo">
+          <label>Status Inicial</label>
+          <select id="novoProjetoStatus">
+            <option value="A Fazer">A Fazer</option>
+            <option value="Em Andamento">Em Andamento</option>
+            <option value="Aguardando Setor">Aguardando Setor</option>
+            <option value="Suspenso">Suspenso</option>
+          </select>
         </div>
 
         <div class="campo-row">

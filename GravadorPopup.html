@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gravador — Smart Meeting</title>
+  <base target="_top">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #FAF7F0;
+      color: #2C1810;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(44,24,16,.12);
+      padding: 2rem 2rem 1.75rem;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+    .icone { font-size: 2.5rem; margin-bottom: .75rem; }
+    h1 { font-size: 1.15rem; font-weight: 700; margin-bottom: .25rem; }
+    .sub { font-size: .8rem; color: #7a6050; margin-bottom: 1.5rem; }
+
+    /* timer */
+    .timer {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #2C1810;
+      margin-bottom: .5rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer.gravando { color: #8B2E2E; }
+
+    /* status pill */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .78rem;
+      font-weight: 600;
+      padding: .25rem .75rem;
+      border-radius: 999px;
+      background: #EDE3CC;
+      color: #5C3D2E;
+      margin-bottom: 1.5rem;
+    }
+    .pill.gravando { background: #8B2E2E; color: #FAF7F0; }
+    .pill.ok       { background: #2d5a1b; color: #FAF7F0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .dot.blink { animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* botões */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .7rem 1.4rem;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: .95rem;
+      font-weight: 600;
+      transition: opacity .15s;
+      width: 100%;
+      justify-content: center;
+      margin-bottom: .6rem;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-iniciar { background: #2C1810; color: #FAF7F0; }
+    .btn-parar   { background: #8B2E2E; color: #FAF7F0; }
+    .btn-fechar  { background: #EDE3CC; color: #2C1810; font-size: .85rem; }
+
+    /* erro */
+    .erro {
+      margin-top: 1rem;
+      padding: .75rem 1rem;
+      border-radius: 10px;
+      background: #fdf0f0;
+      border: 1px solid #e8c0c0;
+      font-size: .82rem;
+      color: #8B2E2E;
+      line-height: 1.6;
+      text-align: left;
+    }
+    .erro strong { display: block; margin-bottom: .25rem; }
+    .dica {
+      margin-top: .75rem;
+      padding: .6rem .875rem;
+      background: #f5f0e8;
+      border-radius: 8px;
+      font-size: .78rem;
+      color: #5C3D2E;
+      line-height: 1.6;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="icone">🎙️</div>
+  <h1>Gravador de Áudio</h1>
+  <p class="sub">Popup independente — sem restrições de iframe</p>
+
+  <div class="timer" id="timer">00:00:00</div>
+  <div class="pill" id="pill"><span class="dot"></span><span id="pillTxt">Aguardando</span></div>
+
+  <button class="btn btn-iniciar" id="btnIniciar" onclick="iniciar()">&#9654; Iniciar gravação</button>
+  <button class="btn btn-parar"   id="btnParar"   onclick="parar()"   style="display:none">&#9646;&#9646; Parar e enviar</button>
+  <button class="btn btn-fechar"  id="btnFechar"  onclick="window.close()" style="display:none">Fechar janela</button>
+
+  <div id="erroArea"></div>
+</div>
+
+<script>
+// ── Estado ────────────────────────────────────────────────────────────────────
+var mr = null, chunks = [], streamAtivo = null, timerInt = null, segs = 0;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setTimer(s) {
+  var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  document.getElementById('timer').textContent =
+    pad(h) + ':' + pad(m) + ':' + pad(ss);
+}
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function setPill(txt, estado) {
+  var el   = document.getElementById('pill');
+  var dot  = el.querySelector('.dot');
+  el.className = 'pill' + (estado ? ' ' + estado : '');
+  dot.className = 'dot' + (estado === 'gravando' ? ' blink' : '');
+  document.getElementById('pillTxt').textContent = txt;
+}
+
+function setErro(titulo, detalhe, dica) {
+  var area = document.getElementById('erroArea');
+  area.innerHTML =
+    '<div class="erro">' +
+    '<strong>' + titulo + '</strong>' + detalhe +
+    (dica ? '</div><div class="dica">' + dica + '</div>' : '</div>');
+}
+function limparErro() { document.getElementById('erroArea').innerHTML = ''; }
+
+// ── Gravação ──────────────────────────────────────────────────────────────────
+async function iniciar() {
+  limparErro();
+  document.getElementById('btnIniciar').disabled = true;
+  setPill('Solicitando microfone...', '');
+
+  // Guarda de contexto seguro
+  if (!window.isSecureContext) {
+    setErro('Contexto inseguro', 'Esta janela precisa de HTTPS.',
+      'Acesse o Smart Meeting pelo link oficial (https://...).');
+    setPill('Erro', '');
+    document.getElementById('btnIniciar').disabled = false;
+    return;
+  }
+
+  // Guarda de API
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+    setErro('API de mídia bloqueada',
+      'navigator.mediaDevices está indisponível neste contexto.',
+      'Este popup ainda pode estar restrito. Tente abrir o link do Smart Meeting ' +
+      'diretamente em uma nova aba do navegador (Ctrl+T) e cole o endereço manualmente.');
+    setPill('Bloqueado', '');
+    document.getElementById('btnIniciar').disabled = false;
+    return;
+  }
+
+  try {
+    streamAtivo = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    var tipos = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+    var tipo  = tipos.find(function(t) { return MediaRecorder.isTypeSupported(t); }) || 'audio/webm';
+
+    mr = new MediaRecorder(streamAtivo, { mimeType: tipo, audioBitsPerSecond: 32000 });
+    chunks = [];
+
+    mr.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
+
+    mr.onstop = function() {
+      clearInterval(timerInt); timerInt = null;
+      var blob = new Blob(chunks, { type: tipo });
+      setPill('Enviando para o Smart Meeting...', '');
+
+      var enviado = false;
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            { type: 'sm_audio_blob', blob: blob, mimeType: tipo, duracaoSegundos: segs },
+            '*'
+          );
+          enviado = true;
+        }
+      } catch(err) {
+        console.warn('[Popup] postMessage falhou:', err);
+      }
+
+      streamAtivo.getTracks().forEach(function(t) { t.stop(); });
+      streamAtivo = null;
+
+      if (enviado) {
+        setPill('Enviado! Pode fechar.', 'ok');
+        document.getElementById('timer').style.color = '#2d5a1b';
+        document.getElementById('btnFechar').style.display = 'flex';
+      } else {
+        setErro('Janela principal não encontrada',
+          'Não foi possível enviar o áudio automaticamente.',
+          'Salve o arquivo manualmente: abra o DevTools (F12) → Console e execute ' +
+          '<code>URL.createObjectURL(window._smLastBlob)</code> para baixar o áudio.');
+        window._smLastBlob = blob; // acessível pelo console
+        setPill('Pronto', '');
+        document.getElementById('btnIniciar').style.display = 'flex';
+        document.getElementById('btnIniciar').disabled = false;
+      }
+    };
+
+    mr.start(1000);
+    segs = 0;
+    timerInt = setInterval(function() { segs++; setTimer(segs); }, 1000);
+
+    document.getElementById('btnIniciar').style.display = 'none';
+    document.getElementById('btnParar').style.display   = 'flex';
+    document.getElementById('timer').className = 'timer gravando';
+    setPill('Gravando...', 'gravando');
+
+  } catch(e) {
+    document.getElementById('btnIniciar').disabled = false;
+    var nome = e.name || 'Erro';
+    var dica = '';
+    if (nome === 'NotAllowedError' || nome === 'PermissionDeniedError') {
+      dica = 'Clique no <strong>ícone de cadeado</strong> na barra de endereço desta janela → ' +
+             'Microfone → <strong>Permitir</strong> → recarregue e tente novamente.';
+    } else if (nome === 'NotFoundError') {
+      dica = 'Verifique se há um microfone conectado ao computador.';
+    } else if (nome === 'NotReadableError') {
+      dica = 'O microfone está em uso por outro aplicativo. Feche-o e tente novamente.';
+    }
+    setErro('Erro ao acessar microfone [' + nome + ']', e.message, dica);
+    setPill('Erro', '');
+  }
+}
+
+function parar() {
+  if (mr && mr.state !== 'inactive') {
+    document.getElementById('btnParar').style.display = 'none';
+    setPill('Finalizando...', '');
+    mr.stop();
+  }
+}
+</script>
+</body>
+</html>

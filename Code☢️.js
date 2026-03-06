@@ -1,6 +1,16 @@
 const ID_PLANILHA = '1Bmy4gcbF13mxRYBTHhu3Y82jMLg3QUEDqg_sCyx5X9M';
 const URL_WEBAPP  = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
 
+function obterUrlWebAppAtual() {
+  try {
+    const url = ScriptApp.getService().getUrl();
+    if (url) return url;
+  } catch (e) {
+    Logger.log('AVISO obterUrlWebAppAtual: ' + e.toString());
+  }
+  return URL_WEBAPP;
+}
+
 /** =====================================================================
  *                          ABAS DA PLANILHAss
 =========================================================================*/
@@ -207,7 +217,7 @@ function doGet(e) {
       tmpl.sessaoToken   = token;
       tmpl.usuarioNome   = sessao.nome;
       tmpl.usuarioPerfil = sessao.perfil;
-      tmpl.baseUrl       = URL_WEBAPP;
+    tmpl.baseUrl       = obterUrlWebAppAtual();
       return tmpl.evaluate()
         .setTitle('Smart Meeting - Painel Admin')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -216,6 +226,19 @@ function doGet(e) {
 
     // ── Renovar sessão (sliding session) ─────────────────────────────────
     _renovarSessao(token, sessao);
+
+    // ── Verificar acesso por página (não-admins) ──────────────────────────
+    if (sessao.perfil !== 'admin') {
+      const paginasPermitidas = sessao.paginasPermitidas || [];
+      if (paginasPermitidas.length > 0) {
+        // Mapeia a rota atual para o ID canônico de página
+        const paginaId = (pagina === 'projeto' || pagina === 'relatorios') ? pagina : 'reunioes';
+        if (!paginasPermitidas.includes(paginaId)) {
+          _registrarLog && _registrarLog('acesso_negado', sessao.email, '', 'tentativa de acesso à página: ' + paginaId, 'falha');
+          return _servirLogin('Você não tem permissão para acessar esta página.');
+        }
+      }
+    }
 
     // ── Roteamento de páginas ─────────────────────────────────────────────
     let nomeArquivoHtml, titulo;
@@ -226,17 +249,25 @@ function doGet(e) {
     } else if (pagina === 'relatorios') {
       nomeArquivoHtml = 'PaginaRelatorios';
       titulo = 'Smart Meeting - Relatórios';
+    } else if (pagina === 'gravador') {
+      // Popup de gravação independente — contorna Permissions Policy do iframe GAS
+      nomeArquivoHtml = 'GravadorPopup';
+      titulo = 'Gravador — Smart Meeting';
     } else {
       nomeArquivoHtml = 'PaginaReunioes▶️';
       titulo = 'Smart Meeting - Reuniões';
     }
 
     const tmpl = HtmlService.createTemplateFromFile(nomeArquivoHtml);
-    tmpl.sessaoToken   = token;
-    tmpl.usuarioNome   = sessao.nome;
-    tmpl.usuarioPerfil = sessao.perfil;
-    tmpl.modoAdmin     = (sessao.perfil === 'admin');
-    tmpl.baseUrl       = URL_WEBAPP;
+    tmpl.sessaoToken       = token;
+    tmpl.usuarioNome       = sessao.nome;
+    tmpl.usuarioPerfil     = sessao.perfil;
+    tmpl.modoAdmin         = (sessao.perfil === 'admin');
+    tmpl.baseUrl           = obterUrlWebAppAtual();
+    // [] = sem restrição (admin sempre passa, usuário sem limitação também)
+    tmpl.paginasPermitidas = JSON.stringify(
+      sessao.perfil === 'admin' ? [] : (sessao.paginasPermitidas || [])
+    );
 
     return tmpl.evaluate()
       .setTitle(titulo)
@@ -253,7 +284,7 @@ function _servirLogin(mensagemErro) {
   const tmpl = HtmlService.createTemplateFromFile('Login');
   tmpl.mensagemErroUrl = mensagemErro || '';
   tmpl.tokenReset = '';
-  tmpl.baseUrl = URL_WEBAPP;
+  tmpl.baseUrl = obterUrlWebAppAtual();
   return tmpl.evaluate()
     .setTitle('Smart Meeting - Login')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -264,7 +295,7 @@ function _servirReset(rt) {
   const tmpl = HtmlService.createTemplateFromFile('Login');
   tmpl.mensagemErroUrl = '';
   tmpl.tokenReset = rt || '';
-  tmpl.baseUrl = URL_WEBAPP;
+  tmpl.baseUrl = obterUrlWebAppAtual();
   return tmpl.evaluate()
     .setTitle('Smart Meeting - Redefinir Senha')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -303,7 +334,7 @@ function verificarEstruturaPlanilha() {
     [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId', 'AtaExecutiva', 'AtaDetalhada', 'AtaResponsavel', 'AtaAlinhamento'],
     [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
     [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
-    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
+    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds', 'PaginasPermitidas'],
     [NOME_ABA_DEPARTAMENTOS]: ['ID', 'Nome', 'Descricao'],
     [NOME_ABA_LOGS]:          ['Timestamp', 'Evento', 'Usuario', 'IP', 'Detalhes', 'Resultado']
   };
@@ -411,7 +442,7 @@ function corrigirEstruturaPlanilha() {
     [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId', 'AtaExecutiva', 'AtaDetalhada', 'AtaResponsavel', 'AtaAlinhamento'],
     [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
     [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
-    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
+    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds', 'PaginasPermitidas'],
     [NOME_ABA_DEPARTAMENTOS]: ['ID', 'Nome', 'Descricao'],
     [NOME_ABA_LOGS]:          ['Timestamp', 'Evento', 'Usuario', 'IP', 'Detalhes', 'Resultado']
   };
@@ -529,7 +560,7 @@ function inicializarPermissoes() {
   } catch(e) { log.push('❌ Cache: ' + e.message); }
 
   // URL da implantação
-  log.push('✅ URL WebApp: ' + URL_WEBAPP);
+  log.push('✅ URL WebApp: ' + obterUrlWebAppAtual());
 
   const resumo = log.join('\n');
   Logger.log(resumo);
@@ -558,22 +589,22 @@ function gravarTimestamp(aba, linhaIndex, colCriacao, colModificacao, ehNovo) {
 }
 
 function obterUrlWebApp() {
-  return URL_WEBAPP;
+  return obterUrlWebAppAtual();
 }
 
 // Alias usado por PaginaReunioes para configurar links de navegação
 function obterUrlBaseWebApp() {
-  return URL_WEBAPP;
+  return obterUrlWebAppAtual();
 }
 
 function abrirPaginaReunioes() {
-  const url = URL_WEBAPP;
+  const url = obterUrlWebAppAtual();
   const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html), 'Abrindo...');
 }
 
 function abrirPaginaProjetos() {
-  const url = URL_WEBAPP + '?pagina=projetos';
+  const url = obterUrlWebAppAtual() + '?pagina=projetos';
   const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html), 'Abrindo...');
 }
@@ -652,7 +683,7 @@ function inicializarCabecalhoAba(aba, nomeAba) {
     [NOME_ABA_REUNIOES]:      ['ID', 'Titulo', 'DataInicio', 'DataFim', 'DuracaoMin', 'Status', 'Participantes', 'Transcricao', 'Ata', 'SugestoesIA', 'LinkAudio', 'LinkAta', 'EmailsEnviados', 'ProjetosImpactados', 'EtapasCriadasOuAlteradas', 'DepartamentoId', 'AtaExecutiva', 'AtaDetalhada', 'AtaResponsavel', 'AtaAlinhamento'],
     [NOME_ABA_SETORES]:       ['ID', 'Nome', 'Descricao', 'ResponsaveisIds'],
     [NOME_ABA_PRIORIDADES]:   ['ID', 'ResponsavelId', 'TipoItem', 'ItemId', 'OrdemPrioridade', 'ProjetoReferencia'],
-    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds'],
+    [NOME_ABA_USUARIOS]:      ['ID', 'Email', 'SenhaHash', 'Salt', 'Nome', 'Perfil', 'Ativo', 'CriadoEm', 'UltimoLogin', 'TentativasLogin', 'BloqueadoAte', 'DepartamentosIds', 'PaginasPermitidas'],
     [NOME_ABA_DEPARTAMENTOS]: ['ID', 'Nome', 'Descricao'],
     [NOME_ABA_LOGS]:          ['Timestamp', 'Evento', 'Usuario', 'IP', 'Detalhes', 'Resultado']
   };

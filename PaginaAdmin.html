@@ -222,13 +222,14 @@
           <tr>
             <th>Nome / Email</th>
             <th>Perfil</th>
+            <th>Páginas</th>
             <th>Status</th>
             <th>Último Login</th>
             <th>Ações</th>
           </tr>
         </thead>
         <tbody id="tbodyUsuarios">
-          <tr><td colspan="5" style="text-align:center;padding:32px;color:#475569;">
+          <tr><td colspan="6" style="text-align:center;padding:32px;color:#475569;">
             <span class="spinner-inline"></span> Carregando...
           </td></tr>
         </tbody>
@@ -349,6 +350,26 @@
         <option value="true">Ativo</option>
         <option value="false">Inativo</option>
       </select>
+    </div>
+    <div class="campo-grupo">
+      <label>Páginas com Acesso <span style="font-weight:400;color:var(--cor-primaria-clara);text-transform:none;">(vazio = todas as páginas)</span></label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;padding:8px 0;">
+        <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--cor-borda);border-radius:20px;cursor:pointer;font-size:.82rem;background:var(--cor-fundo-card);">
+          <input type="checkbox" id="pagReuniao" value="reunioes" style="accent-color:var(--cor-destaque);">
+          <i class="fas fa-video" style="font-size:.8rem;color:var(--cor-destaque);"></i> Reuniões
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--cor-borda);border-radius:20px;cursor:pointer;font-size:.82rem;background:var(--cor-fundo-card);">
+          <input type="checkbox" id="pagProjeto" value="projeto" style="accent-color:var(--cor-destaque);">
+          <i class="fas fa-folder" style="font-size:.8rem;color:var(--cor-destaque);"></i> Projetos
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--cor-borda);border-radius:20px;cursor:pointer;font-size:.82rem;background:var(--cor-fundo-card);">
+          <input type="checkbox" id="pagRelatorio" value="relatorios" style="accent-color:var(--cor-destaque);">
+          <i class="fas fa-chart-bar" style="font-size:.8rem;color:var(--cor-destaque);"></i> Relatórios
+        </label>
+      </div>
+      <div style="font-size:.75rem;color:var(--cor-primaria);margin-top:2px;">
+        <i class="fas fa-info-circle"></i> Admin sempre tem acesso a tudo, independente desta configuração.
+      </div>
     </div>
     <div class="campo-grupo">
       <label>Departamentos <span style="font-weight:400;color:var(--cor-primaria-clara);text-transform:none;">(deixe vazio para admin global)</span></label>

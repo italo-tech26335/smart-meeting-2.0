@@ -516,22 +516,44 @@
     var nome = (usuario && usuario.nome) ? usuario.nome.split(' ')[0] : 'usuário';
     document.getElementById('escolhaNome').textContent = nome;
 
-    var BASE = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
+    var BASE = (typeof BASE_URL !== 'undefined' && BASE_URL)
+      ? BASE_URL
+      : (window.location.origin + window.location.pathname);
     var tk = '&token=' + encodeURIComponent(token);
+
+    var ehAdmin = usuario && usuario.perfil === 'admin';
+    // null = sem restrição (admin ou usuário sem páginas restritas)
+    var permitidas = (!ehAdmin && usuario && Array.isArray(usuario.paginasPermitidas) && usuario.paginasPermitidas.length > 0)
+      ? usuario.paginasPermitidas
+      : null;
+
     var paginas = { linkReunioes: 'reunioes', linkProjetos: 'projeto', linkRelatorios: 'relatorios' };
+    var paginasVisiveis = [];
+
     Object.keys(paginas).forEach(function(id) {
+      var pagina = paginas[id];
       var el = document.getElementById(id);
-      el.href = BASE + '?pagina=' + paginas[id] + tk;
+      el.href = BASE + '?pagina=' + pagina + tk;
       el.target = '_top';
+      var visivel = !permitidas || permitidas.indexOf(pagina) >= 0;
+      el.style.display = visivel ? '' : 'none';
+      if (visivel) paginasVisiveis.push(BASE + '?pagina=' + pagina + tk);
     });
 
     var elAdmin = document.getElementById('linkAdmin');
-    if (usuario && usuario.perfil === 'admin') {
+    if (ehAdmin) {
       elAdmin.href = BASE + '?pagina=admin' + tk;
       elAdmin.target = '_top';
       elAdmin.style.display = 'flex';
+      paginasVisiveis.push(BASE + '?pagina=admin' + tk);
     } else {
       elAdmin.style.display = 'none';
+    }
+
+    // Se apenas 1 página permitida, redirecionar direto sem mostrar painel
+    if (paginasVisiveis.length === 1) {
+      window.location.replace(paginasVisiveis[0]);
+      return;
     }
 
     mostrarPainel('painelEscolha');

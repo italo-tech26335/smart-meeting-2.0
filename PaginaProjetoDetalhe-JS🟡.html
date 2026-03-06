@@ -16,15 +16,19 @@ const ABAS = {
   prioridades:   'Prioridades'
 };
 
-// Status disponíveis no sistema (inclui "Aguardando Setor")
+// Status disponíveis para ATIVIDADES (etapas)
 const LISTA_STATUS = ['A Fazer', 'Em Andamento', 'Aguardando Setor', 'Concluída'];
+
+// Status disponíveis para PROJETOS (inclui "Suspenso")
+const LISTA_STATUS_PROJETOS = ['A Fazer', 'Em Andamento', 'Aguardando Setor', 'Concluída', 'Suspenso'];
 
 // Mapa status → classe CSS
 const MAPA_CLASSE_STATUS = {
   'A Fazer':          'afazer',
   'Em Andamento':     'andamento',
   'Aguardando Setor': 'aguardando',
-  'Concluída':        'concluida'
+  'Concluída':        'concluida',
+  'Suspenso':         'suspenso'
 };
 
 // Mapa status → ícone FontAwesome
@@ -32,7 +36,8 @@ const MAPA_ICONE_STATUS = {
   'A Fazer':          'clipboard-list',
   'Em Andamento':     'spinner',
   'Aguardando Setor': 'hourglass-half',
-  'Concluída':        'check-circle'
+  'Concluída':        'check-circle',
+  'Suspenso':         'pause-circle'
 };
 
 // Cores do gráfico por status
@@ -40,7 +45,8 @@ const CORES_STATUS = {
   'A Fazer':          { cor: '#b8860b', bg: '#fef3c7' },
   'Em Andamento':     { cor: '#4a6fa5', bg: '#dbeafe' },
   'Aguardando Setor': { cor: '#c2855a', bg: '#fde8d8' },
-  'Concluída':        { cor: '#5a7247', bg: '#d1fae5' }
+  'Concluída':        { cor: '#5a7247', bg: '#d1fae5' },
+  'Suspenso':         { cor: '#7c5cbf', bg: '#ede9f7' }
 };
 
 // Pesos GUT — Tipo de Projeto (Correção=5, Nova Impl=4, Melhoria=3)
@@ -78,11 +84,12 @@ let ESTADO = {
     tipoProjeto: null          // ← NOVO
   },
   modoFocoAberto: false,
-  graficoStatusAtivos: ['A Fazer', 'Em Andamento', 'Aguardando Setor', 'Concluída'],
+  graficoStatusAtivos: ['A Fazer', 'Em Andamento', 'Aguardando Setor', 'Concluída', 'Suspenso'],
   cardsExpandidos: {},
   detalhesExpandidos: {},
   ordemProjetosModificada: false,
   ordemAtividadesModificada: false,
+  ordemPorResponsavel: {},   // cache { responsavelId → [{itemId, ordemPrioridade}] }
   calculoAtual: {
     projetoId: null,
     gravidade: 0, gravidadeLabel: '',
@@ -183,6 +190,54 @@ function carregarTudo() {
   }
 }
 
+/**
+ * Reordena ESTADO.listaProjetos conforme um array de prioridades.
+ * @param {Array} prioridades  [{itemId, ordemPrioridade}, ...]
+ */
+function _aplicarOrdemProjetos(prioridades) {
+  if (!prioridades || prioridades.length === 0) return;
+  var mapa = {};
+  prioridades.forEach(function(p) { mapa[p.itemId] = p.ordemPrioridade; });
+  ESTADO.listaProjetos.sort(function(a, b) {
+    var oA = mapa[a.id] !== undefined ? mapa[a.id] : 99999;
+    var oB = mapa[b.id] !== undefined ? mapa[b.id] : 99999;
+    return oA - oB;
+  });
+}
+
+/**
+ * Busca (backend ou cache) a ordem de projetos para um responsável e aplica.
+ * Re-renderiza apenas a lista de projetos ao concluir.
+ * @param {string} responsavelId  ID ou 'TODOS'
+ */
+function _carregarOrdemProjetosParaResponsavel(responsavelId) {
+  var chave = responsavelId || 'TODOS';
+
+  // Cache local → aplica imediatamente
+  if (ESTADO.ordemPorResponsavel[chave]) {
+    _aplicarOrdemProjetos(ESTADO.ordemPorResponsavel[chave]);
+    renderizarProjetosCards();
+    atualizarContadorProjetos();
+    return;
+  }
+
+  if (typeof google === 'undefined' || !google.script) return;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      // Ignorar se o filtro já mudou enquanto esperava
+      if ((ESTADO.filtrosGlobais.responsavelId || 'TODOS') !== chave) return;
+      if (res && res.sucesso && res.prioridades && res.prioridades.length > 0) {
+        ESTADO.ordemPorResponsavel[chave] = res.prioridades;
+        _aplicarOrdemProjetos(res.prioridades);
+        renderizarProjetosCards();
+        atualizarContadorProjetos();
+      }
+    })
+    .withFailureHandler(function() { /* silencioso */ })
+    .obterPrioridadesProjetosPorResponsavel(chave);
+}
+
 /** Preenche o ESTADO com dados recebidos do servidor */
 function preencherEstado(dados) {
   ESTADO.setores = dados.setores || [];
@@ -191,6 +246,9 @@ function preencherEstado(dados) {
   ESTADO.etapas = dados.etapas || [];
   ESTADO.projeto = dados.projeto || null;
   ESTADO.prioridadesProjetos = dados.prioridadesProjetos || [];
+  // Inicializa o cache com a ordem geral e aplica imediatamente
+  ESTADO.ordemPorResponsavel = { 'TODOS': ESTADO.prioridadesProjetos };
+  _aplicarOrdemProjetos(ESTADO.prioridadesProjetos);
   ESTADO.pessoasParaQuem = dados.pessoasParaQuem || {};
   ESTADO.configCalculoPrioridade = dados.configCalculoPrioridade || null;
   ESTADO.permissoes = dados.permissoes || {};
@@ -640,6 +698,12 @@ function aplicarFiltroGlobal(tipo, valor) {
   switch (tipo) {
     case 'responsavel':
       ESTADO.filtrosGlobais.responsavelId = valor || 'TODOS';
+      // Ao trocar o responsável, descarta ordem pendente não salva e esconde botão
+      if (ESTADO.ordemProjetosModificada) {
+        ESTADO.ordemProjetosModificada = false;
+        var _btnOrd = document.getElementById('btnSalvarOrdemProjetos');
+        if (_btnOrd) _btnOrd.style.display = 'none';
+      }
       break;
     case 'status':
       // Toggle: se já selecionado, desmarca
@@ -651,6 +715,11 @@ function aplicarFiltroGlobal(tipo, valor) {
       return; // carregarEstrutura já vai re-renderizar o diagrama
   }
   atualizarTodosComponentes();
+
+  // Ao trocar de responsável, busca e aplica a ordem salva para aquele filtro
+  if (tipo === 'responsavel') {
+    _carregarOrdemProjetosParaResponsavel(ESTADO.filtrosGlobais.responsavelId);
+  }
 }
 
 /** Limpa todos os filtros */
@@ -868,7 +937,7 @@ function renderizarMetricas() {
 
   // Contagem por status (sem filtro de status aplicado)
   var contagens = {};
-  LISTA_STATUS.forEach(function(s) { contagens[s] = 0; });
+  LISTA_STATUS_PROJETOS.forEach(function(s) { contagens[s] = 0; });
   projetosParaContar.forEach(function(p) {
     if (contagens[p.status] !== undefined) contagens[p.status]++;
   });
@@ -886,7 +955,7 @@ function renderizarMetricas() {
     '</div></div></div>';
 
   // Cards por status — contagem sempre real, destaque apenas no selecionado
-  LISTA_STATUS.forEach(function(status) {
+  LISTA_STATUS_PROJETOS.forEach(function(status) {
     var classe = obterClasseStatus(status);
     var icone  = obterIconeStatus(status);
     var sel    = statusSel === status ? ' selecionado' : '';
@@ -912,7 +981,7 @@ function renderizarFiltrosGrafico() {
   var projetos = obterProjetosFiltrados();
   var html = '';
 
-  LISTA_STATUS.forEach(function(status) {
+  LISTA_STATUS_PROJETOS.forEach(function(status) {
     var ativo = ESTADO.graficoStatusAtivos.includes(status);
     var count = projetos.filter(function(p) { return p.status === status; }).length;
     var classe = obterClasseStatus(status);
@@ -1024,7 +1093,7 @@ function renderizarLegendaGrafico() {
   var projetos = obterProjetosFiltrados();
   var html = '';
 
-  LISTA_STATUS.forEach(function(status) {
+  LISTA_STATUS_PROJETOS.forEach(function(status) {
     var count = projetos.filter(function(p) { return p.status === status; }).length;
     var ativo = ESTADO.graficoStatusAtivos.includes(status);
     var corObj = CORES_STATUS[status];
@@ -1055,7 +1124,7 @@ function renderizarListaProjetosStatus() {
     return;
   }
 
-  projetos.sort(function(a, b) { return (b.valorPrioridade || 0) - (a.valorPrioridade || 0); });
+  // Ordem respeitada conforme definida via drag-drop / salva na planilha
 
   var projetoSelId = ESTADO.projeto ? ESTADO.projeto.id : null;
   var html = '';
@@ -1578,7 +1647,7 @@ function renderizarProjetosCards() {
     return;
   }
 
-  projetosFiltrados.sort(function(a, b) { return (b.valorPrioridade || 0) - (a.valorPrioridade || 0); });
+  // Ordem respeitada conforme salva na planilha (drag-drop) — não reordena por valorPrioridade
 
   var projetoSelId = ESTADO.projeto ? ESTADO.projeto.id : null;
   var html = '';
@@ -2930,6 +2999,23 @@ function soltarProjeto(event) {
     if (num) num.textContent = i + 1;
   });
   ESTADO.ordemProjetosModificada = true;
+
+  // Mostrar botão com label contextual (geral ou por responsável)
+  var _btnOrdem = document.getElementById('btnSalvarOrdemProjetos');
+  if (_btnOrdem) {
+    var _respAtivo = ESTADO.filtrosGlobais.responsavelId;
+    var _ehEspec = _respAtivo && _respAtivo !== 'TODOS' && _respAtivo !== 'sem-responsavel';
+    if (_ehEspec) {
+      var _resp = ESTADO.responsaveis.find(function(r) { return r.id === _respAtivo; });
+      var _nome = _resp ? _resp.nome.split(' ')[0] : 'Responsável';
+      _btnOrdem.innerHTML = '<i class="fas fa-save"></i> Salvar Ordem (' + _nome + ')';
+      _btnOrdem.title = 'Salvar ordem de projetos para ' + (_resp ? _resp.nome : _respAtivo);
+    } else {
+      _btnOrdem.innerHTML = '<i class="fas fa-save"></i> Salvar Ordem';
+      _btnOrdem.title = 'Salvar ordem geral de projetos';
+    }
+    _btnOrdem.style.display = 'inline-flex';
+  }
 }
 
 function salvarOrdemProjetos() {
@@ -2942,33 +3028,70 @@ function salvarOrdemProjetos() {
 
   if (idsOrdenados.length === 0) return;
 
+  // ── Sincroniza ESTADO.listaProjetos com a nova ordem do DOM ──
+  ESTADO.listaProjetos.sort(function(a, b) {
+    var iA = idsOrdenados.indexOf(a.id);
+    var iB = idsOrdenados.indexOf(b.id);
+    if (iA === -1) iA = 99999;
+    if (iB === -1) iB = 99999;
+    return iA - iB;
+  });
+
+  // ── Determinar se está salvo para um responsável específico ou geral ──
+  var responsavelAtivo = ESTADO.filtrosGlobais.responsavelId || 'TODOS';
+  var ehEspecifico = responsavelAtivo !== 'TODOS' && responsavelAtivo !== 'sem-responsavel';
+
+  // Resolve o nome do responsável para o toast
+  var nomeResponsavel = '';
+  if (ehEspecifico) {
+    var _r = ESTADO.responsaveis.find(function(r) { return r.id === responsavelAtivo; });
+    nomeResponsavel = _r ? ' para ' + _r.nome : '';
+  }
+
+  // Atualiza cache local
+  var prioridadesCache = idsOrdenados.map(function(id, i) {
+    return { itemId: id, ordemPrioridade: i + 1 };
+  });
+  ESTADO.ordemPorResponsavel[ehEspecifico ? responsavelAtivo : 'TODOS'] = prioridadesCache;
+
   var btn = document.getElementById('btnSalvarOrdemProjetos');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...'; }
 
+  var listaPrioridades = idsOrdenados.map(function(itemId) { return { itemId: itemId }; });
+
   if (typeof google !== 'undefined' && google.script) {
-    var listaPrioridades = idsOrdenados.map(function(itemId) { return { itemId: itemId }; });
-    google.script.run
-      .withSuccessHandler(function(res) {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Salvar Ordem'; }
-        if (res && res.sucesso) {
-          ESTADO.ordemProjetosModificada = false;
-          if (btn) btn.style.display = 'none';
-          mostrarToast('Ordem dos projetos salva!', 'sucesso');
-        } else {
-          mostrarToast('Erro ao salvar ordem: ' + (res ? res.mensagem : ''), 'erro');
-        }
-      })
-      .withFailureHandler(function(e) {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Salvar Ordem'; }
-        mostrarToast('Erro: ' + e, 'erro');
-      })
-      .salvarPrioridadesGeraisDeProjetos(listaPrioridades);
+    var onSuccess = function(res) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Salvar Ordem'; }
+      if (res && res.sucesso) {
+        ESTADO.ordemProjetosModificada = false;
+        if (btn) btn.style.display = 'none';
+        mostrarToast('Ordem dos projetos salva' + nomeResponsavel + '!', 'sucesso');
+      } else {
+        mostrarToast('Erro ao salvar ordem: ' + (res ? res.mensagem : ''), 'erro');
+      }
+    };
+    var onFailure = function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Salvar Ordem'; }
+      mostrarToast('Erro: ' + e, 'erro');
+    };
+
+    if (ehEspecifico) {
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onFailure)
+        .salvarPrioridadesProjetosPorResponsavel(responsavelAtivo, listaPrioridades);
+    } else {
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onFailure)
+        .salvarPrioridadesGeraisDeProjetos(listaPrioridades);
+    }
   } else {
     // Demo / ambiente sem Google
     setTimeout(function() {
       if (btn) { btn.disabled = false; btn.style.display = 'none'; }
       ESTADO.ordemProjetosModificada = false;
-      mostrarToast('Ordem salva! (demo)', 'sucesso');
+      mostrarToast('Ordem salva' + nomeResponsavel + '! (demo)', 'sucesso');
     }, 600);
   }
 }
@@ -2980,6 +3103,19 @@ function abrirModalEdicao(tipo, id) {
 
   document.querySelectorAll('.campos-projeto').forEach(function(el) { el.style.display = tipo === 'projeto' ? 'block' : 'none'; });
   document.querySelectorAll('.campos-etapa').forEach(function(el) { el.style.display = tipo === 'etapa' ? 'block' : 'none'; });
+
+  // Opção "Suspenso" é válida apenas para projetos
+  var _statusSel = document.getElementById('itemStatus');
+  var _suspensoOpt = _statusSel.querySelector('option[value="Suspenso"]');
+  if (tipo === 'projeto') {
+    if (!_suspensoOpt) {
+      var _opt = document.createElement('option');
+      _opt.value = 'Suspenso'; _opt.textContent = 'Suspenso';
+      _statusSel.appendChild(_opt);
+    }
+  } else {
+    if (_suspensoOpt) _suspensoOpt.remove();
+  }
 
   if (tipo === 'projeto') {
     document.getElementById('modalTitulo').textContent = 'Editar Projeto';
@@ -3214,6 +3350,11 @@ function novaAtividade() {
   document.getElementById('itemOQueFazer').value = '';
   document.getElementById('itemStatus').value = 'A Fazer';
 
+  // Remove a opção Suspenso (não é válida para atividades)
+  var _sSel = document.getElementById('itemStatus');
+  var _sOpt = _sSel.querySelector('option[value="Suspenso"]');
+  if (_sOpt) _sOpt.remove();
+
   popularCheckboxesResponsaveis('itemResponsaveisContainer', []);
   document.getElementById('btnExcluirItem').style.display = 'none';
 
@@ -3408,7 +3549,7 @@ function salvarNovoProjeto() {
     setor:           document.getElementById('novoProjetoSetor').value,
     pilar:           document.getElementById('novoProjetoPilar').value.trim(),
     link:            document.getElementById('novoProjetoLink').value.trim(),
-    status:          'A Fazer',
+    status:          (document.getElementById('novoProjetoStatus') || {value:'A Fazer'}).value || 'A Fazer',
     tipo:            c.tipoProjetoLabel || '',
     paraQuem:        c.paraQuemLabel    || '',
     gravidade:       c.gravidadeLabel   || '',

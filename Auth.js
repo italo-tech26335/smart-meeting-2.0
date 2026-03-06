@@ -20,7 +20,8 @@ const COLUNAS_USUARIOS = {
   ULTIMO_LOGIN:      8,
   TENTATIVAS_LOGIN:  9,
   BLOQUEADO_ATE:     10,
-  DEPARTAMENTOS_IDS: 11  // IDs separados por vírgula; vazio = sem restrição (admin)
+  DEPARTAMENTOS_IDS: 11, // IDs separados por vírgula; vazio = sem restrição (admin)
+  PAGINAS_PERMITIDAS:12  // IDs de páginas separados por vírgula: reunioes,projeto,relatorios; vazio = todas
 };
 
 const COLUNAS_LOGS = {
@@ -121,7 +122,7 @@ function fazerLogin(email, senha) {
 
     // Criar nova sessão
     var token = _criarToken();
-    _salvarSessao(token, email, usuario.perfil, usuario.nome, usuario.departamentosIds);
+    _salvarSessao(token, email, usuario.perfil, usuario.nome, usuario.departamentosIds, usuario.paginasPermitidas);
 
     _registrarLog('login_sucesso', email, '', 'login realizado', 'sucesso');
 
@@ -342,7 +343,8 @@ function listarUsuarios(token) {
           bloqueado:         estaBloqueado,
           bloqueadoAte:      estaBloqueado ? new Date(bloqueadoAte).toLocaleString('pt-BR') : null,
           primeiroAcesso:    dados[i][COLUNAS_USUARIOS.SENHA_HASH] === 'PRIMEIRO_ACESSO',
-          departamentosIds:  rawDeps ? rawDeps.split(',').map(function(d) { return d.trim(); }).filter(function(d) { return d !== ''; }) : []
+          departamentosIds:  rawDeps ? rawDeps.split(',').map(function(d) { return d.trim(); }).filter(function(d) { return d !== ''; }) : [],
+          paginasPermitidas: (function() { var raw = (dados[i][COLUNAS_USUARIOS.PAGINAS_PERMITIDAS] || '').toString().trim(); return raw ? raw.split(',').map(function(p) { return p.trim(); }).filter(function(p) { return p !== ''; }) : []; })()
         });
       }
     }
@@ -380,6 +382,12 @@ function criarUsuario(token, dados) {
         ? dados.departamentosIds.join(',')
         : dados.departamentosIds.toString();
     }
+    var pagIds = '';
+    if (dados.paginasPermitidas) {
+      pagIds = Array.isArray(dados.paginasPermitidas)
+        ? dados.paginasPermitidas.join(',')
+        : dados.paginasPermitidas.toString();
+    }
 
     var aba = obterAba(NOME_ABA_USUARIOS);
     aba.appendRow([
@@ -394,7 +402,8 @@ function criarUsuario(token, dados) {
       '',
       0,
       '',
-      depIds
+      depIds,
+      pagIds
     ]);
     limparCacheAba(NOME_ABA_USUARIOS);
 
@@ -446,6 +455,12 @@ function atualizarUsuario(token, dados) {
             ? dados.departamentosIds.join(',')
             : dados.departamentosIds.toString();
           aba.getRange(linha, COLUNAS_USUARIOS.DEPARTAMENTOS_IDS + 1).setValue(depStr);
+        }
+        if (dados.paginasPermitidas !== undefined) {
+          var pagStr = Array.isArray(dados.paginasPermitidas)
+            ? dados.paginasPermitidas.join(',')
+            : dados.paginasPermitidas.toString();
+          aba.getRange(linha, COLUNAS_USUARIOS.PAGINAS_PERMITIDAS + 1).setValue(pagStr);
         }
         limparCacheAba(NOME_ABA_USUARIOS);
         _registrarLog('atualizar_usuario', sessao.email, '', 'usuário atualizado: ' + rows[i][COLUNAS_USUARIOS.EMAIL], 'sucesso');
@@ -579,7 +594,7 @@ function obterLogs(token, filtros) {
 
 function setupAdminInicial() {
   repararHeaderUsuarios();
-  inicializarAdmin('napa13@christus.com.br', 'A@a12345678', 'Italo');
+  inicializarAdmin('italotrabalhodados@gmail.com', '5678', 'Italo');
 }
 
 /**
@@ -681,7 +696,7 @@ function _encodarEmail(email) {
   return Utilities.base64Encode(email.toLowerCase()).replace(/=/g, '');
 }
 
-function _salvarSessao(token, email, perfil, nome, departamentosIds) {
+function _salvarSessao(token, email, perfil, nome, departamentosIds, paginasPermitidas) {
   var deps = [];
   if (departamentosIds) {
     if (Array.isArray(departamentosIds)) {
@@ -690,13 +705,22 @@ function _salvarSessao(token, email, perfil, nome, departamentosIds) {
       deps = departamentosIds.toString().split(',').map(function(d) { return d.trim(); }).filter(function(d) { return d !== ''; });
     }
   }
+  var pags = [];
+  if (paginasPermitidas) {
+    if (Array.isArray(paginasPermitidas)) {
+      pags = paginasPermitidas;
+    } else {
+      pags = paginasPermitidas.toString().split(',').map(function(p) { return p.trim(); }).filter(function(p) { return p !== ''; });
+    }
+  }
   var dados = JSON.stringify({
-    email:            email,
-    perfil:           perfil,
-    nome:             nome || email,
-    departamentosIds: deps,
-    expiry:           Date.now() + SESSAO_TTL_MS,
-    criadoEm:         Date.now()
+    email:             email,
+    perfil:            perfil,
+    nome:              nome || email,
+    departamentosIds:  deps,
+    paginasPermitidas: pags,
+    expiry:            Date.now() + SESSAO_TTL_MS,
+    criadoEm:          Date.now()
   });
   PropertiesService.getScriptProperties().setProperty(PFX_SESSAO + token, dados);
 }
@@ -850,12 +874,13 @@ function _buscarUsuarioPorEmail(email) {
       return {
         id:               dados[i][COLUNAS_USUARIOS.ID],
         email:            dados[i][COLUNAS_USUARIOS.EMAIL],
-        senhaHash:        dados[i][COLUNAS_USUARIOS.SENHA_HASH],
-        salt:             dados[i][COLUNAS_USUARIOS.SALT],
-        nome:             dados[i][COLUNAS_USUARIOS.NOME],
-        perfil:           dados[i][COLUNAS_USUARIOS.PERFIL],
-        ativo:            dados[i][COLUNAS_USUARIOS.ATIVO] === true || dados[i][COLUNAS_USUARIOS.ATIVO] === 'true',
-        departamentosIds: rawDeps ? rawDeps.split(',').map(function(d) { return d.trim(); }).filter(function(d) { return d !== ''; }) : []
+        senhaHash:         dados[i][COLUNAS_USUARIOS.SENHA_HASH],
+        salt:              dados[i][COLUNAS_USUARIOS.SALT],
+        nome:              dados[i][COLUNAS_USUARIOS.NOME],
+        perfil:            dados[i][COLUNAS_USUARIOS.PERFIL],
+        ativo:             dados[i][COLUNAS_USUARIOS.ATIVO] === true || dados[i][COLUNAS_USUARIOS.ATIVO] === 'true',
+        departamentosIds:  rawDeps ? rawDeps.split(',').map(function(d) { return d.trim(); }).filter(function(d) { return d !== ''; }) : [],
+        paginasPermitidas: (function() { var raw = (dados[i][COLUNAS_USUARIOS.PAGINAS_PERMITIDAS] || '').toString().trim(); return raw ? raw.split(',').map(function(p) { return p.trim(); }).filter(function(p) { return p !== ''; }) : []; })()
       };
     }
   }

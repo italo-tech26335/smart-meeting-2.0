@@ -2639,9 +2639,25 @@ function obterConteudoReuniao(reuniaoId, campo) {
     if (linhaEncontrada === -1) return { sucesso: false, mensagem: 'Reunião não encontrada' };
 
     // Busca APENAS a coluna solicitada
-    const indiceCampo = campo === 'ata' ? COLUNAS_REUNIOES.ATA : COLUNAS_REUNIOES.TRANSCRICAO;
-    const valorCelula = aba.getRange(linhaEncontrada, indiceCampo + 1).getValue();
-    let conteudo = valorCelula ? String(valorCelula) : '';
+    let conteudo = '';
+    if (campo === 'ata') {
+      // Prioridade: ATA editada pelo usuário (col 8) → estilos gerados pela IA (cols 16-19)
+      const dadosLinha = aba.getRange(linhaEncontrada, 1, 1, 20).getValues()[0];
+      const colsAta = [
+        COLUNAS_REUNIOES.ATA,              // col 8 — versão editada pelo usuário (prioritária)
+        COLUNAS_REUNIOES.ATA_EXECUTIVA,    // col 16
+        COLUNAS_REUNIOES.ATA_DETALHADA,    // col 17
+        COLUNAS_REUNIOES.ATA_RESPONSAVEL,  // col 18
+        COLUNAS_REUNIOES.ATA_ALINHAMENTO   // col 19
+      ];
+      for (var ci = 0; ci < colsAta.length; ci++) {
+        var txt = (dadosLinha[colsAta[ci]] || '').toString();
+        if (txt.length > 10) { conteudo = txt; break; }
+      }
+    } else {
+      const valorCelula = aba.getRange(linhaEncontrada, COLUNAS_REUNIOES.TRANSCRICAO + 1).getValue();
+      conteudo = valorCelula ? String(valorCelula) : '';
+    }
 
     // Trunca se necessário (limite seguro para google.script.run)
     const LIMITE_CHARS = 120000;
@@ -3084,103 +3100,190 @@ function obterProjetosParaAssociacao() {
 }
 
 function obterReunioesCatalogadas(token) {
+  const logs = [];
+  const log = function(tipo, msg) {
+    logs.push({ tipo: tipo, msg: msg });
+    Logger.log('[obterReunioesCatalogadas][' + tipo + '] ' + msg);
+  };
+
   try {
+    const colunas = (typeof COLUNAS_REUNIOES !== 'undefined') ? COLUNAS_REUNIOES : {
+      ID: 0, TITULO: 1, DATA_INICIO: 2, DATA_FIM: 3, DURACAO: 4, STATUS: 5,
+      PARTICIPANTES: 6, TRANSCRICAO: 7, ATA: 8, SUGESTOES_IA: 9, LINK_AUDIO: 10,
+      LINK_ATA: 11, EMAILS_ENVIADOS: 12, PROJETOS_IMPACTADOS: 13, ETAPAS_IMPACTADAS: 14,
+      DEPARTAMENTO_ID: 15, ATA_EXECUTIVA: 16, ATA_DETALHADA: 17, ATA_RESPONSAVEL: 18, ATA_ALINHAMENTO: 19
+    };
+    const statusReuniao = (typeof STATUS_REUNIAO !== 'undefined') ? STATUS_REUNIAO : {
+      AGUARDANDO: 'Aguardando Processamento'
+    };
+    const serializarValorData = function(valor) {
+      if (valor === null || valor === undefined || valor === '') return '';
+      if (Object.prototype.toString.call(valor) === '[object Date]') {
+        const timestamp = valor.getTime();
+        return Number.isFinite(timestamp) ? valor.toISOString() : '';
+      }
+      return valor;
+    };
+
     const sessao = token ? _obterSessao(token) : null;
+    log('INFO', 'Sessão: ' + (sessao ? sessao.email + ' | perfil=' + sessao.perfil : 'null (sem token)'));
+
     const isAdmin = sessao && sessao.perfil === 'admin';
-    const depsUsuario = (sessao && !isAdmin) ? _obterDepsAtualizadosUsuario(sessao) : null;
+    log('INFO', 'isAdmin: ' + isAdmin);
+
+    let depsUsuario = null;
+    if (sessao && !isAdmin) {
+      try {
+        depsUsuario = _obterDepsAtualizadosUsuario(sessao);
+        log('INFO', 'depsUsuario (IDs resolvidos): ' + JSON.stringify(depsUsuario));
+        log('INFO', 'depsUsuario count: ' + (depsUsuario ? depsUsuario.length : 0));
+        if (!depsUsuario || depsUsuario.length === 0) {
+          log('ALERTA', 'Usuário não-admin sem departamentos — nenhuma reunião será filtrada por depto');
+        }
+      } catch (eDeps) {
+        log('ERRO', 'Falha ao resolver depsUsuario: ' + eDeps.message);
+        depsUsuario = null;
+      }
+    }
 
     const nomeAba = typeof NOME_ABA_REUNIOES !== 'undefined' ? NOME_ABA_REUNIOES : 'Reuniões';
     const aba = obterAba(nomeAba);
     if (!aba || aba.getLastRow() <= 1) {
-      return { sucesso: true, porProjeto: {}, semCatalogo: [] };
+      log('ALERTA', 'Aba "' + nomeAba + '" vazia ou não encontrada (lastRow=' + (aba ? aba.getLastRow() : 'null') + ')');
+      return { sucesso: true, porProjeto: {}, semCatalogo: [], logs: logs };
     }
 
     const dados = aba.getDataRange().getValues();
+    log('INFO', 'Total de linhas na aba Reuniões (incl. cabeçalho): ' + dados.length);
+
+    // Log de amostra das primeiras linhas para diagnóstico
+    if (dados.length > 1) {
+      var amostra = [];
+      for (var ia = 1; ia <= Math.min(3, dados.length - 1); ia++) {
+        amostra.push('ID="' + (dados[ia][colunas.ID] || '') + '" STATUS="' + (dados[ia][colunas.STATUS] || '') + '" DEPT="' + (dados[ia][colunas.DEPARTAMENTO_ID] || '') + '"');
+      }
+      log('INFO', 'Amostra primeiras linhas: ' + amostra.join(' | '));
+    }
+
     const reunioesTodas = [];
+    let cntSemId = 0, cntAguardando = 0, cntBloqueadoDepto = 0, cntPassou = 0;
 
     for (let i = dados.length - 1; i >= 1; i--) {
-      const idCelula = dados[i][COLUNAS_REUNIOES.ID];
-      if (!idCelula || idCelula.toString().trim() === '') continue;
+      let idStr = '';
+      try {
+        const idCelula = dados[i][colunas.ID];
+        if (!idCelula || idCelula.toString().trim() === '') { cntSemId++; continue; }
 
-      // Excluir áudios aguardando processamento (aparecem na seção própria)
-      const statusCelula = dados[i][COLUNAS_REUNIOES.STATUS] ? dados[i][COLUNAS_REUNIOES.STATUS].toString() : '';
-      if (statusCelula === STATUS_REUNIAO.AGUARDANDO) continue;
+        idStr = idCelula.toString().trim();
 
-      // Filtro de departamento: usa dados frescos da planilha (não sessão desatualizada)
-      if (depsUsuario !== null && depsUsuario.length > 0) {
-        const depReuniao = (dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString().trim();
-        // Reuniões sem departamento são visíveis a todos (retrocompat)
-        if (depReuniao && !depsUsuario.includes(depReuniao)) continue;
+        // Excluir áudios aguardando processamento (aparecem na seção própria)
+        const statusCelula = dados[i][colunas.STATUS] ? dados[i][colunas.STATUS].toString() : '';
+        if (statusCelula === statusReuniao.AGUARDANDO) { cntAguardando++; continue; }
+
+        // Filtro de departamento: resolve ambos os lados para IDs canônicos antes de comparar
+        if (depsUsuario !== null && depsUsuario.length > 0) {
+          var depReuniao = (dados[i][colunas.DEPARTAMENTO_ID] || '').toString().trim();
+          // Reuniões sem departamento são visíveis a todos (retrocompat)
+          if (depReuniao) {
+            try {
+              var depReuniaoResolvido = (typeof _resolverIdsDepartamento === 'function')
+                ? ((_resolverIdsDepartamento([depReuniao])[0]) || depReuniao).toString().trim()
+                : depReuniao;
+              if (!depsUsuario.includes(depReuniaoResolvido) && !depsUsuario.includes(depReuniao)) {
+                cntBloqueadoDepto++;
+                continue;
+              }
+            } catch (eFiltro) {
+              log('ALERTA', 'Erro ao filtrar depto da reunião ' + idStr + ': ' + eFiltro.message + ' — permitindo acesso');
+            }
+          }
+        }
+
+        const ataTexto = dados[i][colunas.ATA] ? dados[i][colunas.ATA].toString().trim() : '';
+        const transcricaoTexto = dados[i][colunas.TRANSCRICAO] ? dados[i][colunas.TRANSCRICAO].toString().trim() : '';
+        const projetoId = dados[i][colunas.PROJETOS_IMPACTADOS]
+          ? dados[i][colunas.PROJETOS_IMPACTADOS].toString().trim()
+          : '';
+
+        // Detectar estilos de ata gerados (colunas 16-19)
+        const estilosGerados = [];
+        if ((dados[i][colunas.ATA_EXECUTIVA]   || '').toString().trim().length > 10) estilosGerados.push('executiva');
+        if ((dados[i][colunas.ATA_DETALHADA]   || '').toString().trim().length > 10) estilosGerados.push('detalhada');
+        if ((dados[i][colunas.ATA_RESPONSAVEL] || '').toString().trim().length > 10) estilosGerados.push('por_responsavel');
+        if ((dados[i][colunas.ATA_ALINHAMENTO] || '').toString().trim().length > 10) estilosGerados.push('alinhamento');
+
+        cntPassou++;
+        reunioesTodas.push({
+          id: idStr,
+          titulo: dados[i][colunas.TITULO] ? dados[i][colunas.TITULO].toString() : '',
+          dataInicio: serializarValorData(dados[i][colunas.DATA_INICIO]),
+          duracao: dados[i][colunas.DURACAO],
+          status: statusCelula,
+          participantes: dados[i][colunas.PARTICIPANTES] ? dados[i][colunas.PARTICIPANTES].toString() : '',
+          linkAudio: dados[i][colunas.LINK_AUDIO] ? dados[i][colunas.LINK_AUDIO].toString() : '',
+          emailsEnviados: dados[i][colunas.EMAILS_ENVIADOS] ? dados[i][colunas.EMAILS_ENVIADOS].toString() : '',
+          temAta: ataTexto.length > 10 || estilosGerados.length > 0,
+          temTranscricao: transcricaoTexto.length > 10,
+          projetoId: projetoId,
+          estilosGerados: estilosGerados
+        });
+      } catch (eLinha) {
+        log('ERRO', 'Falha ao processar linha ' + (i + 1) + ' da aba Reuniões' + (idStr ? ' (ID=' + idStr + ')' : '') + ': ' + eLinha.message);
       }
-
-      const ataTexto = dados[i][COLUNAS_REUNIOES.ATA] ? dados[i][COLUNAS_REUNIOES.ATA].toString().trim() : '';
-      const transcricaoTexto = dados[i][COLUNAS_REUNIOES.TRANSCRICAO] ? dados[i][COLUNAS_REUNIOES.TRANSCRICAO].toString().trim() : '';
-      const projetoId = dados[i][COLUNAS_REUNIOES.PROJETOS_IMPACTADOS]
-        ? dados[i][COLUNAS_REUNIOES.PROJETOS_IMPACTADOS].toString().trim()
-        : '';
-
-      // Detectar estilos de ata gerados (colunas 16-19)
-      const estilosGerados = [];
-      if ((dados[i][COLUNAS_REUNIOES.ATA_EXECUTIVA]   || '').toString().trim().length > 10) estilosGerados.push('executiva');
-      if ((dados[i][COLUNAS_REUNIOES.ATA_DETALHADA]   || '').toString().trim().length > 10) estilosGerados.push('detalhada');
-      if ((dados[i][COLUNAS_REUNIOES.ATA_RESPONSAVEL] || '').toString().trim().length > 10) estilosGerados.push('por_responsavel');
-      if ((dados[i][COLUNAS_REUNIOES.ATA_ALINHAMENTO] || '').toString().trim().length > 10) estilosGerados.push('alinhamento');
-
-      reunioesTodas.push({
-        id: idCelula.toString().trim(),
-        titulo: dados[i][COLUNAS_REUNIOES.TITULO] ? dados[i][COLUNAS_REUNIOES.TITULO].toString() : '',
-        dataInicio: dados[i][COLUNAS_REUNIOES.DATA_INICIO],
-        duracao: dados[i][COLUNAS_REUNIOES.DURACAO],
-        status: statusCelula,
-        participantes: dados[i][COLUNAS_REUNIOES.PARTICIPANTES] ? dados[i][COLUNAS_REUNIOES.PARTICIPANTES].toString() : '',
-        linkAudio: dados[i][COLUNAS_REUNIOES.LINK_AUDIO] ? dados[i][COLUNAS_REUNIOES.LINK_AUDIO].toString() : '',
-        emailsEnviados: dados[i][COLUNAS_REUNIOES.EMAILS_ENVIADOS] ? dados[i][COLUNAS_REUNIOES.EMAILS_ENVIADOS].toString() : '',
-        temAta: ataTexto.length > 10,
-        temTranscricao: transcricaoTexto.length > 10,
-        projetoId: projetoId,
-        estilosGerados: estilosGerados
-      });
     }
+
+    log('INFO', '── RESUMO FILTROS ──');
+    log('INFO', 'Linhas sem ID: ' + cntSemId);
+    log('INFO', 'Ignoradas (AGUARDANDO): ' + cntAguardando);
+    log('INFO', 'Bloqueadas por departamento: ' + cntBloqueadoDepto);
+    log('INFO', 'Passaram para o catálogo: ' + cntPassou);
 
     // ── Mapa de responsáveis: ID → Nome ──
     const mapaResponsavelNome = {};
-    const abaResp = obterAba(NOME_ABA_RESPONSAVEIS);
-    if (abaResp && abaResp.getLastRow() > 1) {
-      const dadosResp = abaResp.getDataRange().getValues();
-      for (let i = 1; i < dadosResp.length; i++) {
-        const idResp = dadosResp[i][COLUNAS_RESPONSAVEIS.ID];
-        if (idResp) {
-          mapaResponsavelNome[idResp.toString().trim()] = dadosResp[i][COLUNAS_RESPONSAVEIS.NOME]
-            ? dadosResp[i][COLUNAS_RESPONSAVEIS.NOME].toString()
-            : 'Sem nome';
+    try {
+      const abaResp = obterAba(NOME_ABA_RESPONSAVEIS);
+      if (abaResp && abaResp.getLastRow() > 1) {
+        const dadosResp = abaResp.getDataRange().getValues();
+        for (let i = 1; i < dadosResp.length; i++) {
+          const idResp = dadosResp[i][COLUNAS_RESPONSAVEIS.ID];
+          if (idResp) {
+            mapaResponsavelNome[idResp.toString().trim()] = dadosResp[i][COLUNAS_RESPONSAVEIS.NOME]
+              ? dadosResp[i][COLUNAS_RESPONSAVEIS.NOME].toString()
+              : 'Sem nome';
+          }
         }
       }
+    } catch (eResp) {
+      log('ALERTA', 'Falha ao carregar responsáveis (catálogo continuará sem nomes): ' + eResp.message);
     }
 
     // ── Buscar nomes dos projetos + responsáveis ──
-    const abaProjetos = obterAba(NOME_ABA_PROJETOS);
     const mapaProjetoNome = {};
     const mapaProjetoStatus = {};
     const mapaProjetoRespNomes = {};
+    try {
+      const abaProjetos = obterAba(NOME_ABA_PROJETOS);
+      if (abaProjetos && abaProjetos.getLastRow() > 1) {
+        const dadosProjetos = abaProjetos.getDataRange().getValues();
+        for (let i = 1; i < dadosProjetos.length; i++) {
+          if (dadosProjetos[i][COLUNAS_PROJETOS.ID]) {
+            const pid = dadosProjetos[i][COLUNAS_PROJETOS.ID].toString();
+            mapaProjetoNome[pid] = dadosProjetos[i][COLUNAS_PROJETOS.NOME] || 'Sem nome';
+            mapaProjetoStatus[pid] = dadosProjetos[i][COLUNAS_PROJETOS.STATUS] || '';
 
-    if (abaProjetos && abaProjetos.getLastRow() > 1) {
-      const dadosProjetos = abaProjetos.getDataRange().getValues();
-      for (let i = 1; i < dadosProjetos.length; i++) {
-        if (dadosProjetos[i][COLUNAS_PROJETOS.ID]) {
-          const pid = dadosProjetos[i][COLUNAS_PROJETOS.ID].toString();
-          mapaProjetoNome[pid] = dadosProjetos[i][COLUNAS_PROJETOS.NOME] || 'Sem nome';
-          mapaProjetoStatus[pid] = dadosProjetos[i][COLUNAS_PROJETOS.STATUS] || '';
-
-          // Resolver IDs de responsáveis para nomes
-const listaIds = parsearIdsColuna(dadosProjetos[i][COLUNAS_PROJETOS.RESPONSAVEIS_IDS]);
-const nomes = [];
-for (let j = 0; j < listaIds.length; j++) {
-  var nomeResp = mapaResponsavelNome[listaIds[j]];
-  if (nomeResp) nomes.push(nomeResp);
-}
-          mapaProjetoRespNomes[pid] = nomes;
+            // Resolver IDs de responsáveis para nomes
+            const listaIds = parsearIdsColuna(dadosProjetos[i][COLUNAS_PROJETOS.RESPONSAVEIS_IDS]);
+            const nomes = [];
+            for (let j = 0; j < listaIds.length; j++) {
+              const nomeResp = mapaResponsavelNome[listaIds[j]];
+              if (nomeResp) nomes.push(nomeResp);
+            }
+            mapaProjetoRespNomes[pid] = nomes;
+          }
         }
       }
+    } catch (eProjetos) {
+      log('ALERTA', 'Falha ao carregar projetos (reuniões aparecerão como Não Catalogadas): ' + eProjetos.message);
     }
 
     // ── Agrupar reuniões ──
@@ -3205,11 +3308,20 @@ for (let j = 0; j < listaIds.length; j++) {
       }
     }
 
-    return { sucesso: true, porProjeto: porProjeto, semCatalogo: semCatalogo };
+    log('INFO', 'porProjeto: ' + Object.keys(porProjeto).length + ' projetos | semCatalogo: ' + semCatalogo.length + ' reuniões');
+    // Log de reuniões sem projeto (sem catalogar) — identifica projetoId inválido
+    reunioesTodas.forEach(function(r) {
+      if (r.projetoId && !mapaProjetoNome[r.projetoId]) {
+        log('ALERTA', 'Reunião ID=' + r.id + ' tem projetoId="' + r.projetoId + '" mas projeto NÃO encontrado — vai para "Não Catalogadas"');
+      }
+    });
+    return { sucesso: true, porProjeto: porProjeto, semCatalogo: semCatalogo, logs: logs };
 
   } catch (e) {
     Logger.log('ERRO obterReunioesCatalogadas: ' + e.toString());
-    return { sucesso: false, mensagem: e.message, porProjeto: {}, semCatalogo: [] };
+    const msgErro = (e && (e.message || e.toString())) ? (e.message || e.toString()) : 'Erro desconhecido em obterReunioesCatalogadas';
+    logs.push({ tipo: 'ERRO', msg: 'Exceção: ' + msgErro + ' | ' + (e && e.stack ? e.stack : 'sem stack') });
+    return { sucesso: false, mensagem: msgErro, porProjeto: {}, semCatalogo: [], logs: logs };
   }
 }
 
@@ -3843,12 +3955,13 @@ function salvarAudioNaoProcessado(token, dadosAudio) {
     const tipoMime = dadosAudio.tipoMime || 'audio/webm';
     const extensao = obterExtensaoDoMime(tipoMime);
 
-    // Nomenclatura: AAAA-MM-DD_Departamento_HHmmss.ext
+    // Nomenclatura: _AUDIO_PENDENTE_[Dept]_AAAA-MM-DD_HHmmss.ext
+    // O prefixo _AUDIO_PENDENTE_ é usado para detecção na listagem via Drive.
     const agora = new Date();
     const dataStr = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
     const horaStr = Utilities.formatDate(agora, 'America/Sao_Paulo', 'HHmmss');
     const deptNome = (dadosAudio.departamentoNome || 'SemDepto').replace(/[^a-zA-Z0-9À-ÿ]/g, '_');
-    const nomeArquivo = dataStr + '_' + deptNome + '_' + horaStr + extensao;
+    const nomeArquivo = '_AUDIO_PENDENTE_' + deptNome + '_' + dataStr + '_' + horaStr + extensao;
 
     const audioBlob = Utilities.newBlob(Utilities.base64Decode(audioBase64), tipoMime, nomeArquivo);
     const arquivo = pasta.createFile(audioBlob);
@@ -3868,6 +3981,7 @@ function salvarAudioNaoProcessado(token, dadosAudio) {
       '', '', '', ''  // colunas 16-19: atas ainda não geradas
     ];
     aba.appendRow(linha);
+    SpreadsheetApp.flush();
     limparCacheAba(NOME_ABA_REUNIOES);
     log('SUCESSO', '✅ Registro criado: ' + reuniaoId);
 
@@ -3888,67 +4002,173 @@ function salvarAudioNaoProcessado(token, dadosAudio) {
  * Lista os áudios com STATUS = 'Aguardando Processamento', filtrados por
  * departamento do usuário autenticado.
  */
+/**
+ * Lista áudios pendentes escaneando a pasta do Drive por arquivos cujo nome
+ * contenha "_AUDIO_PENDENTE_". Filtra pelo nome do departamento embutido no
+ * nome do arquivo: _AUDIO_PENDENTE_[dept]_[data]_[hora].ext
+ * Cruza com a planilha para recuperar o reuniaoId necessário para processamento.
+ */
 function listarAudiosNaoProcessados(token) {
+  var logs = [];
+  var log = function(tipo, msg) {
+    logs.push(msg);
+    Logger.log('[listarAudiosNaoProcessados][' + tipo + '] ' + msg);
+  };
+
   try {
-    const sessao = token ? _obterSessao(token) : null;
-    const isAdmin = sessao && sessao.perfil === 'admin';
-    const depsUsuario = (sessao && !isAdmin) ? _obterDepsAtualizadosUsuario(sessao) : null;
+    // ── 1. Sessão e departamentos do usuário ─────────────────────────────
+    var sessao = token ? _obterSessao(token) : null;
+    log('INFO', 'sessao obtida: ' + (sessao ? sessao.email : 'null'));
 
-    const aba = obterAba(NOME_ABA_REUNIOES);
-    if (!aba || aba.getLastRow() <= 1) return { sucesso: true, audios: [] };
+    var isAdmin = sessao && sessao.perfil === 'admin';
+    log('INFO', 'isAdmin: ' + isAdmin);
 
-    // Mapa id→nome de departamentos
-    const deptMap = {};
+    // Conjunto de nomes de departamento permitidos (null = sem filtro)
+    var depNomesPermitidos = null;
+    if (sessao && !isAdmin) {
+      try {
+        var depsIds = _obterDepsAtualizadosUsuario(sessao);
+        log('INFO', 'depsIds: ' + JSON.stringify(depsIds));
+        if (depsIds && depsIds.length > 0) {
+          depNomesPermitidos = {};
+          // Resolve IDs → nomes usando a aba de departamentos
+          var dadosDepts = obterDadosAbaComCache(NOME_ABA_DEPARTAMENTOS) || [];
+          for (var di = 1; di < dadosDepts.length; di++) {
+            var dId   = (dadosDepts[di][COLUNAS_DEPARTAMENTOS.ID]   || '').toString().trim();
+            var dNome = (dadosDepts[di][COLUNAS_DEPARTAMENTOS.NOME] || '').toString().trim();
+            if (!dNome) continue;
+            // Verifica se este departamento está nos IDs do usuário
+            var pertence = false;
+            for (var ki = 0; ki < depsIds.length; ki++) {
+              if (_normalizarDepartamentoValor(depsIds[ki]) === _normalizarDepartamentoValor(dId) ||
+                  _normalizarDepartamentoValor(depsIds[ki]) === _normalizarDepartamentoValor(dNome)) {
+                pertence = true; break;
+              }
+            }
+            if (pertence) {
+              // Guarda o nome sanitizado (igual ao usado no nome do arquivo)
+              var dNomeSan = dNome.replace(/[^a-zA-Z0-9\u00C0-\u00FF]/g, '_');
+              depNomesPermitidos[dNomeSan.toLowerCase()] = true;
+              depNomesPermitidos[dNome.toLowerCase()] = true;
+              log('INFO', 'dept permitido: ' + dNome + ' / ' + dNomeSan);
+            }
+          }
+          // Fallback: inclui os próprios valores de depsIds (caso sejam nomes diretos)
+          for (var fi = 0; fi < depsIds.length; fi++) {
+            var fv = (depsIds[fi] || '').toString().trim();
+            if (fv) depNomesPermitidos[fv.toLowerCase()] = true;
+          }
+        }
+      } catch (eDeps) {
+        log('ERRO', 'erro ao obter deps: ' + eDeps.message + ' | ' + eDeps.stack);
+      }
+    }
+    log('INFO', 'depNomesPermitidos: ' + JSON.stringify(depNomesPermitidos));
+
+    // ── 2. Mapa linkAudio → {reuniaoId, participantes} da planilha ────────
+    var linkParaReuniao = {};
     try {
-      const abaDepts = obterAba(NOME_ABA_DEPARTAMENTOS);
-      if (abaDepts) {
-        abaDepts.getDataRange().getValues().forEach((row, idx) => {
-          if (idx === 0) return;
-          const dId = row[COLUNAS_DEPARTAMENTOS.ID];
-          if (dId) deptMap[dId.toString()] = (row[COLUNAS_DEPARTAMENTOS.NOME] || '').toString();
-        });
+      var aba = obterAba(NOME_ABA_REUNIOES);
+      log('INFO', 'aba Reuniões existe: ' + (aba ? 'sim' : 'não') + ' | lastRow: ' + (aba ? aba.getLastRow() : 0));
+      if (aba && aba.getLastRow() > 1) {
+        var dadosAba = aba.getDataRange().getValues();
+        for (var ri = 1; ri < dadosAba.length; ri++) {
+          var rStatus = (dadosAba[ri][COLUNAS_REUNIOES.STATUS] || '').toString().trim();
+          if (rStatus !== STATUS_REUNIAO.AGUARDANDO) continue;
+          var rLink  = (dadosAba[ri][COLUNAS_REUNIOES.LINK_AUDIO]   || '').toString().trim();
+          var rId    = (dadosAba[ri][COLUNAS_REUNIOES.ID]           || '').toString().trim();
+          var rPartic= (dadosAba[ri][COLUNAS_REUNIOES.PARTICIPANTES]|| '').toString().trim();
+          if (rLink && rId) linkParaReuniao[rLink] = { id: rId, participantes: rPartic };
+        }
       }
-    } catch (eDepts) { /* ignora erro de lookup */ }
+      log('INFO', 'linhas aguardando na planilha: ' + Object.keys(linkParaReuniao).length);
+    } catch (eAba) {
+      log('ERRO', 'erro ao ler planilha: ' + eAba.message);
+    }
 
-    const dados = aba.getDataRange().getValues();
-    const agora = new Date();
-    const audios = [];
+    // ── 3. Escaneia pasta do Drive ────────────────────────────────────────
+    var idPasta = typeof ID_PASTA_DRIVE_REUNIOES !== 'undefined' ? ID_PASTA_DRIVE_REUNIOES : '';
+    log('INFO', 'ID_PASTA_DRIVE_REUNIOES: ' + idPasta);
+    if (!idPasta) return { sucesso: true, audios: [], logs: logs };
 
-    for (let i = dados.length - 1; i >= 1; i--) {
-      const idCelula = dados[i][COLUNAS_REUNIOES.ID];
-      if (!idCelula || idCelula.toString().trim() === '') continue;
+    var pasta;
+    try {
+      pasta = DriveApp.getFolderById(idPasta);
+      log('INFO', 'pasta Drive: ' + pasta.getName());
+    } catch (ePasta) {
+      log('ERRO', 'erro ao acessar pasta Drive: ' + ePasta.message);
+      return { sucesso: false, mensagem: 'Pasta Drive inacessível: ' + ePasta.message, audios: [], logs: logs };
+    }
 
-      const statusCelula = dados[i][COLUNAS_REUNIOES.STATUS] ? dados[i][COLUNAS_REUNIOES.STATUS].toString() : '';
-      if (statusCelula !== STATUS_REUNIAO.AGUARDANDO) continue;
+    var fileIter = pasta.getFiles();
+    var audios   = [];
+    var agora    = new Date();
+    var totalArqs = 0, totalPendentes = 0;
 
-      if (depsUsuario !== null && depsUsuario.length > 0) {
-        const depReuniao = (dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString().trim();
-        if (depReuniao && !depsUsuario.includes(depReuniao)) continue;
+    while (fileIter.hasNext()) {
+      var file = fileIter.next();
+      totalArqs++;
+      var nome = file.getName();
+
+      if (nome.indexOf('_AUDIO_PENDENTE_') < 0) continue;
+      totalPendentes++;
+      log('INFO', 'arquivo pendente encontrado: ' + nome);
+
+      // Extrai nome do departamento: _AUDIO_PENDENTE_[dept]_...
+      var deptNomeArq = '';
+      var partes = nome.split('_AUDIO_PENDENTE_');
+      if (partes.length > 1) {
+        var segmento = partes[1]; // e.g. "Italo_2026-03-05_210441.m4a"
+        var underIdx = segmento.indexOf('_');
+        deptNomeArq = underIdx >= 0 ? segmento.substring(0, underIdx) : segmento.replace(/\.[^.]+$/, '');
+      }
+      log('INFO', 'dept extraído do arquivo: "' + deptNomeArq + '"');
+
+      // Filtro por departamento
+      if (depNomesPermitidos !== null && deptNomeArq) {
+        if (!depNomesPermitidos[deptNomeArq.toLowerCase()]) {
+          log('INFO', 'arquivo ignorado (dept não permitido): ' + nome);
+          continue;
+        }
       }
 
-      const dataUpload = dados[i][COLUNAS_REUNIOES.DATA_INICIO];
-      let diasDesdeUpload = 0;
-      if (dataUpload) {
-        const dtUpload = dataUpload instanceof Date ? dataUpload : new Date(dataUpload);
-        diasDesdeUpload = Math.floor((agora - dtUpload) / (1000 * 60 * 60 * 24));
+      // Cruza com planilha para obter reuniaoId
+      var fileUrl = file.getUrl();
+      var meta    = linkParaReuniao[fileUrl] || {};
+      var reuniaoId   = meta.id           || '';
+      var participantes = meta.participantes || '';
+      log('INFO', 'reuniaoId para ' + nome + ': ' + (reuniaoId || '(não encontrado na planilha)'));
+
+      if (!reuniaoId) {
+        log('ALERTA', 'arquivo sem reuniaoId na planilha — ignorado: ' + nome);
+        continue;
       }
+
+      var dataUpload = file.getDateCreated();
+      var diasDesdeUpload = Math.floor((agora - dataUpload) / (1000 * 60 * 60 * 24));
 
       audios.push({
-        id:               idCelula.toString().trim(),
-        nomeArquivo:      dados[i][COLUNAS_REUNIOES.TITULO] ? dados[i][COLUNAS_REUNIOES.TITULO].toString() : '',
-        dataUpload:       dataUpload,
+        id:               reuniaoId,
+        nomeArquivo:      nome,
+        dataUpload:       dataUpload.toISOString(),
         diasDesdeUpload:  diasDesdeUpload,
-        linkAudio:        dados[i][COLUNAS_REUNIOES.LINK_AUDIO] ? dados[i][COLUNAS_REUNIOES.LINK_AUDIO].toString() : '',
-        participantes:    dados[i][COLUNAS_REUNIOES.PARTICIPANTES] ? dados[i][COLUNAS_REUNIOES.PARTICIPANTES].toString() : '',
-        departamentoId:   (dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString(),
-        departamentoNome: deptMap[(dados[i][COLUNAS_REUNIOES.DEPARTAMENTO_ID] || '').toString()] || ''
+        departamentoNome: deptNomeArq,
+        departamentoId:   '',
+        participantes:    participantes,
+        linkAudio:        fileUrl
       });
     }
 
-    return { sucesso: true, audios };
+    log('INFO', 'total arquivos Drive: ' + totalArqs + ' | pendentes: ' + totalPendentes + ' | retornados: ' + audios.length);
+
+    // Ordena do mais recente para o mais antigo
+    audios.sort(function(a, b) { return new Date(b.dataUpload) - new Date(a.dataUpload); });
+
+    return { sucesso: true, audios: audios, logs: logs };
+
   } catch (e) {
-    Logger.log('ERRO listarAudiosNaoProcessados: ' + e.toString());
-    return { sucesso: false, mensagem: e.message, audios: [] };
+    Logger.log('ERRO listarAudiosNaoProcessados: ' + e.toString() + ' | ' + e.stack);
+    return { sucesso: false, mensagem: e.message, audios: [], logs: logs };
   }
 }
 
@@ -4128,6 +4348,21 @@ function processarReuniaoSalva(token, dadosProcessamento) {
     if (participantes) aba.getRange(linhaReal, COLUNAS_REUNIOES.PARTICIPANTES + 1).setValue(participantes);
     aba.getRange(linhaReal, COLUNAS_REUNIOES.DATA_FIM + 1).setValue(dataFim);
     limparCacheAba(NOME_ABA_REUNIOES);
+
+    // Remove o prefixo _AUDIO_PENDENTE_ do arquivo no Drive após processar
+    try {
+      var matchFileId = linkAudio.match(/\/d\/([^\/\?]+)/);
+      if (matchFileId) {
+        var arqDrive = DriveApp.getFileById(matchFileId[1]);
+        var nomeAtual = arqDrive.getName();
+        if (nomeAtual.indexOf('_AUDIO_PENDENTE_') >= 0) {
+          arqDrive.setName(nomeAtual.replace('_AUDIO_PENDENTE_', ''));
+          log('INFO', '🏷️ Arquivo renomeado: ' + arqDrive.getName());
+        }
+      }
+    } catch (eRename) {
+      log('ALERTA', '⚠️ Não foi possível renomear arquivo: ' + eRename.message);
+    }
 
     log('SUCESSO', '🎉 Processamento concluído!');
 

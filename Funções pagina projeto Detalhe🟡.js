@@ -1063,7 +1063,8 @@ function montarCorpoEmailComPrioridades(responsavel, projetos, etapas, todosProj
       'A Fazer':          { bg: '#fef3c7', cor: '#92400e', label: '📋 A Fazer'          },
       'Em Andamento':     { bg: '#dbeafe', cor: '#1e40af', label: '🔄 Em Andamento'     },
       'Aguardando Setor': { bg: '#fde8d8', cor: '#9a3412', label: '⏳ Aguardando Setor' },
-      'Concluída':        { bg: '#d1fae5', cor: '#065f46', label: '✅ Concluída'        }
+      'Concluída':        { bg: '#d1fae5', cor: '#065f46', label: '✅ Concluída'        },
+      'Suspenso':         { bg: '#ede9f7', cor: '#5a3e9e', label: '⏸ Suspenso'         }
     };
     var cfg = mapa[status] || mapa['A Fazer'];
     return '<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;background:' +
@@ -1267,7 +1268,8 @@ function obterClasseBadgeStatus(status) {
     'A Fazer': 'badge-afazer',
     'Em Andamento': 'badge-andamento',
     'Bloqueada': 'badge-bloqueada',
-    'Concluída': 'badge-concluida'
+    'Concluída': 'badge-concluida',
+    'Suspenso': 'badge-suspenso'
   };
   return mapa[status] || 'badge-afazer';
 }

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -11,10 +11,11 @@
   <?!= include('TemaPadrao-CSS'); ?>
   <script>
     const MODO_ADMIN_URL = <?= modoAdmin ?>;
-    var SESSAO_TOKEN   = '<?= sessaoToken ?>';
-    var USUARIO_NOME   = '<?= usuarioNome ?>';
-    var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
-    var BASE_URL       = '<?= baseUrl ?>';
+    var SESSAO_TOKEN        = '<?= sessaoToken ?>';
+    var USUARIO_NOME        = '<?= usuarioNome ?>';
+    var USUARIO_PERFIL      = '<?= usuarioPerfil ?>';
+    var BASE_URL            = '<?= baseUrl ?>';
+    var PAGINAS_PERMITIDAS  = <?= paginasPermitidas ?>; // [] = acesso total
   </script>
 
   <style>
@@ -1494,6 +1495,7 @@
             <i class="fas fa-stop"></i> Encerrar
           </button>
         </div>
+
       </div>
     </div>
 
@@ -1574,6 +1576,19 @@
       </div>
     </div>
 
+    <!-- REUNIÕES PENDENTES — painel intermediário -->
+    <div id="pendentesPainel" style="display:none;margin-bottom:0.75rem;">
+      <div class="catalogo-toolbar" style="border-bottom:1px solid var(--creme-escuro);margin-bottom:0.5rem;padding-bottom:0.5rem;">
+        <div class="catalogo-toolbar-titulo">
+          <i class="fas fa-clock" style="color:var(--laranja,#e07b39);margin-right:0.4rem;font-size:0.85rem;"></i>
+          Reuniões Pendentes
+          <span id="pendentesContador" style="background:var(--laranja,#e07b39);color:#fff;font-size:0.65rem;font-weight:700;border-radius:100px;padding:1px 6px;margin-left:0.4rem;vertical-align:middle;"></span>
+        </div>
+        <button class="btn btn-sm btn-secundario" onclick="carregarAudiosNaoProcessados()" title="Atualizar"><i class="fas fa-rotate"></i></button>
+      </div>
+      <div id="pendentesLista" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+    </div>
+
     <!-- CATÁLOGO — painel inferior -->
     <div class="catalogo-panel">
       <div class="catalogo-toolbar">
@@ -1609,6 +1624,55 @@
 <!-- ══════════════════════════════════════════════
      MODAIS
 ══════════════════════════════════════════════ -->
+
+<!-- Modal Processar Pendente -->
+<div class="modal-overlay" id="modalProcessarPendente">
+  <div class="modal-caixa" style="max-width:480px;width:95%;">
+    <div class="modal-header">
+      <div class="modal-titulo"><i class="fas fa-cogs" style="color:var(--ocre);margin-right:6px;"></i> Processar Reunião Pendente</div>
+      <button class="modal-fechar" onclick="fecharModal('modalProcessarPendente')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+      <input type="hidden" id="procPendenteId">
+      <input type="hidden" id="procPendenteDeptId">
+      <input type="hidden" id="procPendenteDeptNome">
+      <div class="form-grupo">
+        <label class="form-label">Título da Reunião</label>
+        <input type="text" class="form-input" id="procPendenteTitulo" placeholder="Ex: Reunião de Sprint Planning">
+      </div>
+      <div class="form-grupo">
+        <label class="form-label">Participantes</label>
+        <input type="text" class="form-input" id="procPendenteParticipantes" placeholder="João, Maria, Pedro...">
+      </div>
+      <div class="form-grupo" style="margin-bottom:0;">
+        <label class="form-label">Estilo de Ata</label>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.25rem;">
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.875rem;">
+            <input type="radio" name="procPendenteEstilo" value="executiva" checked style="accent-color:var(--ocre);"> Ata Executiva
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.875rem;">
+            <input type="radio" name="procPendenteEstilo" value="detalhada" style="accent-color:var(--ocre);"> Ata Detalhada
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.875rem;">
+            <input type="radio" name="procPendenteEstilo" value="por_responsavel" style="accent-color:var(--ocre);"> Por Responsável
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.875rem;">
+            <input type="radio" name="procPendenteEstilo" value="alinhamento" style="accent-color:var(--ocre);"> Alinhamento Rápido
+          </label>
+        </div>
+      </div>
+      <div id="procPendenteStatus" style="display:none;font-size:0.82rem;color:var(--marrom-claro);text-align:center;padding:0.5rem;background:var(--creme-claro);border-radius:var(--raio);">
+        <i class="fas fa-spinner fa-spin"></i> Processando...
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:0.5rem;padding:0.75rem 1.25rem;">
+      <button class="btn btn-secundario" onclick="fecharModal('modalProcessarPendente')">Cancelar</button>
+      <button class="btn btn-verde" id="btnConfirmarProcPendente" onclick="confirmarProcessamentoPendente()">
+        <i class="fas fa-play"></i> Processar
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal Configurar Envio -->
 <div class="modal-overlay" id="modalConfigurarEnvio">
@@ -1876,6 +1940,7 @@
 var mediaRecorder = null, chunksAudio = [], streamAudio = null;
 var timerInterval = null, segsGravados = 0, gravPausada = false;
 var arquivoAtual = null, audioCtx = null, analisador = null, animViz = null;
+var reuniaoIdPendente = null; // Preenchido ao carregar áudio pendente no dropzone
 let cacheReuniao = [];    // cache local para o catálogo
 let dadosCatalogo = { porProjeto:{}, semCatalogo:[] };
 let reuniaoModalAtual = null; // dados da reunião aberta
@@ -1910,12 +1975,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) {
     verificarConfig();
     carregarCatalogo();
+    carregarAudiosNaoProcessados();
     setupDropzone();
     log('INFO', '🚀 Smart Meeting inicializado');
-    // Aviso proativo se estiver em iframe (bloqueio de microfone)
-    if (_emIframe()) {
-      setTimeout(_mostrarBannerIframe, 800);
-    }
   } else {
     _redirecionarLogin();
   }
@@ -1941,8 +2003,13 @@ function popularSelectDepartamentosReunioes(departamentos) {
     frag.appendChild(opt);
   });
   sel.appendChild(frag);
-  // Auto-selecionar se só houver um departamento
-  if ((departamentos || []).length === 1) sel.value = departamentos[0].id;
+  // Auto-selecionar e desabilitar se só houver um departamento
+  if ((departamentos || []).length === 1) {
+    sel.value = departamentos[0].id;
+    sel.disabled = true;
+  } else {
+    sel.disabled = false;
+  }
 }
 
 function verificarConfig() {
@@ -1968,52 +2035,75 @@ function setPill(id, ok, label) {
 // ═══════════════════════════════════════
 //  GRAVAÇÃO
 // ═══════════════════════════════════════
-function _emIframe() {
-  try { return window.self !== window.top; } catch(_) { return true; }
+// ── Helpers de detecção de bloqueio ──────────────────────────────────────────
+
+// Retorna true quando a Permissions Policy do frame bloqueia o microfone.
+// Isso é uma restrição SERVER-SIDE (Google/GAS) — configurações do navegador NÃO resolvem.
+function _permissionsPolicyBloqueada() {
+  try {
+    if (document.permissionsPolicy && typeof document.permissionsPolicy.allowsFeature === 'function') {
+      return !document.permissionsPolicy.allowsFeature('microphone');
+    }
+    if (document.featurePolicy && typeof document.featurePolicy.allowsFeature === 'function') {
+      return !document.featurePolicy.allowsFeature('microphone');
+    }
+  } catch(_) {}
+  return false;
 }
 
-function _abrirNovaAba() {
-  const url = window.location.href;
-  const nova = window.open(url, '_blank', 'noopener,noreferrer');
-  if (!nova || nova.closed || typeof nova.closed === 'undefined') {
-    toast('Popup bloqueado. Copie o endereço da barra de URL e abra em uma nova aba manualmente.', 'aviso');
-  } else {
-    toast('Abrindo em nova aba — conceda permissão ao microfone na nova janela.', 'ok');
-  }
+// Detecta Permissions Policy na mensagem de erro do getUserMedia
+function _erroPermissionsPolicy(e) {
+  var msg = (e && e.message) ? e.message.toLowerCase() : '';
+  return msg.includes('permissions policy') ||
+         msg.includes('permission policy') ||
+         msg.includes('feature policy') ||
+         msg.includes('not allowed by the') ||
+         msg.includes('blocked by');
 }
 
-function _mostrarBannerIframe() {
-  if (document.getElementById('bannerIframe')) return;
-  const banner = document.createElement('div');
-  banner.id = 'bannerIframe';
-  banner.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 16px;margin:0 0 12px;font-size:.83rem;display:flex;align-items:center;gap:10px;';
-  banner.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e65100;flex-shrink:0"></i>'
-    + '<span>O navegador bloqueia microfone neste contexto. Para gravar, abra em nova aba.</span>'
-    + '<button onclick="_abrirNovaAba()" style="margin-left:auto;background:#e65100;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:.82rem;white-space:nowrap;"><i class="fas fa-external-link-alt"></i> Abrir em nova aba</button>';
-  const cardGrav = document.querySelector('.controles-grav');
-  if (cardGrav) cardGrav.closest('.card-body').insertAdjacentElement('afterbegin', banner);
+// Abre gravador popup automaticamente (contorna Permissions Policy do GAS)
+function _abrirGravadorAutomatico() {
+  log('INFO', '🔒 Permissions Policy detectada — abrindo gravador popup automático');
+  abrirGravadorPopup(true);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function iniciarGravacao() {
   try {
     log('INFO', '🎙️ Solicitando microfone...');
 
-    // Detecta iframe e tenta verificar permissão
-    const noIframe = _emIframe();
-    if (noIframe && navigator.permissions) {
+    // 1. Contexto seguro (HTTPS obrigatório para getUserMedia)
+    if (!window.isSecureContext) {
+      log('ERRO', '❌ Contexto inseguro: API de mídia requer HTTPS');
+      toast('Gravação requer conexão segura (HTTPS). Abra o app pelo link oficial do deploy.', 'erro');
+      return;
+    }
+
+    // 2. Permissions Policy do frame (restrição do Google/GAS — browser settings NÃO resolve)
+    if (_permissionsPolicyBloqueada()) {
+      _abrirGravadorAutomatico();
+      return;
+    }
+
+    // 3. API disponível
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+      log('ERRO', '❌ navigator.mediaDevices indisponível');
+      _abrirGravadorAutomatico();
+      return;
+    }
+
+    // 4. Estado de permissão do usuário (distinto de Permissions Policy)
+    if (navigator.permissions) {
       try {
         const perm = await navigator.permissions.query({ name: 'microphone' });
-        log('INFO', '🔑 Permissão microfone: ' + perm.state + ' | iframe: ' + noIframe);
-        if (perm.state === 'denied') {
-          _mostrarBannerIframe();
-          log('ERRO', '❌ Microfone bloqueado pela política do iframe (Permissions Policy)');
-          _abrirNovaAba();
-          return;
-        }
+        log('INFO', '🔑 Permissão do usuário: ' + perm.state);
+        // Não bloqueia em "denied" aqui — pode ser artefato da Permissions Policy.
+        // Deixa o getUserMedia tentar e mostrar o erro real.
       } catch(_) {}
     }
 
-    // Tenta com constraints completas; se falhar por constraints, tenta simplificado
+    // 5. Tenta com constraints completas; fallback sem constraints se necessário
     try {
       streamAudio = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true } });
     } catch(e1) {
@@ -2024,8 +2114,10 @@ async function iniciarGravacao() {
 
     setupVisualizador(streamAudio);
 
-    const tipos = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
+    const tipos = ['audio/mp4','audio/ogg;codecs=opus','audio/webm;codecs=opus','audio/webm'];
     const tipo = tipos.find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
+    const extMap = {'audio/mp4':'m4a','audio/ogg':'ogg','audio/ogg;codecs=opus':'ogg','audio/webm':'webm','audio/webm;codecs=opus':'webm'};
+    const ext = extMap[tipo] || (tipo.includes('mp4')?'m4a':tipo.includes('ogg')?'ogg':'webm');
     log('INFO', `📹 Formato: ${tipo}`);
 
     mediaRecorder = new MediaRecorder(streamAudio, { mimeType: tipo, audioBitsPerSecond:32000 });
@@ -2033,31 +2125,269 @@ async function iniciarGravacao() {
     mediaRecorder.ondataavailable = e => e.data.size > 0 && chunksAudio.push(e.data);
     mediaRecorder.onstop = () => {
       const blob = new Blob(chunksAudio, { type: tipo });
-      arquivoAtual = new File([blob], 'gravacao.webm', { type: tipo });
+      arquivoAtual = new File([blob], 'gravacao.' + ext, { type: tipo });
       mostrarArquivo(arquivoAtual);
       log('SUCESSO', `✅ Gravação: ${fmtBytes(blob.size)}`);
+      _autoSalvarAudio(blob, tipo);
     };
     mediaRecorder.start(1000);
     segsGravados = 0; gravPausada = false;
     timerInterval = setInterval(tickTimer, 1000);
     setUIGrav('gravando');
     log('INFO', '🔴 Gravando...');
+
   } catch(e) {
-    const negado = e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError';
-    log('ERRO', '❌ Microfone [' + e.name + ']: ' + e.message + ' | iframe: ' + _emIframe());
-    if (negado && _emIframe()) {
-      _mostrarBannerIframe();
-      toast('🎤 Microfone bloqueado pelo navegador neste contexto. Clique em "Abrir em nova aba" acima.', 'erro');
-      _abrirNovaAba();
-    } else if (negado) {
-      toast('🎤 Permissão de microfone negada. Clique no cadeado na barra de endereço e permita o microfone.', 'erro');
+    const origemHost = window.location.hostname;
+    log('ERRO', '❌ Microfone erro [' + e.name + ']: ' + e.message);
+
+    // Distingue Permissions Policy (Google) de permissão do usuário
+    if (_erroPermissionsPolicy(e)) {
+      _abrirGravadorAutomatico();
+    } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+      toast(
+        'Microfone negado pelo usuário para "' + origemHost + '". ' +
+        'Clique no cadeado na barra de endereço → Microfone → Permitir → Recarregue a página.',
+        'erro'
+      );
+    } else if (e.name === 'NotFoundError') {
+      toast('Nenhum microfone encontrado. Verifique se há um microfone conectado.', 'erro');
+    } else if (e.name === 'NotReadableError') {
+      toast('Microfone em uso por outro programa. Feche-o e tente novamente.', 'erro');
     } else {
       toast('Erro ao acessar microfone [' + e.name + ']: ' + e.message, 'erro');
     }
   }
 }
 
+
+// ── GRAVADOR POPUP ────────────────────────────────────────────────────────────
+// Estratégia: abre popup vazio (about:blank) e injeta o HTML do gravador via
+// document.write — sem passar pelo servidor GAS, sem iframe wrapper.
+// Um popup aberto via window.open() é sempre um contexto de navegação top-level,
+// portanto não herda a Permissions-Policy do userCodeAppPanel.
+var _popupGravador = null;
+
+function _htmlGravador(autostart) {
+  // HTML autocontido do gravador (sem dependências externas).
+  // O </scr"+"ipt> é partido para não fechar a tag no parser do documento pai.
+  return '<!DOCTYPE html><html lang="pt-BR"><head>' +
+    '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Gravador \u2014 Smart Meeting<\/title>' +
+    '<style>' +
+      '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}' +
+      'body{font-family:"Segoe UI",sans-serif;background:#FAF7F0;color:#2C1810;' +
+        'min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem}' +
+      '.card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(44,24,16,.12);' +
+        'padding:2rem;width:100%;max-width:360px;text-align:center}' +
+      'h1{font-size:1.1rem;font-weight:700;margin-bottom:.3rem}' +
+      '.sub{font-size:.75rem;color:#7a6050;margin-bottom:1.5rem}' +
+      '.timer{font-size:2rem;font-weight:700;letter-spacing:2px;margin-bottom:.5rem;font-variant-numeric:tabular-nums}' +
+      '.timer.gravando{color:#8B2E2E}' +
+      '.pill{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:600;' +
+        'padding:.25rem .75rem;border-radius:999px;background:#EDE3CC;color:#5C3D2E;margin-bottom:1.5rem}' +
+      '.pill.gravando{background:#8B2E2E;color:#FAF7F0}.pill.ok{background:#2d5a1b;color:#FAF7F0}' +
+      '.dot{width:8px;height:8px;border-radius:50%;background:currentColor}' +
+      '.dot.blink{animation:blink 1s step-end infinite}@keyframes blink{50%{opacity:0}}' +
+      '.btn{display:flex;align-items:center;justify-content:center;gap:.5rem;padding:.7rem 1.4rem;' +
+        'border:none;border-radius:10px;cursor:pointer;font-size:.95rem;font-weight:600;' +
+        'transition:opacity .15s;width:100%;margin-bottom:.6rem}' +
+      '.btn:disabled{opacity:.45;cursor:not-allowed}' +
+      '.btn-iniciar{background:#2C1810;color:#FAF7F0}.btn-parar{background:#8B2E2E;color:#FAF7F0}' +
+      '.btn-fechar{background:#EDE3CC;color:#2C1810;font-size:.85rem}' +
+      '.erro{margin-top:1rem;padding:.75rem 1rem;border-radius:10px;background:#fdf0f0;' +
+        'border:1px solid #e8c0c0;font-size:.82rem;color:#8B2E2E;line-height:1.6;text-align:left}' +
+      '.erro strong{display:block;margin-bottom:.25rem}' +
+      '.dica{margin-top:.75rem;padding:.6rem .875rem;background:#f5f0e8;border-radius:8px;' +
+        'font-size:.78rem;color:#5C3D2E;line-height:1.6;text-align:left}' +
+    '<\/style><\/head><body>' +
+    '<div class="card">' +
+      '<div style="font-size:2rem;margin-bottom:.5rem">\uD83C\uDFA4<\/div>' +
+      '<h1>Gravador de \u00C1udio<\/h1>' +
+      '<p class="sub">Janela independente \u2014 sem restri\u00E7\u00F5es de iframe<\/p>' +
+      '<div class="timer" id="timer">00:00:00<\/div>' +
+      '<div class="pill" id="pill"><span class="dot" id="dot"><\/span><span id="pillTxt">Aguardando<\/span><\/div>' +
+      '<button class="btn btn-iniciar" id="btnI" onclick="iniciar()">\u25B6 Iniciar grava\u00E7\u00E3o<\/button>' +
+      '<button class="btn btn-parar"   id="btnP" onclick="parar()"   style="display:none">\u23F9 Parar e enviar<\/button>' +
+      '<button class="btn btn-fechar"  id="btnF" onclick="window.close()" style="display:none">Fechar janela<\/button>' +
+      '<div id="erroArea"><\/div>' +
+    '<\/div>' +
+    '<scr' + 'ipt>' +
+      'var mr=null,chunks=[],st=null,ti=null,segs=0;' +
+      'function pad(n){return String(n).padStart(2,"0")}' +
+      'function setTimer(s){var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;' +
+        'document.getElementById("timer").textContent=pad(h)+":"+pad(m)+":"+pad(ss)}' +
+      'function setPill(txt,cls){var el=document.getElementById("pill");' +
+        'el.className="pill"+(cls?" "+cls:"");' +
+        'document.getElementById("dot").className="dot"+(cls==="gravando"?" blink":"");' +
+        'document.getElementById("pillTxt").textContent=txt}' +
+      'function setErro(titulo,det,dica){document.getElementById("erroArea").innerHTML=' +
+        '"<div class=\\"erro\\"><strong>"+titulo+"<\/strong>"+det+(dica?"<\/div><div class=\\"dica\\">"+dica:"")+"<\/div>"}' +
+      'async function iniciar(){' +
+        'document.getElementById("erroArea").innerHTML="";' +
+        'document.getElementById("btnI").disabled=true;' +
+        'setPill("Solicitando microfone...","");' +
+        'if(!window.isSecureContext){setErro("Contexto inseguro","Requer HTTPS.","Acesse pelo link oficial.");' +
+          'setPill("Erro","");document.getElementById("btnI").disabled=false;return}' +
+        'if(!navigator.mediaDevices||typeof navigator.mediaDevices.getUserMedia!=="function"){' +
+          'setErro("API bloqueada","navigator.mediaDevices indispon\u00EDvel.","Tente abrir a URL diretamente em uma nova aba do Chrome (Ctrl+T).");' +
+          'setPill("Bloqueado","");document.getElementById("btnI").disabled=false;return}' +
+        'try{st=await navigator.mediaDevices.getUserMedia({audio:true});' +
+          'var tipos=["audio/mp4","audio/ogg;codecs=opus","audio/webm;codecs=opus","audio/webm"];' +
+          'var tipo=tipos.find(function(t){return MediaRecorder.isTypeSupported(t)})||"audio/webm";' +
+          'mr=new MediaRecorder(st,{mimeType:tipo,audioBitsPerSecond:32000});' +
+          'chunks=[];' +
+          'mr.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};' +
+          'mr.onstop=function(){' +
+            'clearInterval(ti);ti=null;' +
+            'var blob=new Blob(chunks,{type:tipo});' +
+            'setPill("Enviando...","");' +
+            'var ok=false;' +
+            'try{if(window.opener&&!window.opener.closed){' +
+              'window.opener.postMessage({type:"sm_audio_blob",blob:blob,mimeType:tipo,duracaoSegundos:segs},"*");' +
+              'ok=true}}catch(e2){console.warn("postMessage falhou:",e2)}' +
+            'st.getTracks().forEach(function(t){t.stop()});st=null;' +
+            'if(ok){setPill("Enviado! Pode fechar.","ok");' +
+              'document.getElementById("timer").style.color="#2d5a1b";' +
+              'document.getElementById("btnF").style.display="flex"}' +
+            'else{setErro("Janela principal n\u00E3o encontrada","N\u00E3o foi poss\u00EDvel enviar automaticamente.","");' +
+              'window._smLastBlob=blob;setPill("Pronto","");' +
+              'document.getElementById("btnI").style.display="flex";document.getElementById("btnI").disabled=false}};' +
+          'mr.start(1000);segs=0;' +
+          'ti=setInterval(function(){segs++;setTimer(segs)},1000);' +
+          'document.getElementById("btnI").style.display="none";' +
+          'document.getElementById("btnP").style.display="flex";' +
+          'document.getElementById("timer").className="timer gravando";' +
+          'setPill("Gravando...","gravando");' +
+          'if(window.opener&&!window.opener.closed)try{window.opener.postMessage({type:"sm_gravando"},"*")}catch(_){}}' +
+        'catch(e){document.getElementById("btnI").disabled=false;' +
+          'var n=e.name||"Erro",dica="";' +
+          'if(n==="NotAllowedError"||n==="PermissionDeniedError")' +
+            'dica="Clique no <strong>cadeado<\/strong> na barra de endere\u00E7o desta janela \u2192 Microfone \u2192 <strong>Permitir<\/strong> \u2192 recarregue.";' +
+          'else if(n==="NotFoundError")dica="Nenhum microfone detectado.";' +
+          'else if(n==="NotReadableError")dica="Microfone em uso por outro app.";' +
+          'setErro("Erro ["+n+"]",e.message,dica);setPill("Erro","")}}' +
+      'function parar(){if(mr&&mr.state!=="inactive"){' +
+        'document.getElementById("btnP").style.display="none";setPill("Finalizando...","");mr.stop()}}' +
+      'function pausarP(){if(mr&&mr.state==="recording"){mr.pause();setPill("Pausado","")}}' +
+      'function retomarP(){if(mr&&mr.state==="paused"){mr.resume();setPill("Gravando...","gravando")}}' +
+      'window.addEventListener("message",function(e){if(!e.data)return;' +
+        'if(e.data.type==="sm_parar")parar();' +
+        'else if(e.data.type==="sm_pausar")pausarP();' +
+        'else if(e.data.type==="sm_retomar")retomarP()});' +
+      (autostart ? 'window.addEventListener("load",function(){iniciar()});' : '') +
+    '<\/scr' + 'ipt>' +
+    '<\/body><\/html>';
+}
+
+function abrirGravadorPopup(autostart) {
+  // Foca popup existente se ainda aberto
+  if (_popupGravador && !_popupGravador.closed) {
+    _popupGravador.focus();
+    return;
+  }
+
+  // Abre popup vazio (about:blank) — contexto top-level, sem iframe wrapper do GAS
+  _popupGravador = window.open('', 'smGravador',
+    'popup=yes,width=420,height=460,resizable=yes,scrollbars=no');
+
+  if (!_popupGravador) {
+    toast('Popup bloqueado pelo navegador. Clique no ícone de popup bloqueado na barra de endereço e permita popups para este site.', 'erro', 8000);
+    setUIGrav('parado');
+    return;
+  }
+
+  // Injeta o HTML do gravador diretamente — não passa pelo servidor GAS
+  try {
+    _popupGravador.document.open();
+    _popupGravador.document.write(_htmlGravador(autostart));
+    _popupGravador.document.close();
+  } catch(e) {
+    // Se document.write for bloqueado por CSP, tenta navegar para a rota GAS como fallback
+    log('ALERTA', '⚠️ document.write bloqueado, usando rota GAS como fallback: ' + e.message);
+    var token = (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) ? SESSAO_TOKEN : '';
+    var base  = (typeof BASE_URL !== 'undefined' && BASE_URL) ? BASE_URL : window.location.href.split('?')[0];
+    _popupGravador.location.href = base + '?pagina=gravador&token=' + encodeURIComponent(token);
+  }
+
+  log('INFO', '🪟 Gravador popup aberto (document.write — sem iframe GAS)');
+
+  // Monitora fechamento do popup sem enviar áudio
+  var jaRecebeu = false;
+  var monitorFechamento = setInterval(function() {
+    if (_popupGravador && _popupGravador.closed) {
+      clearInterval(monitorFechamento);
+      if (!jaRecebeu && timerInterval) {
+        // Popup fechou enquanto estava gravando — reseta UI
+        clearInterval(timerInterval); timerInterval = null;
+        setUIGrav('parado');
+        toast('Janela de gravação fechada sem enviar o áudio.', 'alerta', 5000);
+      }
+    }
+  }, 800);
+
+  // Sinaliza para o monitor que o blob foi recebido
+  _popupGravador._jaRecebeu = function() { jaRecebeu = true; };
+}
+
+// Receptor do blob enviado pelo popup via postMessage
+window.addEventListener('message', function(evt) {
+  if (!evt.data) return;
+
+  // Popup confirmou que gravação iniciou → atualiza UI da página principal
+  if (evt.data.type === 'sm_gravando') {
+    timerInterval && clearInterval(timerInterval);
+    segsGravados = 0; gravPausada = false;
+    timerInterval = setInterval(tickTimer, 1000);
+    setUIGrav('gravando');
+    log('INFO', '🔴 Gravando via popup...');
+    return;
+  }
+
+  if (evt.data.type !== 'sm_audio_blob') return;
+
+  var blob = evt.data.blob;
+  var mime = evt.data.mimeType || 'audio/webm';
+  var dur  = evt.data.duracaoSegundos || 0;
+
+  if (!(blob instanceof Blob) || blob.size === 0) {
+    log('ALERTA', '⚠️ Popup enviou blob inválido'); return;
+  }
+
+  // Para o timer da página principal
+  clearInterval(timerInterval); timerInterval = null;
+  setUIGrav('parado');
+
+  var ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm';
+  arquivoAtual = new File([blob], 'gravacao-popup.' + ext, { type: mime });
+  if (dur > 0) segsGravados = dur;
+
+  mostrarArquivo(arquivoAtual);
+  log('SUCESSO', '✅ Áudio recebido do popup: ' + fmtBytes(blob.size));
+  toast('Áudio recebido! Salvando no Drive...', 'sucesso', 4000);
+  _autoSalvarAudio(blob, mime);
+
+  // Fecha o popup após receber o blob
+  if (_popupGravador) {
+    try { if (typeof _popupGravador._jaRecebeu === 'function') _popupGravador._jaRecebeu(); } catch(_) {}
+    if (!_popupGravador.closed) { try { _popupGravador.close(); } catch(_) {} }
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 function pausarGravacao() {
+  // Gravação via popup — encaminha comando ao popup
+  if (_popupGravador && !_popupGravador.closed && !mediaRecorder) {
+    if (gravPausada) {
+      _popupGravador.postMessage({ type: 'sm_retomar' }, '*');
+      gravPausada = false; setUIGrav('gravando');
+      log('INFO', '▶️ Retomado (popup)');
+    } else {
+      _popupGravador.postMessage({ type: 'sm_pausar' }, '*');
+      gravPausada = true; setUIGrav('pausado');
+      log('INFO', '⏸️ Pausado (popup)');
+    }
+    return;
+  }
   if (!mediaRecorder) return;
   if (gravPausada) {
     mediaRecorder.resume(); gravPausada = false; setUIGrav('gravando');
@@ -2069,6 +2399,12 @@ function pausarGravacao() {
 }
 
 function pararGravacao() {
+  // Gravação via popup — encaminha comando de parar ao popup
+  if (_popupGravador && !_popupGravador.closed && !mediaRecorder) {
+    _popupGravador.postMessage({ type: 'sm_parar' }, '*');
+    log('INFO', '⏹️ Parando gravação via popup...');
+    return;
+  }
   if (!mediaRecorder) return;
   mediaRecorder.stop();
   streamAudio && streamAudio.getTracks().forEach(t => t.stop()); streamAudio = null;
@@ -2177,6 +2513,7 @@ function mostrarArquivo(f) {
 
 function removerArquivo() {
   arquivoAtual = null;
+  reuniaoIdPendente = null;
   document.getElementById('dropzone').style.display = 'block';
   document.getElementById('arquivoPreview').style.display = 'none';
   document.getElementById('btnEnviar').disabled = true;
@@ -2202,7 +2539,80 @@ function confirmarEnvio() {
 
   const instrucaoExtra = document.getElementById('inputInstrucaoExtra').value.trim();
   fecharModal('modalConfigurarEnvio');
-  _executarEnvio([rdoSelecionado.value], instrucaoExtra);
+
+  // Se há um áudio pendente carregado no dropzone, processa via Drive (sem re-upload)
+  if (reuniaoIdPendente) {
+    _executarProcessamentoPendente([rdoSelecionado.value], instrucaoExtra);
+  } else {
+    _executarEnvio([rdoSelecionado.value], instrucaoExtra);
+  }
+}
+
+function _executarProcessamentoPendente(estilosAta, instrucaoExtra) {
+  var token = typeof SESSAO_TOKEN !== 'undefined' ? SESSAO_TOKEN : null;
+  if (!token || !reuniaoIdPendente) return;
+
+  var titulo        = (document.getElementById('inputTitulo') || {}).value || arquivoAtual.name || 'Reunião';
+  var participantes = (document.getElementById('inputParticipantes') || {}).value || '';
+  var selDept       = document.getElementById('inputDepartamento');
+  var departamentoId   = selDept ? selDept.value : '';
+  var departamentoNome = (selDept && selDept.selectedIndex >= 0 && selDept.options[selDept.selectedIndex])
+    ? selDept.options[selDept.selectedIndex].text : '';
+  if (departamentoNome === 'Selecione...') departamentoNome = '';
+
+  var reuniaoId = reuniaoIdPendente;
+
+  // Bloqueia interação e mostra loading
+  var btnEnviar = document.getElementById('btnEnviar');
+  if (btnEnviar) btnEnviar.disabled = true;
+  atualizarLoading('Processando áudio do Drive... aguarde');
+  log('INFO', '⚙️ Iniciando processamento do áudio pendente: ' + titulo);
+  toast('Processando... pode levar alguns minutos', 'info', 30000);
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      (r && r.logs || []).forEach(function(l) { log(l.tipo, l.mensagem); });
+      atualizarLoading('');
+      if (btnEnviar) btnEnviar.disabled = false;
+
+      if (r && r.sucesso) {
+        toast('Reunião processada com sucesso!', 'sucesso');
+        log('SUCESSO', '🎉 Processamento completo!');
+
+        // Exibe a ata gerada no painel
+        var ataFinal = r.atas ? (r.atas[estilosAta[0]] || Object.values(r.atas)[0] || '') : '';
+        if (ataFinal) exibirAtaPainel(r.reuniaoId, ataFinal, titulo, true);
+
+        // Limpa estado
+        reuniaoIdPendente = null;
+        removerArquivo();
+        carregarAudiosNaoProcessados();
+        carregarCatalogo();
+
+        if (ataFinal) setTimeout(function() { abrirValidacaoAta(r.reuniaoId, ataFinal, titulo, true); }, 400);
+      } else {
+        toast('Erro: ' + (r ? r.mensagem : 'desconhecido'), 'erro', 8000);
+        log('ERRO', '❌ ' + (r ? r.mensagem : 'Falha no processamento'));
+        if (btnEnviar) btnEnviar.disabled = false;
+      }
+    })
+    .withFailureHandler(function(e) {
+      atualizarLoading('');
+      if (btnEnviar) btnEnviar.disabled = false;
+      var msg = e && e.message ? e.message : String(e);
+      toast('Falha: ' + msg, 'erro', 8000);
+      log('ERRO', '❌ Falha GAS: ' + msg);
+    })
+    .processarReuniaoSalva(token, {
+      reuniaoId:        reuniaoId,
+      titulo:           titulo,
+      participantes:    participantes,
+      departamentoId:   departamentoId,
+      departamentoNome: departamentoNome,
+      estilosAta:       estilosAta,
+      gerarRelatorio:   false,
+      instrucaoExtra:   instrucaoExtra || ''
+    });
 }
 
 function carregarPreviewPrompt(estilo) {
@@ -2612,6 +3022,259 @@ function abrirEmailAtaAtual() {
 }
 
 // ═══════════════════════════════════════
+//  REUNIÕES PENDENTES (áudios não processados)
+// ═══════════════════════════════════════
+
+function _autoSalvarAudio(blob, tipo) {
+  if (!blob || blob.size === 0) return;
+  var token = typeof SESSAO_TOKEN !== 'undefined' ? SESSAO_TOKEN : null;
+  if (!token) return;
+
+  var depSel = document.getElementById('inputDepartamento');
+  var departamentoId   = depSel ? depSel.value : '';
+  var departamentoNome = (depSel && depSel.selectedIndex >= 0 && depSel.options[depSel.selectedIndex]) ? depSel.options[depSel.selectedIndex].text : '';
+  var participantes    = (document.getElementById('inputParticipantes')||{}).value || '';
+
+  log('INFO', '💾 Salvando áudio no Drive...');
+  toast('Salvando áudio no Drive para não perder...', 'info', 5000);
+
+  // Converter blob para base64
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64 = e.target.result.split(',')[1];
+    google.script.run
+      .withSuccessHandler(function(r) {
+        if (r && r.sucesso) {
+          log('SUCESSO', '✅ Áudio salvo no Drive: ' + r.nomeArquivo);
+          toast('Áudio salvo! Visível em "Reuniões Pendentes".', 'sucesso', 5000);
+          // Adiciona diretamente ao painel para exibição imediata
+          _adicionarAudioAoPainel({
+            id: r.reuniaoId,
+            nomeArquivo: r.nomeArquivo,
+            dataUpload: r.dataUpload,
+            diasDesdeUpload: 0,
+            participantes: participantes,
+            departamentoId: departamentoId,
+            departamentoNome: departamentoNome === 'Selecione...' ? '' : departamentoNome
+          });
+          // Também recarrega do servidor para sincronizar estado
+          carregarAudiosNaoProcessados();
+        } else {
+          log('ALERTA', '⚠️ Falha ao salvar áudio: ' + (r ? r.mensagem : 'desconhecido'));
+          toast('Aviso: não foi possível salvar áudio automaticamente.', 'aviso', 6000);
+        }
+      })
+      .withFailureHandler(function(e) {
+        log('ERRO', '❌ Erro ao salvar áudio: ' + (e.message || e));
+        toast('Erro ao salvar áudio automaticamente.', 'erro', 6000);
+      })
+      .salvarAudioNaoProcessado(token, {
+        audioBase64: base64,
+        tipoMime: tipo,
+        participantes: participantes,
+        departamentoId: departamentoId,
+        departamentoNome: departamentoNome === 'Selecione...' ? '' : departamentoNome
+      });
+  };
+  reader.readAsDataURL(blob);
+}
+
+function carregarAudiosNaoProcessados() {
+  var token = typeof SESSAO_TOKEN !== 'undefined' ? SESSAO_TOKEN : null;
+  if (!token) return;
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r) {
+        log('ERRO', '❌ listarAudiosNaoProcessados retornou null — erro interno GAS (verifique Stackdriver)');
+        return;
+      }
+      // Logs detalhados do backend
+      (r.logs || []).forEach(function(l) { log('INFO', '[Drive] ' + l); });
+      if (!r.sucesso) {
+        log('ALERTA', '⚠️ Falha ao listar pendentes: ' + (r.mensagem || 'sem mensagem'));
+        return;
+      }
+      log('INFO', '📋 Áudios pendentes encontrados: ' + (r.audios || []).length);
+      _renderAudiosPendentes(r.audios || []);
+    })
+    .withFailureHandler(function(e) {
+      log('ERRO', '❌ Falha GAS ao listar pendentes: ' + (e && e.message ? e.message : String(e)));
+    })
+    .listarAudiosNaoProcessados(token);
+}
+
+function _adicionarAudioAoPainel(audio) {
+  var painel  = document.getElementById('pendentesPainel');
+  var lista   = document.getElementById('pendentesLista');
+  var contador = document.getElementById('pendentesContador');
+  if (!painel || !lista) return;
+  // Evita duplicata
+  if (document.getElementById('pendente-' + audio.id)) return;
+
+  painel.style.display = '';
+  var total = lista.querySelectorAll('[data-pendente-id]').length + 1;
+  if (contador) contador.textContent = total;
+
+  var depBadge = audio.departamentoNome
+    ? '<span style="font-size:0.65rem;background:var(--creme-escuro);padding:1px 6px;border-radius:100px;color:var(--marrom-claro);margin-left:0.35rem;">' + esc(audio.departamentoNome) + '</span>'
+    : '';
+  var el = document.createElement('div');
+  el.id = 'pendente-' + audio.id;
+  el.setAttribute('data-pendente-id', audio.id);
+  el.style.cssText = 'display:flex;align-items:center;gap:0.6rem;background:var(--creme-claro);border:1px solid var(--creme-escuro);border-radius:var(--raio);padding:0.55rem 0.7rem;';
+  el.innerHTML =
+    '<i class="fas fa-file-audio" style="color:var(--laranja,#e07b39);flex-shrink:0;font-size:0.9rem;"></i>' +
+    '<div style="flex:1;min-width:0;">' +
+      '<div style="font-size:0.8rem;font-weight:600;color:var(--marrom-escuro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(audio.nomeArquivo || 'Sem título') + depBadge + '</div>' +
+      (audio.participantes ? '<div style="font-size:0.7rem;color:var(--marrom-claro);">' + esc(audio.participantes) + '</div>' : '') +
+    '</div>' +
+    '<button class="btn btn-sm btn-verde" style="flex-shrink:0;"><i class="fas fa-play"></i> Processar</button>';
+  el.querySelector('button').addEventListener('click', function() {
+    abrirModalProcessarPendente(audio);
+  });
+  lista.insertBefore(el, lista.firstChild);
+}
+
+function _renderAudiosPendentes(audios) {
+  var painel  = document.getElementById('pendentesPainel');
+  var lista   = document.getElementById('pendentesLista');
+  var contador = document.getElementById('pendentesContador');
+  if (!painel || !lista) return;
+
+  if (!audios || audios.length === 0) {
+    painel.style.display = 'none';
+    return;
+  }
+
+  painel.style.display = '';
+  if (contador) contador.textContent = audios.length;
+
+  var html = '';
+  audios.forEach(function(audio) {
+    var dataStr = '';
+    if (audio.dataUpload) {
+      try { dataStr = new Date(audio.dataUpload).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); } catch(_) {}
+    }
+    var depBadge = audio.departamentoNome
+      ? '<span style="font-size:0.65rem;background:var(--creme-escuro);padding:1px 6px;border-radius:100px;color:var(--marrom-claro);margin-left:0.35rem;">' + esc(audio.departamentoNome) + '</span>'
+      : '';
+    var diasAviso = audio.diasDesdeUpload >= 7
+      ? '<span style="font-size:0.65rem;color:#c0392b;font-weight:700;margin-left:0.35rem;"><i class="fas fa-exclamation-triangle"></i> ' + audio.diasDesdeUpload + 'd</span>'
+      : (audio.diasDesdeUpload > 0 ? '<span style="font-size:0.65rem;color:var(--marrom-claro);margin-left:0.35rem;">' + audio.diasDesdeUpload + 'd</span>' : '');
+
+    html += '<div style="display:flex;align-items:center;gap:0.6rem;background:var(--creme-claro);border:1px solid var(--creme-escuro);border-radius:var(--raio);padding:0.55rem 0.7rem;">' +
+      '<i class="fas fa-file-audio" style="color:var(--laranja,#e07b39);flex-shrink:0;font-size:0.9rem;"></i>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:0.8rem;font-weight:600;color:var(--marrom-escuro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(audio.nomeArquivo || 'Sem título') + depBadge + diasAviso + '</div>' +
+        (audio.participantes ? '<div style="font-size:0.7rem;color:var(--marrom-claro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(audio.participantes) + '</div>' : '') +
+        (dataStr ? '<div style="font-size:0.68rem;color:var(--marrom-claro);">' + dataStr + '</div>' : '') +
+      '</div>' +
+      '<button class="btn btn-sm btn-verde" onclick="abrirModalProcessarPendente(' + JSON.stringify(audio).replace(/"/g,'&quot;') + ')" style="flex-shrink:0;">' +
+        '<i class="fas fa-play"></i> Processar' +
+      '</button>' +
+    '</div>';
+  });
+  lista.innerHTML = html;
+}
+
+function abrirModalProcessarPendente(audio) {
+  carregarPendenteNoFormulario(audio);
+}
+
+function carregarPendenteNoFormulario(audio) {
+  // Preenche campos do formulário principal
+  var inpTitulo = document.getElementById('inputTitulo');
+  var inpPartic = document.getElementById('inputParticipantes');
+  var selDept   = document.getElementById('inputDepartamento');
+
+  if (inpTitulo) inpTitulo.value = '';
+  if (inpPartic) inpPartic.value = audio.participantes || '';
+  if (selDept && audio.departamentoId) {
+    // Tenta selecionar o departamento pelo ID
+    var found = false;
+    for (var i = 0; i < selDept.options.length; i++) {
+      if (selDept.options[i].value === audio.departamentoId) {
+        selDept.selectedIndex = i;
+        found = true;
+        break;
+      }
+    }
+    if (!found && audio.departamentoNome) {
+      // Tenta por nome caso o ID não bata
+      for (var j = 0; j < selDept.options.length; j++) {
+        if (selDept.options[j].text === audio.departamentoNome) {
+          selDept.selectedIndex = j;
+          break;
+        }
+      }
+    }
+  }
+
+  // Exibe arquivo fantasma no dropzone (sem dados, só metadata)
+  arquivoAtual = { name: audio.nomeArquivo || 'audio-pendente', size: 0, type: 'audio/m4a', _driveId: audio.id };
+  mostrarArquivo(arquivoAtual);
+
+  // Guarda o ID da reunião pendente para o fluxo de processamento
+  reuniaoIdPendente = audio.id || null;
+
+  // Scroll suave até o card de envio
+  var cardEnvio = document.getElementById('dropzone') || document.getElementById('arquivoPreview');
+  if (cardEnvio) cardEnvio.closest('.card') && cardEnvio.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  toast('Áudio carregado! Clique em "Processar" para gerar a ata.', 'info', 5000);
+  log('INFO', '📂 Áudio pendente selecionado: ' + (audio.nomeArquivo || audio.id));
+}
+
+function confirmarProcessamentoPendente() {
+  var token  = typeof SESSAO_TOKEN !== 'undefined' ? SESSAO_TOKEN : null;
+  if (!token) return;
+  var reuniaoId       = document.getElementById('procPendenteId').value;
+  var titulo          = document.getElementById('procPendenteTitulo').value.trim();
+  var participantes   = document.getElementById('procPendenteParticipantes').value.trim();
+  var departamentoId  = document.getElementById('procPendenteDeptId').value;
+  var departamentoNome= document.getElementById('procPendenteDeptNome').value;
+  if (!reuniaoId) { toast('ID da reunião inválido.', 'erro'); return; }
+  if (!titulo)    { toast('Informe o título da reunião.', 'aviso'); return; }
+
+  var estiloSel = 'executiva';
+  document.querySelectorAll('input[name="procPendenteEstilo"]').forEach(function(r) { if (r.checked) estiloSel = r.value; });
+
+  document.getElementById('procPendenteStatus').style.display = '';
+  document.getElementById('procPendenteStatus').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando... (pode levar alguns minutos)';
+  document.getElementById('btnConfirmarProcPendente').disabled = true;
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      document.getElementById('procPendenteStatus').innerHTML = r && r.sucesso
+        ? '<i class="fas fa-check" style="color:green;"></i> Processado com sucesso!'
+        : '<i class="fas fa-times" style="color:red;"></i> Erro: ' + (r ? r.mensagem : 'desconhecido');
+      if (r && r.sucesso) {
+        toast('Reunião processada com sucesso!', 'sucesso');
+        fecharModal('modalProcessarPendente');
+        carregarAudiosNaoProcessados();
+        carregarCatalogo();
+      } else {
+        document.getElementById('btnConfirmarProcPendente').disabled = false;
+      }
+    })
+    .withFailureHandler(function(e) {
+      document.getElementById('procPendenteStatus').innerHTML = '<i class="fas fa-times" style="color:red;"></i> Falha: ' + (e.message || e);
+      document.getElementById('btnConfirmarProcPendente').disabled = false;
+    })
+    .processarReuniaoSalva(token, {
+      reuniaoId:       reuniaoId,
+      titulo:          titulo,
+      participantes:   participantes,
+      departamentoId:  departamentoId,
+      departamentoNome:departamentoNome,
+      estilosAta:      [estiloSel],
+      gerarRelatorio:  false,
+      instrucaoExtra:  ''
+    });
+}
+
+// ═══════════════════════════════════════
 //  CATÁLOGO
 // ═══════════════════════════════════════
 let filtroResp = 'todos';
@@ -2623,7 +3286,24 @@ function carregarCatalogo() {
 
   google.script.run
     .withSuccessHandler(r => {
-      if (!r?.sucesso) { document.getElementById('catalogoLista').innerHTML='<p style="text-align:center;padding:2rem;color:var(--marrom-claro);font-size:0.8rem;">Erro ao carregar catálogo</p>'; return; }
+      // Exibe logs do backend no painel de log
+      (r?.logs || []).forEach(function(l) {
+        var tipo = l.tipo === 'ERRO' ? 'ERRO' : l.tipo === 'ALERTA' ? 'ALERTA' : 'INFO';
+        log(tipo, '[Catálogo] ' + l.msg);
+      });
+
+      if (!r?.sucesso) {
+        var _msg = (r && r.mensagem) ? String(r.mensagem) : 'Sem detalhes do backend';
+        var _logs = (r && Array.isArray(r.logs)) ? r.logs : [];
+        var _ultimosLogs = _logs.slice(-3).map(function(l){ return (l?.tipo || 'INFO') + ': ' + (l?.msg || ''); }).join(' | ');
+        var _raw = '';
+        try { _raw = JSON.stringify(r); } catch (_eRaw) { _raw = String(r); }
+        var _detalhe = '<br><small style="opacity:0.8;display:block;margin-top:0.35rem;">' + esc(_msg) + '</small>';
+        if (_ultimosLogs) _detalhe += '<small style="opacity:0.6;display:block;margin-top:0.35rem;">' + esc(_ultimosLogs) + '</small>';
+        _detalhe += '<small style="opacity:0.5;display:block;margin-top:0.35rem;">tipo=' + esc(typeof r) + ' | raw=' + esc(_raw) + '</small>';
+        document.getElementById('catalogoLista').innerHTML='<p style="text-align:center;padding:2rem;color:var(--marrom-claro);font-size:0.8rem;">Erro ao carregar catálogo' + _detalhe + '</p>';
+        return;
+      }
       dadosCatalogo = r;
       // Flatten para cache
       cacheReuniao = [];
@@ -2644,6 +3324,7 @@ function carregarCatalogo() {
       }
     })
     .withFailureHandler(e => {
+      log('ERRO', '[Catálogo] Falha GAS: ' + (e?.message || 'desconhecido'));
       document.getElementById('catalogoLista').innerHTML='<p style="text-align:center;padding:2rem;color:var(--marrom-claro);font-size:0.8rem;">Erro: '+(e?.message||'desconhecido')+'</p>';
     })
     .obterReunioesCatalogadas(typeof SESSAO_TOKEN !== 'undefined' ? SESSAO_TOKEN : null);
@@ -3224,6 +3905,7 @@ var NOMES_CONHECIDOS = ['Murilo','Adeline','Ana','Anne','Bráulio','Dr. André',
 var _val = { reuniaoId:null, titulo:'', ataBruta:'', secoes:[], historico:[], aposProcessamento:false };
 var _valEditId = null;        // id da seção sendo editada no modal
 var _valAiResultadoRaw = ''; // texto bruto (markdown) do último resultado da IA
+var _valAiAplicado = false;  // true quando IA foi aplicada (textarea tem o conteúdo correto)
 
 function _valParsear(md) {
   if (!md || !md.trim()) return [];
@@ -3308,6 +3990,7 @@ function _valAbrirEditModal(id) {
   document.getElementById('valEditRawToggleLabel').textContent = 'Editar Markdown';
   document.getElementById('valAiInstrucao').value = '';
   _valAiResultadoRaw = '';
+  _valAiAplicado = false;
   document.getElementById('valAiResultadoWrap').style.display = 'none';
   document.getElementById('valAiResultado').innerHTML = '';
   document.getElementById('valEditOverlay').style.display = 'flex';
@@ -3344,9 +4027,10 @@ function _valFecharEditModal() {
 function _valSalvarEditModal() {
   if (!_valEditId) return;
   const s = _val.secoes.find(x => x.id===_valEditId); if (!s) return;
-  // Se o raw está aberto, usa o markdown do textarea; caso contrário, converte do rich editor
+  // Se o raw está aberto ou IA foi aplicada, usa o markdown do textarea (já correto);
+  // caso contrário, converte do rich editor para markdown
   const rawAberto = document.getElementById('valEditRawWrap').classList.contains('aberto');
-  s.conteudo = rawAberto
+  s.conteudo = (rawAberto || _valAiAplicado)
     ? document.getElementById('valEditTextarea').value
     : html2md(document.getElementById('valEditRichEditor').innerHTML);
   s.editando = false;
@@ -3393,6 +4077,7 @@ function _valAplicarResultadoIA() {
     // Aplica no rich editor (renderizado) e sincroniza o textarea raw
     document.getElementById('valEditRichEditor').innerHTML = md2html(_valAiResultadoRaw);
     document.getElementById('valEditTextarea').value = _valAiResultadoRaw;
+    _valAiAplicado = true;
   }
   _valAiResultadoRaw = '';
   document.getElementById('valAiResultadoWrap').style.display = 'none';
@@ -3661,7 +4346,9 @@ function limparForm() {
 //  NAVEGAÇÃO
 // ═══════════════════════════════════════
 (function() {
-  var BASE = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
+  var BASE = (typeof BASE_URL !== 'undefined' && BASE_URL)
+    ? BASE_URL
+    : (window.location.origin + window.location.pathname);
   var tk = (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN)
     ? '&token=' + encodeURIComponent(SESSAO_TOKEN) : '';
   document.querySelectorAll('a[data-pagina]').forEach(function(a) {

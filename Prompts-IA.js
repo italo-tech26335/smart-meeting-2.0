@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const CONFIG_PROMPTS_REUNIAO = {
   TRANSCRICAO: {
-    modelo: 'gemini-2.5-pro',
+    modelo: 'gemini-2.5-flash',
     temperatura: 0.0,
     maxTokens: 200000,
     pensamento: 1
@@ -71,7 +71,7 @@ const CONFIG_PROMPTS_REUNIAO = {
         {
           id: 'topicos',
           nome: 'Tópicos de Gestão e Matriz de Ação',
-          modelo: 'gemini-2.5-pro',
+          modelo: 'gemini-2.5-flash',
           temperatura: 0.3,
           maxTokens: 25000,
           pensamento: 5000

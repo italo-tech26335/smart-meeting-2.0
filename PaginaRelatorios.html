@@ -9,10 +9,11 @@
   <?!= include('TemaPadrao-CSS'); ?>
 <base target="_top">
 <script>
-  var SESSAO_TOKEN   = '<?= sessaoToken ?>';
-  var USUARIO_NOME   = '<?= usuarioNome ?>';
-  var USUARIO_PERFIL = '<?= usuarioPerfil ?>';
-  var BASE_URL       = '<?= baseUrl ?>';
+  var SESSAO_TOKEN       = '<?= sessaoToken ?>';
+  var USUARIO_NOME       = '<?= usuarioNome ?>';
+  var USUARIO_PERFIL     = '<?= usuarioPerfil ?>';
+  var BASE_URL           = '<?= baseUrl ?>';
+  var PAGINAS_PERMITIDAS = <?= paginasPermitidas ?>; // [] = acesso total
 </script>
 <style>
 /* ============================================================
@@ -878,7 +879,9 @@ document.addEventListener('DOMContentLoaded',function(){
    NAVEGAÇÃO
 ============================================================ */
 function configurarNavegacao(){
-  var BASE = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
+  var BASE = (typeof BASE_URL !== 'undefined' && BASE_URL)
+    ? BASE_URL
+    : (window.location.origin + window.location.pathname);
   var tk = (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) ? '&token=' + encodeURIComponent(SESSAO_TOKEN) : '';
   document.querySelectorAll('a[data-pagina]').forEach(function(a){
     a.href = BASE + '?pagina=' + a.getAttribute('data-pagina') + tk;
@@ -1265,7 +1268,8 @@ function getOpcoes(key,tipo){
     {value:'A Fazer',label:'A Fazer'},
     {value:'Em Andamento',label:'Em Andamento'},
     {value:'Aguardando Setor',label:'Aguardando Setor'},
-    {value:'Concluída',label:'Concluída'}
+    {value:'Concluída',label:'Concluída'},
+    {value:'Suspenso',label:'Suspenso'}
   ];
   if(key==='TIPO') return [
     {value:'Correção',label:'5 - Correção'},

@@ -44,7 +44,7 @@ function mostrarSecao(id) {
 // ── Carregar usuários ─────────────────────────────────────────────────
 function carregarUsuarios() {
   var tbody = document.getElementById('tbodyUsuarios');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#475569;"><span class="spinner-inline"></span> Carregando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#475569;"><span class="spinner-inline"></span> Carregando...</td></tr>';
 
   google.script.run
     .withSuccessHandler(function(r) {
@@ -59,7 +59,7 @@ function carregarUsuarios() {
 function _renderizarUsuarios(lista) {
   var tbody = document.getElementById('tbodyUsuarios');
   if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-users"></i><p>Nenhum usuário cadastrado</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-users"></i><p>Nenhum usuário cadastrado</p></div></td></tr>';
     return;
   }
 
@@ -86,9 +86,27 @@ function _renderizarUsuarios(lista) {
       return dep ? dep.nome : depId;
     }).join(', ') || '—';
 
+    // Badges de páginas permitidas
+    var PAGINAS_INFO = { reunioes: { label: 'Reuniões', icon: 'fa-video' }, projeto: { label: 'Projetos', icon: 'fa-folder' }, relatorios: { label: 'Relatórios', icon: 'fa-chart-bar' } };
+    var paginasBadges;
+    if (u.perfil === 'admin') {
+      paginasBadges = '<span style="font-size:.72rem;color:var(--cor-aviso);font-weight:600;"><i class="fas fa-shield-alt"></i> Tudo</span>';
+    } else {
+      var pags = u.paginasPermitidas || [];
+      if (pags.length === 0) {
+        paginasBadges = '<span style="font-size:.72rem;color:var(--cor-primaria);">Todas</span>';
+      } else {
+        paginasBadges = pags.map(function(p) {
+          var info = PAGINAS_INFO[p];
+          return info ? '<span style="font-size:.7rem;background:var(--cor-destaque-bg);color:var(--cor-destaque);border-radius:12px;padding:2px 8px;font-weight:600;white-space:nowrap;"><i class="fas ' + info.icon + '" style="font-size:.65rem;"></i> ' + info.label + '</span>' : '';
+        }).filter(Boolean).join(' ');
+      }
+    }
+
     return '<tr>'
       + '<td><div style="font-weight:600;">' + _esc(u.nome) + '</div><div style="color:var(--cor-primaria);font-size:.78rem;">' + _esc(u.email) + '</div><div style="color:var(--cor-primaria);font-size:.75rem;margin-top:2px;"><i class="fas fa-building" style="font-size:.7rem;"></i> ' + _esc(depNomes) + '</div></td>'
       + '<td>' + perfilBadge + '</td>'
+      + '<td>' + paginasBadges + '</td>'
       + '<td>' + statusBadge + '</td>'
       + '<td style="color:#64748b;">' + ultimoLogin + '</td>'
       + '<td>'
@@ -298,6 +316,15 @@ function _renderizarChecksDeps(container, depsSelecionadas) {
 }
 
 // ── Modal novo usuário ────────────────────────────────────────────────
+function _definirPaginasModal(paginasPermitidas) {
+  var pags = paginasPermitidas || [];
+  // Se vazio = sem restrição = marca tudo
+  var marcaTudo = pags.length === 0;
+  document.getElementById('pagReuniao').checked   = marcaTudo || pags.includes('reunioes');
+  document.getElementById('pagProjeto').checked   = marcaTudo || pags.includes('projeto');
+  document.getElementById('pagRelatorio').checked = marcaTudo || pags.includes('relatorios');
+}
+
 function abrirModalNovoUsuario() {
   _txt('modalUsuarioTitulo', 'Novo Usuário');
   _val('editUserId', '');
@@ -308,6 +335,7 @@ function abrirModalNovoUsuario() {
   document.getElementById('campoSenhaModal').style.display = '';
   document.getElementById('senhaGerada').style.display = 'none';
   document.getElementById('editEmail').readOnly = false;
+  _definirPaginasModal([]);
   _carregarDepsParaModal([]);
   document.getElementById('modalUsuario').classList.add('aberto');
 }
@@ -323,6 +351,7 @@ function abrirModalEditarUsuario(u) {
   document.getElementById('campoSenhaModal').style.display = 'none';
   document.getElementById('senhaGerada').style.display = 'none';
   document.getElementById('editEmail').readOnly = true;
+  _definirPaginasModal(u.paginasPermitidas || []);
   _carregarDepsParaModal(u.departamentosIds || []);
   document.getElementById('modalUsuario').classList.add('aberto');
 }
@@ -347,9 +376,19 @@ function salvarUsuario() {
   var depChecks = document.querySelectorAll('#listaDepartamentosUsuario input[type="checkbox"]:checked');
   var depIds = Array.prototype.map.call(depChecks, function(c) { return c.value; });
 
+  // Coletar páginas selecionadas
+  var pagIds = [];
+  ['pagReuniao', 'pagProjeto', 'pagRelatorio'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && el.checked) pagIds.push(el.value);
+  });
+  // Se marcou tudo, salva vazio (sem restrição) para manter compatibilidade
+  var todasPags = ['reunioes', 'projeto', 'relatorios'];
+  var paginasPermitidas = pagIds.length === todasPags.length ? [] : pagIds;
+
   if (!id) {
     // Criar novo usuário (sem senha — usuário definirá PIN no primeiro acesso)
-    var dados = { nome: nome, email: email, perfil: perfil, departamentosIds: depIds };
+    var dados = { nome: nome, email: email, perfil: perfil, departamentosIds: depIds, paginasPermitidas: paginasPermitidas };
 
     google.script.run
       .withSuccessHandler(function(r) {
@@ -372,7 +411,7 @@ function salvarUsuario() {
   } else {
     // Atualizar usuário existente
     var ativo = document.getElementById('editAtivo').value === 'true';
-    var dadosUpd = { id: id, nome: nome, perfil: perfil, ativo: ativo, departamentosIds: depIds };
+    var dadosUpd = { id: id, nome: nome, perfil: perfil, ativo: ativo, departamentosIds: depIds, paginasPermitidas: paginasPermitidas };
 
     google.script.run
       .withSuccessHandler(function(r) {
