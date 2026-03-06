@@ -35,23 +35,15 @@ const CONFIG_PROMPTS_REUNIAO = {
   // de modelo, temperatura e tokens — dando controle granular sobre cada parte.
   ESTILOS: {
 
-    // ── ATA EXECUTIVA (2 segmentos) ──────────────────────────────────────────
-    executiva: {
+    // ── DECISÕES TOMADAS (1 segmento) ────────────────────────────────────────
+    decisoes: {
       segmentos: [
         {
-          id: 'decisoes',
-          nome: 'Cabeçalho e Decisões Tomadas',
+          id: 'completo',
+          nome: 'Decisões Tomadas',
           modelo: 'gemini-2.5-flash',
-          temperatura: 0.2,
-          maxTokens: 10000,
-          pensamento: 0
-        },
-        {
-          id: 'encaminhamentos',
-          nome: 'Encaminhamentos e Próximos Passos',
-          modelo: 'gemini-2.5-flash',
-          temperatura: 0.2,
-          maxTokens: 8000,
+          temperatura: 0.3,
+          maxTokens: 12000,
           pensamento: 0
         }
       ]
@@ -95,32 +87,16 @@ const CONFIG_PROMPTS_REUNIAO = {
       ]
     },
 
-    // ── ATA POR RESPONSÁVEL (3 segmentos) ────────────────────────────────────
-    por_responsavel: {
+    // ── DEV — SETOR B.I. (1 segmento — PRD completo) ─────────────────────────
+    dev_bi: {
       segmentos: [
         {
-          id: 'cabecalho',
-          nome: 'Cabeçalho',
+          id: 'completo',
+          nome: 'PRD — Documento de Requisitos',
           modelo: 'gemini-2.5-flash',
           temperatura: 0.2,
-          maxTokens: 4000,
-          pensamento: 0
-        },
-        {
-          id: 'participacao',
-          nome: 'Participação por Pessoa',
-          modelo: 'gemini-2.5-flash',
-          temperatura: 0.3,
-          maxTokens: 18000,
-          pensamento: 0
-        },
-        {
-          id: 'consolidado',
-          nome: 'Responsabilidades Consolidadas',
-          modelo: 'gemini-2.5-flash',
-          temperatura: 0.2,
-          maxTokens: 8000,
-          pensamento: 0
+          maxTokens: 20000,
+          pensamento: 5000
         }
       ]
     },
@@ -522,7 +498,7 @@ function montarPromptRelatorio(setoresExistentes, projetosExistentes, etapasExis
 //  com configuração própria de modelo e tokens.
 //
 //  Parâmetros:
-//    estilo         – 'executiva' | 'detalhada' | 'por_responsavel' | 'alinhamento'
+//    estilo         – 'decisoes' | 'detalhada' | 'dev_bi' | 'alinhamento'
 //    segmentoId     – id do segmento conforme definido em ESTILOS[estilo].segmentos
 //    titulo         – título da reunião
 //    participantes  – lista de participantes (texto livre)
@@ -548,38 +524,38 @@ function montarPromptSegmentoAta(estilo, segmentoId, titulo, participantes, data
 
 
   // ══════════════════════════════════════════════════════════════════
-  //  ESTILO: EXECUTIVA
+  //  ESTILO: DECISÕES TOMADAS
   // ══════════════════════════════════════════════════════════════════
 
-  if (estilo === 'executiva') {
+  if (estilo === 'decisoes') {
 
-    if (segmentoId === 'decisoes') {
+    if (segmentoId === 'completo') {
       return (
-        'Você é um secretário executivo especializado em atas de alto nível para diretores e gestores.\n\n' +
+        'Você é um secretário especializado em registrar decisões de reunião de forma clara e consultável.\n\n' +
+        '**Objetivo:** Não gerar atas formais. O propósito é manter um histórico consultável de decisões — ' +
+        'respondendo perguntas como "quando foi que decidimos isso?" — e garantir que todos os participantes fiquem alinhados.\n\n' +
         cabecalhoComum +
         '## SUA TAREFA:\n' +
-        'Gere APENAS as seções 1 e 2 da Ata Executiva. Seja EXAUSTIVO — extraia cada decisão sem omitir nenhuma.\n\n' +
-        '### 1. CABEÇALHO\n' +
-        '- Reunião, Data, Participantes Presentes, Pauta\n\n' +
-        '### 2. DECISÕES TOMADAS\n' +
-        'Lista numerada com CADA DECISÃO firmada, quem decidiu e o racional resumido em 1-2 frases.\n' +
-        'Se houver 10 decisões, liste 10. Se houver 20, liste 20. Não omita nenhuma.\n\n' +
-        '⚠️ Retorne APENAS essas 2 seções em Markdown. Não adicione introdução, conclusão ou outras seções.'
-      );
-    }
-
-    if (segmentoId === 'encaminhamentos') {
-      return (
-        'Você é um secretário executivo especializado em atas de alto nível para diretores e gestores.\n\n' +
-        cabecalhoComum +
-        '## SUA TAREFA:\n' +
-        'Gere APENAS as seções 3 e 4 da Ata Executiva. Seja EXAUSTIVO — não omita nenhum encaminhamento.\n\n' +
-        '### 3. ENCAMINHAMENTOS\n' +
-        'Tabela completa: Nº | Ação | Responsável | Prazo\n' +
-        'Liste TODOS os encaminhamentos, tarefas e compromissos assumidos na reunião.\n\n' +
-        '### 4. PRÓXIMA REUNIÃO / PRÓXIMOS PASSOS\n' +
-        'Data ou prazo da próxima revisão, se mencionado. Outros próximos passos estratégicos.\n\n' +
-        '⚠️ Retorne APENAS essas 2 seções em Markdown. Não adicione introdução, conclusão ou outras seções.'
+        'Analise a transcrição e redija um documento de decisões. Inclua APENAS o que foi efetivamente DECIDIDO e APROVADO na reunião.\n\n' +
+        '## REGRAS:\n' +
+        '1. Comece com uma saudação breve e natural dirigida aos participantes (ex: "Boa tarde, [Nome] e demais.")\n' +
+        '2. Adicione uma linha de abertura explicando o propósito do documento\n' +
+        '3. Agrupe as decisões por TEMA numerado (ex: "1. Gestão Financeira e Preços")\n' +
+        '4. Dentro de cada tema, liste cada decisão com um **título em negrito** seguido de 2-3 frases de explicação\n' +
+        '5. Use linguagem direta e natural — sem jargão burocrático ou fórmulas de ata formal\n' +
+        '6. Inclua SOMENTE decisões confirmadas — exclua discussões, opiniões, possibilidades em aberto\n' +
+        '7. Preserve valores, percentuais, prazos e nomes com exatidão\n' +
+        '8. Não use tabelas, cabeçalhos formais, numeração de seções de ata tradicional\n\n' +
+        '## MODELO DE SAÍDA (siga este padrão):\n' +
+        '[Saudação], [participantes] e demais.\n\n' +
+        'Segue o resumo das decisões aprovadas em nossa última reunião, para que possamos dar andamento às nossas pautas.\n\n' +
+        '1. [Tema do Grupo]\n\n' +
+        '**[Título da Decisão]:** [Explicação em 2-3 frases com detalhes concretos — valores, prazos, nomes.]\n\n' +
+        '**[Próxima Decisão]:** [Explicação...]\n\n' +
+        '2. [Próximo Tema]\n\n' +
+        '...\n\n' +
+        '⚠️ Retorne APENAS este documento em Markdown leve (negrito para títulos de decisão, sem outros marcadores). ' +
+        'Não adicione assinatura, rodapé, seção de cabeçalho ou "próximos passos" separados.'
       );
     }
   }
@@ -674,56 +650,94 @@ function montarPromptSegmentoAta(estilo, segmentoId, titulo, participantes, data
 
 
   // ══════════════════════════════════════════════════════════════════
-  //  ESTILO: POR RESPONSÁVEL
+  //  ESTILO: DEV — SETOR B.I.
   // ══════════════════════════════════════════════════════════════════
 
-  if (estilo === 'por_responsavel') {
+  if (estilo === 'dev_bi') {
 
-    if (segmentoId === 'cabecalho') {
+    if (segmentoId === 'completo') {
       return (
-        'Você é um secretário especializado em atas organizadas por pessoa.\n\n' +
+        'Você é um Product Manager técnico sênior especializado em transformar discussões de reuniões em documentos de requisitos estruturados.\n\n' +
+        'Sua tarefa: Analisar o transcript da reunião a seguir e gerar um PRD (Product Requirements Document) completo, claro e acionável para o time de desenvolvimento.\n\n' +
         cabecalhoComum +
-        '## SUA TAREFA:\n' +
-        'Gere APENAS a seção 1 da Ata por Responsável.\n\n' +
-        '### 1. CABEÇALHO\n' +
-        '- Reunião, Data, Participantes Presentes, Pauta, Duração estimada.\n\n' +
-        '⚠️ Retorne APENAS esta seção em Markdown. Não adicione introdução, conclusão ou outras seções.'
-      );
-    }
-
-    if (segmentoId === 'participacao') {
-      return (
-        'Você é um secretário especializado em atas organizadas por pessoa.\n\n' +
-        cabecalhoComum +
-        '## SUA TAREFA:\n' +
-        'Gere APENAS a seção 2 da Ata por Responsável. ' +
-        'Seja EXAUSTIVO — capture TUDO que cada pessoa disse, decidiu ou assumiu. ' +
-        'Não agrupe pessoas diferentes. Não resuma demais.\n\n' +
-        '### 2. PARTICIPAÇÃO POR PESSOA\n' +
-        'Para CADA participante que contribuiu ativamente:\n\n' +
-        '**[Nome do Participante]**\n' +
-        '- Posicionamentos e declarações relevantes (com detalhes, não apenas "concordou")\n' +
-        '- Decisões que tomou ou co-participou\n' +
-        '- Tarefas ou responsabilidades assumidas (com prazo, se mencionado)\n' +
-        '- Questões ou dúvidas levantadas\n\n' +
-        'Inclua apenas participantes com contribuição identificável.\n\n' +
-        '⚠️ Retorne APENAS esta seção em Markdown. Não adicione introdução, conclusão ou outras seções.'
-      );
-    }
-
-    if (segmentoId === 'consolidado') {
-      return (
-        'Você é um secretário especializado em atas organizadas por pessoa.\n\n' +
-        cabecalhoComum +
-        '## SUA TAREFA:\n' +
-        'Gere APENAS as seções 3 e 4 da Ata por Responsável. ' +
-        'Seja COMPLETO — liste TODAS as pendências e responsabilidades, incluindo as implícitas.\n\n' +
-        '### 3. RESPONSABILIDADES CONSOLIDADAS\n' +
-        'Tabela completa: Responsável | Tarefa | Prazo | Status\n' +
-        'Liste TODAS as responsabilidades atribuídas na reunião.\n\n' +
-        '### 4. PONTOS SEM RESPONSÁVEL DEFINIDO\n' +
-        'Pendências, problemas ou questões levantadas sem atribuição clara de responsável.\n\n' +
-        '⚠️ Retorne APENAS essas 2 seções em Markdown. Não adicione introdução, conclusão ou outras seções.'
+        '─── REGRAS DE EXTRAÇÃO ───\n\n' +
+        '1. Extraia SOMENTE o que foi discutido e decidido na reunião — não invente requisitos\n' +
+        '2. Se algo ficou ambíguo, marque com [PRECISA CLARIFICAÇÃO]\n' +
+        '3. Se uma tecnologia/linguagem foi mencionada, priorize ela; se não foi, sugira a mais adequada e justifique\n' +
+        '4. Separe claramente o que é MVP do que é melhoria futura\n' +
+        '5. Use linguagem técnica mas acessível — o PRD será lido por devs frontend, backend e mobile\n\n' +
+        '─── ESTRUTURA DO PRD ───\n\n' +
+        'Gere o documento EXATAMENTE neste formato:\n\n' +
+        '## 📋 PRD — [Nome do Projeto/Feature]\n' +
+        'Versão: 1.0 | Data: [data da reunião] | Status: Rascunho\n\n' +
+        '---\n\n' +
+        '### 1. VISÃO GERAL\n' +
+        '- **Objetivo:** O que está sendo construído e por quê\n' +
+        '- **Problema que resolve:** Dor/necessidade identificada na reunião\n' +
+        '- **Usuários afetados:** Quem vai usar isso\n' +
+        '- **Impacto esperado:** O que muda após a entrega\n\n' +
+        '---\n\n' +
+        '### 2. ESCOPO\n' +
+        '**✅ Dentro do escopo (MVP):**\n' +
+        '[lista de funcionalidades confirmadas]\n\n' +
+        '**🔮 Fora do escopo (futuro):**\n' +
+        '[lista de ideias mencionadas mas não prioritárias agora]\n\n' +
+        '---\n\n' +
+        '### 3. REQUISITOS FUNCIONAIS\n' +
+        'Para cada feature, use o formato:\n' +
+        '**RF-01 — [Nome]**\n' +
+        '- Descrição: O que deve fazer\n' +
+        '- Comportamento esperado: Como deve funcionar\n' +
+        '- Critério de aceite: Como saber que está pronto\n\n' +
+        '---\n\n' +
+        '### 4. REQUISITOS NÃO-FUNCIONAIS\n' +
+        '- Performance: [tempo de resposta, carga esperada]\n' +
+        '- Segurança: [autenticação, permissões, dados sensíveis]\n' +
+        '- Escalabilidade: [previsão de crescimento]\n' +
+        '- Disponibilidade: [uptime esperado, ambientes]\n\n' +
+        '---\n\n' +
+        '### 5. STACK TÉCNICA SUGERIDA\n' +
+        '| Camada | Tecnologia | Justificativa |\n' +
+        '|--------|-----------|---------------|\n' +
+        '| Frontend | ... | ... |\n' +
+        '| Backend | ... | ... |\n' +
+        '| Banco de dados | ... | ... |\n' +
+        '| Infra/Deploy | ... | ... |\n' +
+        '| Integrações | ... | ... |\n\n' +
+        '*(Se a tecnologia foi definida na reunião, use ela. Se não, sugira e explique o porquê.)*\n\n' +
+        '---\n\n' +
+        '### 6. ARQUITETURA / FLUXO PRINCIPAL\n' +
+        'Descreva em texto simples o fluxo principal do sistema:\n' +
+        '[Ex: Usuário acessa → autentica via X → visualiza dashboard → realiza ação Y → sistema dispara Z]\n\n' +
+        'Se houver integrações entre sistemas, descreva-as.\n\n' +
+        '---\n\n' +
+        '### 7. HISTÓRIAS DE USUÁRIO (User Stories)\n' +
+        'Use o formato padrão:\n' +
+        '**US-01:** Como [tipo de usuário], quero [ação], para que [benefício]\n' +
+        '- Tarefas técnicas: [lista de tasks para o dev]\n' +
+        '- Estimativa: [P/M/G ou story points se mencionado]\n\n' +
+        '---\n\n' +
+        '### 8. PONTOS DE ATENÇÃO / RISCOS\n' +
+        '- ⚠️ [Risco técnico ou de negócio identificado]\n' +
+        '- ❓ [Dúvida que precisa ser respondida antes de começar]\n' +
+        '- 🔗 [Dependência externa — outro time, API, fornecedor]\n\n' +
+        '---\n\n' +
+        '### 9. DEFINIÇÃO DE PRONTO (Definition of Done)\n' +
+        'Uma feature está pronta quando:\n' +
+        '- [ ] Código revisado (code review aprovado)\n' +
+        '- [ ] Testes escritos e passando\n' +
+        '- [ ] Documentação atualizada\n' +
+        '- [ ] Deploy em staging validado pelo PO\n' +
+        '- [ ] [outros critérios mencionados na reunião]\n\n' +
+        '---\n\n' +
+        '### 10. PRÓXIMOS PASSOS\n' +
+        '| Ação | Responsável | Prazo |\n' +
+        '|------|------------|-------|\n' +
+        '| [ação extraída da reunião] | [pessoa mencionada] | [data mencionada ou DEFINIR] |\n\n' +
+        '---\n' +
+        '⚡ PONTOS DESTACADOS DA REUNIÃO\n' +
+        'Liste aqui frases ou decisões importantes ditas literalmente na reunião que não devem ser perdidas.\n\n' +
+        '⚠️ Retorne APENAS o PRD completo em Markdown. Não adicione introdução, conclusão ou texto fora da estrutura acima.'
       );
     }
   }

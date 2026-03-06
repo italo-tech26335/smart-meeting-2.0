@@ -4173,6 +4173,58 @@ function listarAudiosNaoProcessados(token) {
 }
 
 /**
+ * Exclui um áudio pendente: move o arquivo do Drive para lixeira e remove a linha
+ * da planilha (ou marca como excluído). Só funciona em reuniões com status AGUARDANDO.
+ */
+function excluirAudioPendente(reuniaoId, token) {
+  try {
+    var sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+
+    var aba = obterAba(NOME_ABA_REUNIOES);
+    if (!aba) return { sucesso: false, mensagem: 'Aba de reuniões não encontrada.' };
+
+    var dados    = aba.getDataRange().getValues();
+    var linhaNum = -1;
+    var linkAudio = '';
+
+    for (var i = 1; i < dados.length; i++) {
+      var rowId  = (dados[i][COLUNAS_REUNIOES.ID]     || '').toString().trim();
+      var status = (dados[i][COLUNAS_REUNIOES.STATUS] || '').toString().trim();
+      if (rowId === reuniaoId) {
+        if (status !== STATUS_REUNIAO.AGUARDANDO) {
+          return { sucesso: false, mensagem: 'Reunião não está em status "Aguardando Processamento".' };
+        }
+        linhaNum  = i + 1; // índice 1-based para GAS
+        linkAudio = (dados[i][COLUNAS_REUNIOES.LINK_AUDIO] || '').toString().trim();
+        break;
+      }
+    }
+
+    if (linhaNum < 0) return { sucesso: false, mensagem: 'Reunião não encontrada.' };
+
+    // Move o arquivo do Drive para a lixeira
+    if (linkAudio) {
+      try {
+        var m = linkAudio.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (m) DriveApp.getFileById(m[1]).setTrashed(true);
+      } catch (eDrive) {
+        Logger.log('AVISO excluirAudioPendente: erro ao mover para lixeira: ' + eDrive.message);
+        // Prossegue para remover da planilha mesmo assim
+      }
+    }
+
+    // Remove a linha da planilha
+    aba.deleteRow(linhaNum);
+
+    return { sucesso: true };
+  } catch (e) {
+    Logger.log('ERRO excluirAudioPendente: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
  * Processa um áudio previamente salvo: executa transcrição, gera estilos de ata
  * selecionados e opcionalmente gera relatório. Atualiza a linha existente na planilha.
  * Parâmetros de dadosProcessamento:
@@ -4481,7 +4533,7 @@ function gerarAtaEstiloParaReuniao(token, reuniaoId, estilo, instrucaoExtra) {
     const sessao = _obterSessao(token);
     if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.', logs };
 
-    const estilosValidos = ['executiva', 'detalhada', 'por_responsavel', 'alinhamento'];
+    const estilosValidos = Object.keys(CONFIG_PROMPTS_REUNIAO.ESTILOS);
     if (!estilo || !estilosValidos.includes(estilo)) {
       return { sucesso: false, mensagem: 'Estilo inválido: ' + estilo, logs };
     }
@@ -4661,8 +4713,8 @@ function obterPreviewPromptAta(token, opcoes) {
     if (!_obterSessao(token)) return { sucesso: false, mensagem: 'Sessao invalida.' };
 
     opcoes = opcoes || {};
-    const estilo = (opcoes.estilo || 'executiva').toString();
-    const estilosValidos = ['executiva', 'detalhada', 'por_responsavel', 'alinhamento'];
+    const estilo = (opcoes.estilo || 'decisoes').toString();
+    const estilosValidos = Object.keys(CONFIG_PROMPTS_REUNIAO.ESTILOS);
     if (!estilosValidos.includes(estilo)) {
       return { sucesso: false, mensagem: 'Estilo invalido: ' + estilo };
     }

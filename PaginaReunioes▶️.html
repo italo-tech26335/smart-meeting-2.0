@@ -1648,13 +1648,13 @@
         <label class="form-label">Estilo de Ata</label>
         <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.25rem;">
           <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.875rem;">
-            <input type="radio" name="procPendenteEstilo" value="executiva" checked style="accent-color:var(--ocre);"> Ata Executiva
+            <input type="radio" name="procPendenteEstilo" value="decisoes" checked style="accent-color:var(--ocre);"> Decisões Tomadas
           </label>
           <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.875rem;">
             <input type="radio" name="procPendenteEstilo" value="detalhada" style="accent-color:var(--ocre);"> Ata Detalhada
           </label>
           <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.875rem;">
-            <input type="radio" name="procPendenteEstilo" value="por_responsavel" style="accent-color:var(--ocre);"> Por Responsável
+            <input type="radio" name="procPendenteEstilo" value="dev_bi" style="accent-color:var(--ocre);"> DEV — Setor B.I.
           </label>
           <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.875rem;">
             <input type="radio" name="procPendenteEstilo" value="alinhamento" style="accent-color:var(--ocre);"> Alinhamento Rápido
@@ -1688,16 +1688,16 @@
           <p style="color:var(--marrom-claro);font-size:0.82rem;margin-bottom:0.75rem;">Selecione o estilo de ata a gerar:</p>
           <div style="display:flex;flex-direction:column;gap:0.55rem;">
             <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
-              <input type="radio" name="estiloAta" id="rdoEstiloExecutiva" value="executiva" onchange="carregarPreviewPrompt('executiva')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
-              <span>Ata Executiva<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Decisões e encaminhamentos</small></span>
+              <input type="radio" name="estiloAta" id="rdoEstiloDecisoes" value="decisoes" onchange="carregarPreviewPrompt('decisoes')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
+              <span>Decisões Tomadas<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Histórico consultável de decisões aprovadas</small></span>
             </label>
             <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
               <input type="radio" name="estiloAta" id="rdoEstiloDetalhada" value="detalhada" onchange="carregarPreviewPrompt('detalhada')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
               <span>Ata Detalhada<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Tópicos, log operacional e feedback</small></span>
             </label>
             <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
-              <input type="radio" name="estiloAta" id="rdoEstiloResponsavel" value="por_responsavel" onchange="carregarPreviewPrompt('por_responsavel')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
-              <span>Por Responsável<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Agrupado por pessoa</small></span>
+              <input type="radio" name="estiloAta" id="rdoEstiloDevBi" value="dev_bi" onchange="carregarPreviewPrompt('dev_bi')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
+              <span>DEV — Setor B.I.<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">PRD completo para o time de desenvolvimento</small></span>
             </label>
             <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
               <input type="radio" name="estiloAta" id="rdoEstiloAlinhamento" value="alinhamento" onchange="carregarPreviewPrompt('alinhamento')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
@@ -2639,7 +2639,7 @@ async function _executarEnvio(estilosAta, instrucaoExtra) {
   if (!arquivoAtual) { toast('Selecione um arquivo', 'aviso'); return; }
   const titulo = document.getElementById('inputTitulo').value || 'Reunião ' + new Date().toLocaleDateString('pt-BR');
   const participantes = document.getElementById('inputParticipantes').value || '';
-  const estilo = estilosAta[0] || 'executiva';
+  const estilo = estilosAta[0] || 'decisoes';
 
   let arq = arquivoAtual;
   const precisaComprimir = arq.size > 15*1024*1024;
@@ -3163,6 +3163,7 @@ function _renderAudiosPendentes(audios) {
       ? '<span style="font-size:0.65rem;color:#c0392b;font-weight:700;margin-left:0.35rem;"><i class="fas fa-exclamation-triangle"></i> ' + audio.diasDesdeUpload + 'd</span>'
       : (audio.diasDesdeUpload > 0 ? '<span style="font-size:0.65rem;color:var(--marrom-claro);margin-left:0.35rem;">' + audio.diasDesdeUpload + 'd</span>' : '');
 
+    var audioJson = JSON.stringify(audio).replace(/"/g,'&quot;');
     html += '<div style="display:flex;align-items:center;gap:0.6rem;background:var(--creme-claro);border:1px solid var(--creme-escuro);border-radius:var(--raio);padding:0.55rem 0.7rem;">' +
       '<i class="fas fa-file-audio" style="color:var(--laranja,#e07b39);flex-shrink:0;font-size:0.9rem;"></i>' +
       '<div style="flex:1;min-width:0;">' +
@@ -3170,9 +3171,17 @@ function _renderAudiosPendentes(audios) {
         (audio.participantes ? '<div style="font-size:0.7rem;color:var(--marrom-claro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(audio.participantes) + '</div>' : '') +
         (dataStr ? '<div style="font-size:0.68rem;color:var(--marrom-claro);">' + dataStr + '</div>' : '') +
       '</div>' +
-      '<button class="btn btn-sm btn-verde" onclick="abrirModalProcessarPendente(' + JSON.stringify(audio).replace(/"/g,'&quot;') + ')" style="flex-shrink:0;">' +
-        '<i class="fas fa-play"></i> Processar' +
-      '</button>' +
+      '<div style="display:flex;gap:0.35rem;flex-shrink:0;">' +
+        '<button class="btn btn-sm btn-verde" onclick="abrirModalProcessarPendente(' + audioJson + ')" title="Processar áudio e gerar ata">' +
+          '<i class="fas fa-play"></i> Processar' +
+        '</button>' +
+        '<button class="btn btn-sm btn-secundario" onclick="downloadAudioPendente(' + audioJson + ')" title="Baixar áudio" style="padding:0 0.5rem;">' +
+          '<i class="fas fa-download"></i>' +
+        '</button>' +
+        '<button class="btn btn-sm" onclick="excluirAudioPendente(' + audioJson + ')" title="Excluir áudio" style="padding:0 0.5rem;background:transparent;border:1px solid var(--vermelho,#c0392b);color:var(--vermelho,#c0392b);">' +
+          '<i class="fas fa-trash"></i>' +
+        '</button>' +
+      '</div>' +
     '</div>';
   });
   lista.innerHTML = html;
@@ -3180,6 +3189,50 @@ function _renderAudiosPendentes(audios) {
 
 function abrirModalProcessarPendente(audio) {
   carregarPendenteNoFormulario(audio);
+}
+
+function downloadAudioPendente(audio) {
+  var link = audio.linkAudio || '';
+  if (!link) { toast('Link de download não disponível.', 'erro'); return; }
+  // Extrai o file ID do Drive e abre URL de download direto
+  var m = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) {
+    window.open('https://drive.google.com/uc?export=download&id=' + m[1], '_blank');
+  } else {
+    window.open(link, '_blank');
+  }
+}
+
+function excluirAudioPendente(audio) {
+  if (!confirm('Excluir o áudio "' + (audio.nomeArquivo || 'este áudio') + '"?\n\nO arquivo será movido para a lixeira do Drive e não poderá mais ser processado.')) return;
+
+  var token = typeof SESSAO_TOKEN !== 'undefined' ? SESSAO_TOKEN : null;
+  if (!token) { toast('Sessão inválida.', 'erro'); return; }
+
+  // Desativa o card visualmente enquanto exclui
+  var cards = document.querySelectorAll('#pendentesLista > div');
+  cards.forEach(function(card) {
+    if (card.textContent.indexOf(audio.nomeArquivo || audio.id) >= 0) {
+      card.style.opacity = '0.4';
+      card.style.pointerEvents = 'none';
+    }
+  });
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (res.sucesso) {
+        toast('Áudio excluído com sucesso.', 'sucesso');
+        carregarAudiosNaoProcessados(); // recarrega a lista
+      } else {
+        toast('Erro ao excluir: ' + res.mensagem, 'erro');
+        carregarAudiosNaoProcessados(); // restaura visualmente
+      }
+    })
+    .withFailureHandler(function(e) {
+      toast('Falha ao excluir áudio.', 'erro');
+      carregarAudiosNaoProcessados();
+    })
+    .excluirAudioPendente(audio.id, token);
 }
 
 function carregarPendenteNoFormulario(audio) {
@@ -3776,10 +3829,10 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 // ═══════════════════════════════════════════════════════════════
 // Segmentos de cada estilo (espelha CONFIG_PROMPTS_REUNIAO.ESTILOS no backend)
 var CONFIG_ESTILOS_SEGMENTOS = {
-  executiva:      [{ id:'decisoes', nome:'Cabeçalho e Decisões Tomadas' }, { id:'encaminhamentos', nome:'Encaminhamentos e Próximos Passos' }],
-  detalhada:      [{ id:'cabecalho', nome:'Cabeçalho e Síntese Executiva' }, { id:'topicos', nome:'Tópicos de Gestão e Matriz de Ação' }, { id:'log_compliance', nome:'Log Operacional e Compliance' }, { id:'feedback', nome:'Relatório de Feedback (Privado)' }],
-  por_responsavel:[{ id:'cabecalho', nome:'Cabeçalho' }, { id:'participacao', nome:'Participação por Pessoa' }, { id:'consolidado', nome:'Responsabilidades Consolidadas' }],
-  alinhamento:    [{ id:'completo', nome:'Ata de Alinhamento Rápido' }]
+  decisoes:   [{ id:'completo', nome:'Decisões Tomadas' }],
+  detalhada:  [{ id:'cabecalho', nome:'Cabeçalho e Síntese Executiva' }, { id:'topicos', nome:'Tópicos de Gestão e Matriz de Ação' }, { id:'log_compliance', nome:'Log Operacional e Compliance' }, { id:'feedback', nome:'Relatório de Feedback (Privado)' }],
+  dev_bi:     [{ id:'completo', nome:'PRD — Documento de Requisitos' }],
+  alinhamento:[{ id:'completo', nome:'Ata de Alinhamento Rápido' }]
 };
 
 var _procState = { etapas: [] };

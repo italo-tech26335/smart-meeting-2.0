@@ -107,6 +107,7 @@ let ESTADO = {
   },
   filtroStatusAtividades: 'todos',
   statusAnteriorAtividades: {},
+  atividadesEmSalvamento: new Set(), // lock por atividade — impede cliques duplos
 
   textoBuscaAtividades: '',
 ordenacaoAtividades: 'manual',
@@ -2633,6 +2634,9 @@ function renderizarAtividade(atividade, todasAtividades, idx, isDraggable) {
 function alternarConclusaoAtividade(atividadeId, event) {
   if (event) { event.stopPropagation(); event.preventDefault(); }
 
+  // ── LOCK por atividade: ignora clique se já está sendo salva ──
+  if (ESTADO.atividadesEmSalvamento.has(atividadeId)) return;
+
   var atividade = ESTADO.etapas.find(function(e) { return e.id === atividadeId; });
   if (!atividade || !ESTADO.projeto) return;
 
@@ -2649,11 +2653,11 @@ function alternarConclusaoAtividade(atividadeId, event) {
     novoStatus = 'Concluída';
   }
 
-  // Atualiza localmente de imediato (UX responsivo)
+  // ── Atualiza ESTADO e trava o botão visualmente (sem re-render completo) ──
   atividade.status = novoStatus;
-  renderizarDiagrama();
+  ESTADO.atividadesEmSalvamento.add(atividadeId);
+  _atualizarBotaoChecklist(atividadeId, novoStatus, true); // spinner
 
-  // Montar objeto completo para salvar (mesmo formato do modal de edição)
   var dadosParaSalvar = {
     id:              atividade.id,
     projetoId:       atividade.projetoId || ESTADO.projeto.id,
@@ -2662,42 +2666,119 @@ function alternarConclusaoAtividade(atividadeId, event) {
     status:          novoStatus,
     responsaveisIds: atividade.responsaveisIds || []
   };
-  // Persistir no backend (segundo plano, sem tela de carregamento)
+
   if (typeof google !== 'undefined' && google.script) {
     google.script.run
       .withSuccessHandler(function(res) {
+        ESTADO.atividadesEmSalvamento.delete(atividadeId);
         if (res.sucesso) {
-          // Sucesso silencioso — já atualizamos a tela antes
+          _atualizarBotaoChecklist(atividadeId, novoStatus, false);
           var textoAcao = novoStatus === 'Concluída' ? 'concluída' : 'reaberta';
           mostrarToast('Atividade ' + textoAcao + '!', 'sucesso');
         } else {
-          // Rollback completo em caso de erro do servidor
-          rollbackChecklist(atividade, atividadeId, statusAnterior, novoStatus);
+          // Rollback cirúrgico — sem re-render completo
+          atividade.status = statusAnterior;
+          if (novoStatus === 'Concluída') {
+            delete ESTADO.statusAnteriorAtividades[atividadeId];
+          } else {
+            ESTADO.statusAnteriorAtividades[atividadeId] = novoStatus;
+          }
+          _atualizarBotaoChecklist(atividadeId, statusAnterior, false);
           mostrarToast('Erro ao salvar: ' + res.mensagem, 'erro');
         }
       })
       .withFailureHandler(function(erro) {
-        // Rollback completo em caso de falha de rede/servidor
-        rollbackChecklist(atividade, atividadeId, statusAnterior, novoStatus);
-        mostrarToast('Erro de conexão: ' + erro, 'erro');
+        ESTADO.atividadesEmSalvamento.delete(atividadeId);
+        // Rollback cirúrgico — sem re-render completo
+        atividade.status = statusAnterior;
+        if (novoStatus === 'Concluída') {
+          delete ESTADO.statusAnteriorAtividades[atividadeId];
+        } else {
+          ESTADO.statusAnteriorAtividades[atividadeId] = novoStatus;
+        }
+        _atualizarBotaoChecklist(atividadeId, statusAnterior, false);
+        mostrarToast('Erro de conexão ao salvar atividade', 'erro');
       })
       .salvarEtapaCompleta(dadosParaSalvar, SESSAO_TOKEN);
+  } else {
+    // Ambiente sem google.script (dev local): libera lock imediatamente
+    ESTADO.atividadesEmSalvamento.delete(atividadeId);
+    _atualizarBotaoChecklist(atividadeId, novoStatus, false);
   }
 }
 
-function rollbackChecklist(atividade, atividadeId, statusAnterior, novoStatusQuefalhou) {
-  // Reverter para o status que estava ANTES do clique
-  atividade.status = statusAnterior;
+// Atualiza cirurgicamente o botão checklist e o visual da atividade no DOM,
+// sem reconstruir todo o innerHTML (evita perda de foco e cliques desordenados).
+function _atualizarBotaoChecklist(atividadeId, status, salvando) {
+  var node  = document.querySelector('.atividade-node[data-atividade-id="' + atividadeId + '"]');
+  if (!node) return;
 
-  if (novoStatusQuefalhou === 'Concluída') {
-    // Tentamos concluir e falhou → remove o registro do mapa
-    delete ESTADO.statusAnteriorAtividades[atividadeId];
+  var btn    = node.querySelector('.btn-checklist');
+  var icone  = btn  ? btn.querySelector('i')                       : null;
+  var titulo = node.querySelector('.atividade-card-titulo');
+  var badge  = node.querySelector('.badge-status-clicavel');
+
+  var concluida = (status === 'Concluída');
+
+  if (salvando) {
+    // ── Travar: spinner + desabilitar ──
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add('salvando');
+      if (icone) icone.className = 'fas fa-spinner fa-spin';
+      btn.title = 'Salvando...';
+    }
   } else {
-    // Tentamos desfazer e falhou → restaura o registro no mapa
-    ESTADO.statusAnteriorAtividades[atividadeId] = novoStatusQuefalhou;
-  }
+    // ── Liberar: atualiza ícone, classes e badge ──
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('salvando');
+      if (concluida) {
+        btn.classList.add('concluida');
+        if (icone) icone.className = 'fas fa-check-circle';
+        btn.title = 'Desmarcar conclusão';
+      } else {
+        btn.classList.remove('concluida');
+        if (icone) icone.className = 'fas fa-circle';
+        btn.title = 'Marcar como concluída';
+      }
+    }
 
-  renderizarDiagrama();
+    // Risco no título
+    if (titulo) {
+      if (concluida) titulo.classList.add('riscado');
+      else           titulo.classList.remove('riscado');
+    }
+
+    // Opacidade do card
+    if (concluida) node.classList.add('atividade-concluida');
+    else           node.classList.remove('atividade-concluida');
+
+    // Badge de status (ciclarStatusAtividade)
+    if (badge) {
+      var classeStatus = obterClasseStatus(status);
+      var iconeStatus  = obterIconeStatus(status);
+      badge.className  = 'badge badge-' + classeStatus + ' badge-status-clicavel';
+      badge.innerHTML  = '<i class="fas fa-' + iconeStatus + '"></i> ' + (status || 'A Fazer');
+    }
+
+    // ── Barra de progresso do projeto (atualização em tempo real) ──
+    if (ESTADO.projeto) {
+      var etapasDoProjeto     = ESTADO.etapas.filter(function(e) { return e.projetoId === ESTADO.projeto.id; });
+      var totalAtividades     = etapasDoProjeto.length;
+      var concluidasAtividades = etapasDoProjeto.filter(function(e) { return e.status === 'Concluída'; }).length;
+      var pct                 = totalAtividades > 0 ? Math.round((concluidasAtividades / totalAtividades) * 100) : 0;
+      var cor                 = pct === 100 ? 'var(--cor-sucesso)' : pct >= 50 ? 'var(--cor-aviso)' : 'var(--cor-primaria)';
+
+      var elFill     = document.querySelector('.diagrama-progresso-barra-fill');
+      var elPct      = document.querySelector('.diagrama-progresso-pct');
+      var elContagem = document.querySelector('.diagrama-progresso-contagem');
+
+      if (elFill)     { elFill.style.width = pct + '%'; elFill.style.background = cor; }
+      if (elPct)      { elPct.textContent  = pct + '%'; elPct.style.color = cor; }
+      if (elContagem) { elContagem.textContent = concluidasAtividades + ' de ' + totalAtividades + ' concluídas'; }
+    }
+  }
 }
 
 function filtrarAtividades(status) {
@@ -4447,6 +4528,8 @@ style.textContent =
   '.btn-checklist:hover{border-color:var(--cor-sucesso);color:var(--cor-sucesso);transform:scale(1.1);}' +
   '.btn-checklist.concluida{border-color:var(--cor-sucesso);color:var(--cor-sucesso);background:rgba(85,107,75,0.1);}' +
   '.btn-checklist.concluida:hover{background:rgba(85,107,75,0.2);}' +
+  '.btn-checklist.salvando{cursor:wait;opacity:0.6;transform:none!important;border-color:var(--cor-borda)!important;color:var(--cor-borda)!important;}' +
+  '.btn-checklist:disabled{pointer-events:none;}' +
   '.atividade-concluida .atividade-card{opacity:0.72;}' +
   '.riscado{text-decoration:line-through;color:var(--cor-texto-secundario)!important;}' +
 
