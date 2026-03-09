@@ -6,8 +6,9 @@
   <title>Smart Meeting - Login</title>
   <base target="_top">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <?!= include('Login-CSS') ?>
 </head>
 <body>
@@ -21,13 +22,19 @@
   <div class="loading-barra"></div>
 </div>
 
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="orb orb-4"></div>
+</div>
 <div class="login-bg"></div>
 
 <div class="login-card" id="painelLogin">
   <div class="login-logo">
-    <div class="icon">&#9889;</div>
+    <div class="icon">&#9749;</div>
     <h1>Smart Meeting</h1>
-    <p>Faca login para continuar</p>
+    <p>Fa&#231;a login para continuar</p>
   </div>
 
   <? if (mensagemErroUrl) { ?>
@@ -67,8 +74,8 @@
 
 <div class="login-card painel-escolha" id="painelEscolha">
   <div class="escolha-saudacao">
-    <div class="icon">&#9889;</div>
-    <h2>Bem-vindo, <span id="escolhaNome">usuário</span>!</h2>
+    <div class="icon">&#9749;</div>
+    <h2>Bem-vindo, <span id="escolhaNome">usu&#225;rio</span>!</h2>
     <p>Onde você quer ir hoje?</p>
   </div>
 
@@ -107,8 +114,8 @@
     </a>
   </div>
 
-  <div style="text-align:center;">
-    <a onclick="fazerLogoutEscolha()" style="color:var(--marrom-claro);font-size:.8rem;cursor:pointer;text-decoration:none;">
+  <div class="link-sair">
+    <a onclick="fazerLogoutEscolha()">
       <i class="fas fa-sign-out-alt"></i> Sair
     </a>
   </div>
@@ -120,7 +127,7 @@
   </button>
 
   <div class="login-logo">
-    <div class="icon">&#128233;</div>
+    <div class="icon"><i class="fas fa-envelope" style="font-size:1.4rem;"></i></div>
     <h1>Redefinir Senha</h1>
     <p>Enviaremos um link para seu email</p>
   </div>
@@ -146,7 +153,7 @@
   </button>
 
   <div class="login-logo">
-    <div class="icon">&#128273;</div>
+    <div class="icon"><i class="fas fa-key" style="font-size:1.4rem;"></i></div>
     <h1>Primeiro Acesso</h1>
     <p>Crie seu PIN de <strong>4 dígitos</strong></p>
   </div>
@@ -193,7 +200,7 @@
 
 <div class="login-card painel-nova-senha" id="painelNovaSenha">
   <div class="login-logo">
-    <div class="icon">&#128273;</div>
+    <div class="icon"><i class="fas fa-key" style="font-size:1.4rem;"></i></div>
     <h1>Nova Senha</h1>
     <p>Crie sua nova senha de acesso</p>
   </div>

@@ -1,0 +1,656 @@
+<style id="tema-preto-styles">
+/* =====================================================================
+ *  SMART MEETING — TEMA BLACK NIGHT
+ *  Design system inspirado em GitHub Dark · Linear · VS Code
+ *  Cobertura total: header, dashboard, projetos, atividades,
+ *  todos os modais, sidebar, formulários, badges, relatório.
+ * ===================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap');
+
+/* ──────────────────────────────────────────────────────────────
+   1. VARIÁVEIS
+────────────────────────────────────────────────────────────── */
+:root {
+  /* Superfícies — hierarquia de profundidade */
+  --cor-fundo:            #0d0d0d;   /* página */
+  --cor-fundo-card:       #161616;   /* cards / modais */
+  --cor-fundo-quente:     #111111;   /* superfícies alt */
+  --dn-elevated:          #1c1c1c;   /* elementos elevados (hover cards) */
+  --dn-inlay:             #222222;   /* inputs, inlays */
+  --dn-overlay:           #2a2a2a;   /* hover rows, separadores */
+
+  /* Accent — gold */
+  --cor-primaria:         #e0b84a;
+  --cor-primaria-escura:  #b89030;
+  --cor-primaria-clara:   #f0d080;
+  --cor-primaria-bg:      rgba(224,184,74,0.10);
+
+  /* Accent — roxo */
+  --cor-destaque:         #8b7cf6;
+  --cor-destaque-bg:      rgba(139,124,246,0.12);
+
+  /* Texto */
+  --cor-texto:            #e0e0e0;
+  --cor-texto-secundario: #909090;
+  --dn-texto-muted:       #606060;
+
+  /* Bordas */
+  --cor-borda:            #2a2a2a;
+  --cor-borda-clara:      #1e1e1e;
+
+  /* Estado */
+  --cor-sucesso:   #3aaa6e;
+  --cor-aviso:     #d4882a;
+  --cor-perigo:    #d04040;
+  --cor-info:      #5578c8;
+  --cor-aguardando:#8b7cf6;
+
+  /* Sombras */
+  --sombra:    0 1px 4px  rgba(0,0,0,0.55);
+  --sombra-lg: 0 4px 16px rgba(0,0,0,0.70);
+  --sombra-xl: 0 8px 32px rgba(0,0,0,0.85);
+  --raio:    7px;
+  --raio-lg: 12px;
+  --transicao: all 0.22s ease;
+
+  --font-titulo: 'Nunito', 'Segoe UI', sans-serif;
+  --font-corpo:  'Inter',  'Segoe UI', sans-serif;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   2. BASE
+────────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-corpo) !important;
+  background:  var(--cor-fundo)  !important;
+  color:       var(--cor-texto)  !important;
+}
+h1,h2,h3,h4,h5,h6 {
+  font-family: var(--font-titulo) !important;
+  color: var(--cor-texto) !important;
+}
+a { color: var(--cor-primaria-clara) !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   3. SCROLLBARS
+────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width:7px; height:7px; }
+::-webkit-scrollbar-track  { background:#0d0d0d !important; }
+::-webkit-scrollbar-thumb  { background:#2e2e2e !important; border-radius:4px; }
+::-webkit-scrollbar-thumb:hover { background:#3e3e3e !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   4. TELA DE CARREGAMENTO
+────────────────────────────────────────────────────────────── */
+.loading-screen {
+  background: linear-gradient(135deg,#090909 0%,#111 50%,#181818 100%) !important;
+}
+.loading-vignette { background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%) !important; }
+.loading-title     { color:#e8e8e8 !important; font-family:var(--font-titulo) !important; }
+.loading-subtitle  { color:#888 !important; }
+.loading-saudacao  { color:#bbb !important; }
+.loading-status    { color:#606060 !important; }
+.loading-cup-icon  { color:var(--cor-primaria) !important; text-shadow:0 0 20px rgba(224,184,74,0.4) !important; }
+.loading-cup-wrap  { background:transparent !important; }
+.loading-progress  { background:#2a2a2a !important; }
+.loading-progress-bar { background:linear-gradient(90deg,#e0b84a,#f0d080) !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   5. SKELETON LOADING
+────────────────────────────────────────────────────────────── */
+.sk {
+  background:linear-gradient(90deg,#1c1c1c 25%,#282828 50%,#1c1c1c 75%) !important;
+  background-size:200% 100% !important;
+}
+.sk-project-card {
+  background:#161616 !important;
+  border-color:#2a2a2a !important;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   6. HEADER & NAVEGAÇÃO
+────────────────────────────────────────────────────────────── */
+.header {
+  background:linear-gradient(135deg,#080808 0%,#111 60%,#181818 100%) !important;
+  border-bottom:1px solid rgba(224,184,74,0.22) !important;
+  box-shadow:0 2px 16px rgba(0,0,0,0.65) !important;
+}
+.header-linha1 { background:transparent !important; }
+.header-linha2 {
+  background:#0a0a0a !important;
+  border-top:1px solid #1e1e1e !important;
+}
+.header-filtro-label { color:#777 !important; }
+.header-divisor-vertical { background:rgba(224,184,74,0.18) !important; }
+#headerTitulo, .headerTitulo { color:#e0e0e0 !important; font-family:var(--font-titulo) !important; }
+.header-usuario-nome { color:rgba(224,184,74,0.8) !important; }
+
+/* Nav links */
+.nav-link-proj             { color:rgba(224,184,74,0.55) !important; }
+.nav-link-proj:hover       { color:#f0d080 !important; background:rgba(224,184,74,0.06) !important; }
+.nav-link-proj.ativo       { color:#f0d080 !important; border-bottom-color:#e0b84a !important; }
+
+/* Chips header */
+.header-filtro-chips .header-chip,
+.header-chip                  { background:rgba(255,255,255,0.03) !important; border-color:rgba(224,184,74,0.2) !important; color:rgba(224,184,74,0.65) !important; }
+.header-chip:hover             { background:rgba(224,184,74,0.08) !important; color:#f0d080 !important; }
+.header-chip.ativo             { background:rgba(224,184,74,0.15) !important; color:#f0d080 !important; border-color:rgba(224,184,74,0.45) !important; }
+
+/* Botões do header */
+.btn-header                   { color:rgba(224,184,74,0.72) !important; border-color:rgba(224,184,74,0.18) !important; background:rgba(255,255,255,0.03) !important; }
+.btn-header:hover             { background:rgba(224,184,74,0.10) !important; color:#f0d080 !important; border-color:rgba(224,184,74,0.35) !important; }
+.btn-novo-projeto             { background:rgba(224,184,74,0.12) !important; border-color:rgba(224,184,74,0.35) !important; color:#f0d080 !important; }
+.btn-novo-projeto:hover       { background:rgba(224,184,74,0.22) !important; }
+.btn-tema-toggle              { background:rgba(224,184,74,0.10) !important; border-color:rgba(224,184,74,0.28) !important; color:#f0d080 !important; }
+.btn-logout                   { color:rgba(208,80,80,0.8) !important; }
+.btn-logout:hover             { color:#ff8888 !important; background:rgba(208,80,80,0.10) !important; }
+.btn-lixeira                  { background:rgba(180,50,50,0.08) !important; border-color:rgba(180,50,50,0.22) !important; color:#c05050 !important; }
+.btn-lixeira:hover            { background:rgba(180,50,50,0.15) !important; color:#e07070 !important; }
+
+/* Dropdown criar */
+.dropdown-criar               { background:#1c1c1c !important; border-color:#333 !important; box-shadow:0 8px 28px rgba(0,0,0,0.75) !important; }
+.dropdown-criar-item          { color:#ccc !important; background:transparent !important; }
+.dropdown-criar-item:hover    { background:#2a2a2a !important; color:#f0d080 !important; }
+.dropdown-criar-item i        { color:#888 !important; }
+.dropdown-criar-item:hover i  { color:#e0b84a !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   7. LAYOUT PRINCIPAL
+────────────────────────────────────────────────────────────── */
+.main-layout       { background:var(--cor-fundo) !important; }
+.painel-editor     { background:var(--cor-fundo) !important; }
+.chat-backdrop     { background:rgba(0,0,0,0.72) !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   8. DASHBOARD
+────────────────────────────────────────────────────────────── */
+.dashboard-secao { background:transparent !important; }
+.dashboard-titulo {
+  background:transparent !important;
+  border-color:#2a2a2a !important;
+}
+.dashboard-titulo h2 { color:var(--cor-texto) !important; font-family:var(--font-titulo) !important; }
+
+.bento-grid { background:transparent !important; }
+.bento-cel  {
+  background:#161616 !important;
+  border-color:#2a2a2a !important;
+  box-shadow:0 1px 6px rgba(0,0,0,0.45) !important;
+}
+.grafico-container, .grafico-setor-container { background:transparent !important; }
+.grafico-header           { background:transparent !important; border-bottom-color:#2a2a2a !important; }
+.grafico-header h4        { color:#d0d0d0 !important; font-family:var(--font-titulo) !important; }
+.grafico-filtros          { background:transparent !important; }
+.grafico-legenda          { color:#888 !important; }
+.grafico-centro-valor     { color:var(--cor-texto) !important; font-family:var(--font-titulo) !important; }
+.grafico-centro-label     { color:#777 !important; }
+.grafico-wrapper          { background:transparent !important; }
+.grafico-wrapper-setor    { background:transparent !important; }
+
+.dashboard-bloco          { background:transparent !important; border-color:#2a2a2a !important; }
+.dashboard-prioridade-bars { background:transparent !important; }
+
+.bento-resp               { background:linear-gradient(145deg,#131313 0%,#0d0d0d 100%) !important; border-color:#2a2a2a !important; }
+.resp-chip                { background:rgba(224,184,74,0.07) !important; border-color:rgba(224,184,74,0.22) !important; color:#e0c870 !important; }
+.resp-chip-label          { color:#777 !important; }
+
+.btn-ocultar-concluidas              { background:#1e1e1e !important; color:#888 !important; border-color:#333 !important; }
+.btn-ocultar-concluidas:hover        { background:#2a2a2a !important; color:#bbb !important; }
+.btn-ocultar-concluidas.ativo        { background:rgba(58,170,110,0.12) !important; color:#5dc898 !important; border-color:rgba(58,170,110,0.35) !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   9. BANNER CRÍTICOS
+────────────────────────────────────────────────────────────── */
+.criticos-banner              { background:linear-gradient(135deg,#191000,#211500) !important; border-color:rgba(224,184,74,0.28) !important; }
+.criticos-banner-label        { color:#e0b84a !important; }
+.criticos-banner-nav button   { background:rgba(224,184,74,0.10) !important; color:#e0b84a !important; border-color:rgba(224,184,74,0.25) !important; }
+.criticos-banner-nav button:hover { background:rgba(224,184,74,0.2) !important; }
+#criticosBannerIndicador      { color:#888 !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   10. COLUNAS — LISTA DE PROJETOS
+────────────────────────────────────────────────────────────── */
+.area-projetos-estrutura  { background:transparent !important; }
+.coluna-projetos, .coluna-estrutura, .coluna-container {
+  background:#111 !important;
+  border-color:#2a2a2a !important;
+}
+.coluna-header            { background:linear-gradient(135deg,#161616 0%,#131313 100%) !important; border-bottom-color:#2a2a2a !important; }
+.coluna-header h3         { color:#d0d0d0 !important; font-family:var(--font-titulo) !important; }
+.badge-contador           { background:rgba(224,184,74,0.12) !important; color:#e0b84a !important; border-color:rgba(224,184,74,0.28) !important; }
+.coluna-acoes .btn-acao-pequeno { background:#1e1e1e !important; border-color:#333 !important; color:#ccc !important; }
+
+/* Busca */
+.busca-input-wrapper      { background:#1a1a1a !important; border-color:#333 !important; }
+.busca-input              { background:transparent !important; color:#d0d0d0 !important; }
+.busca-input::placeholder { color:#555 !important; }
+.busca-icone              { color:#555 !important; }
+.busca-limpar             { color:#666 !important; }
+
+/* Projeto cards */
+.projeto-card             { background:#161616 !important; border-color:#2a2a2a !important; box-shadow:0 1px 4px rgba(0,0,0,0.4) !important; }
+.projeto-card:hover       { background:#1c1c1c !important; border-color:rgba(224,184,74,0.28) !important; box-shadow:0 3px 14px rgba(0,0,0,0.55) !important; }
+.projeto-card.ativo,
+.projeto-card.selecionado { background:#1a1500 !important; border-color:rgba(224,184,74,0.50) !important; box-shadow:0 0 0 2px rgba(224,184,74,0.15) !important; }
+.projeto-card-header      { background:linear-gradient(135deg,#1c1c1c 0%,#181818 100%) !important; border-bottom-color:#2a2a2a !important; }
+.projeto-card-nome, .projeto-card-titulo { color:#ddd !important; }
+.projeto-card-meta, .projeto-card-setor,
+.projeto-card-resp, .projeto-card-data   { color:#888 !important; }
+.projeto-card-ordem { background:linear-gradient(135deg,#2e2e2e,#222) !important; color:var(--cor-primaria) !important; }
+.btn-salvar-ordem   { background:linear-gradient(135deg,#e0b84a,#b89030) !important; color:#0d0d0d !important; border-color:transparent !important; font-weight:700 !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   11. DIAGRAMA / ESTRUTURA
+────────────────────────────────────────────────────────────── */
+.diagrama-body            { background:#0d0d0d !important; }
+.diagrama-proj-hero       { background:linear-gradient(135deg,#0d0d0d 0%,#181818 60%,#1e1e1e 100%) !important; border-bottom:1px solid rgba(224,184,74,0.15) !important; }
+.diagrama-proj-hero-nome  { color:#e8e8e8 !important; font-family:var(--font-titulo) !important; }
+.diagrama-proj-hero-meta,
+.diagrama-proj-hero-info,
+.diagrama-proj-hero-desc  { color:#888 !important; }
+.diagrama-proj-hero-setor { color:#aaa !important; }
+
+.diagrama-progresso-barra      { background:#252525 !important; }
+.diagrama-progresso-barra-fill { background:linear-gradient(90deg,#e0b84a,#f0d080) !important; }
+.diagrama-progresso-texto      { color:#888 !important; }
+.diagrama-progresso-pct        { color:var(--cor-primaria) !important; font-weight:700 !important; }
+
+.metrica-card             { background:#161616 !important; border-color:#2a2a2a !important; }
+.metrica-card.total       { border-left-color:var(--cor-primaria) !important; }
+.metrica-card.total .metrica-icone,
+.metrica-card.total .metrica-valor { color:var(--cor-primaria) !important; }
+.metrica-icone            { color:#777 !important; }
+.metrica-valor            { color:#e0e0e0 !important; font-family:var(--font-titulo) !important; }
+.metrica-label            { color:#777 !important; }
+
+.btn-link-documentos      { background:rgba(139,124,246,0.08) !important; border-color:rgba(139,124,246,0.28) !important; color:#a899f8 !important; }
+.btn-link-documentos:hover { background:rgba(139,124,246,0.18) !important; color:#c4bcfc !important; }
+
+/* Atividade items */
+.atividade-item           { background:#161616 !important; border-color:#2a2a2a !important; }
+.atividade-item:hover     { background:#1c1c1c !important; }
+.atividade-nome           { color:#d0d0d0 !important; }
+.atividade-meta           { color:#888 !important; }
+.atividade-resp-avatar    { background:linear-gradient(135deg,#2e2e2e,#222) !important; border-color:rgba(224,184,74,0.25) !important; color:var(--cor-primaria) !important; }
+.atividade-numero         { background:linear-gradient(135deg,#2e2e2e,#222) !important; color:var(--cor-primaria) !important; }
+
+/* Empty state */
+.empty-state   { color:#555 !important; }
+.empty-state i { color:#2e2e2e !important; }
+.empty-state p { color:#555 !important; }
+
+/* Chips setor/prioridade/tipo */
+.setor-chip, .prioridade-chip, .tipo-chip           { background:#1e1e1e !important; border-color:#333 !important; color:#888 !important; }
+.setor-chip:hover, .prioridade-chip:hover, .tipo-chip:hover { background:#2a2a2a !important; color:#ccc !important; border-color:#444 !important; }
+.setor-chip.ativo, .prioridade-chip.ativo, .tipo-chip.ativo { background:var(--cor-primaria) !important; border-color:var(--cor-primaria) !important; color:#111 !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   12. STATUS BADGES — semi-transparentes, leitura garantida
+────────────────────────────────────────────────────────────── */
+/* A Fazer */
+.badge-fazer, [class*="badge-fazer"] {
+  background:rgba(160,128,55,0.18) !important;
+  color:#d4a840 !important;
+  border-color:rgba(160,128,55,0.35) !important;
+}
+/* Em Andamento */
+.badge-andamento, .badge-em-andamento, [class*="badge-andamento"] {
+  background:rgba(56,120,200,0.18) !important;
+  color:#6ea8e8 !important;
+  border-color:rgba(56,120,200,0.35) !important;
+}
+/* Aguardando Setor */
+.badge-aguardando, .badge-aguardando-setor, [class*="badge-aguardando"] {
+  background:rgba(200,120,55,0.18) !important;
+  color:#e09060 !important;
+  border-color:rgba(200,120,55,0.35) !important;
+}
+/* Concluída */
+.badge-concluida, .badge-concluido, [class*="badge-concluida"], [class*="badge-concluido"] {
+  background:rgba(50,160,100,0.18) !important;
+  color:#5dc898 !important;
+  border-color:rgba(50,160,100,0.35) !important;
+}
+/* Suspenso */
+.badge-suspenso, [class*="badge-suspenso"] {
+  background:rgba(120,100,220,0.18) !important;
+  color:#a899f8 !important;
+  border-color:rgba(120,100,220,0.35) !important;
+}
+.status-badge { border-color:currentColor !important; }
+
+/* Prioridade badges */
+.prio-alta, [class*="prio-alta"]     { background:rgba(180,50,50,0.18) !important; color:#e07070 !important; border-color:rgba(180,50,50,0.35) !important; }
+.prio-media, [class*="prio-media"]   { background:rgba(180,140,30,0.18) !important; color:#d4a840 !important; border-color:rgba(180,140,30,0.35) !important; }
+.prio-baixa, [class*="prio-baixa"]   { background:rgba(50,140,80,0.18) !important; color:#5dc898 !important; border-color:rgba(50,140,80,0.35) !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   13. SIDEBAR
+────────────────────────────────────────────────────────────── */
+.painel-chat              { background:#111 !important; border-left:1px solid #2a2a2a !important; }
+.sidebar-abas             { background:#0a0a0a !important; border-bottom-color:#2a2a2a !important; }
+.sidebar-aba              { color:#666 !important; background:transparent !important; }
+.sidebar-aba:hover        { background:rgba(224,184,74,0.06) !important; color:#bbb !important; }
+.sidebar-aba.ativa        { color:var(--cor-primaria) !important; }
+.sidebar-aba.ativa::after { background:var(--cor-primaria) !important; }
+.sidebar-conteudo         { background:transparent !important; }
+.sidebar-painel           { background:transparent !important; }
+
+/* Chat */
+.painel-chat-interno { background:transparent !important; }
+.chat-header         { background:linear-gradient(135deg,#161616,#131313) !important; border-bottom-color:#2a2a2a !important; color:#bbb !important; }
+.chat-header span    { color:#ccc !important; }
+.chat-status         { color:var(--cor-sucesso) !important; }
+.chat-mensagens      { background:#0a0a0a !important; }
+.balao-ai            { background:#1c1c1c !important; border-color:#2a2a2a !important; color:#d0d0d0 !important; }
+.balao-user          { background:rgba(224,184,74,0.12) !important; border-color:rgba(224,184,74,0.25) !important; color:#e8d880 !important; }
+.chat-input-area     { background:#111 !important; border-top-color:#2a2a2a !important; }
+#inputChat           { background:#1a1a1a !important; border-color:#333 !important; color:#d0d0d0 !important; }
+#inputChat::placeholder { color:#555 !important; }
+.btn-mic             { background:#1e1e1e !important; border-color:#333 !important; color:#777 !important; }
+.btn-mic:hover       { background:rgba(224,184,74,0.12) !important; color:#e0b84a !important; }
+.btn-send            { background:var(--cor-primaria) !important; color:#111 !important; }
+.btn-send:hover      { filter:brightness(1.1) !important; }
+
+/* Email sidebar */
+.painel-email        { background:transparent !important; }
+.email-header h3     { color:#d0d0d0 !important; }
+.email-header p      { color:#666 !important; }
+.email-corpo         { background:transparent !important; }
+.email-vazio         { color:#555 !important; }
+.email-vazio i       { color:#2e2e2e !important; }
+.email-footer        { background:#0a0a0a !important; border-top-color:#2a2a2a !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   14. MODAIS — ESTRUTURA GERAL
+────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  background:rgba(0,0,0,0.82) !important;
+  backdrop-filter:blur(4px) !important;
+}
+.modal-content {
+  background:#161616 !important;
+  border:1px solid #2a2a2a !important;
+  box-shadow:0 24px 64px rgba(0,0,0,0.88) !important;
+}
+.modal-header {
+  background:linear-gradient(135deg,#1c1c1c 0%,#181818 100%) !important;
+  border-bottom-color:#2a2a2a !important;
+}
+.modal-header h3  { color:#e0e0e0 !important; font-family:var(--font-titulo) !important; }
+.modal-body       { background:#161616 !important; color:var(--cor-texto) !important; }
+.modal-footer     { background:#111 !important; border-top-color:#2a2a2a !important; }
+.btn-fechar-modal { background:#252525 !important; color:#888 !important; border-color:#333 !important; }
+.btn-fechar-modal:hover { background:#333 !important; color:#ccc !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   15. FORMULÁRIOS
+────────────────────────────────────────────────────────────── */
+.campo-grupo        { background:transparent !important; }
+.campo-grupo label,
+label               { color:#bbb !important; font-weight:500 !important; }
+.campo-hint         { color:#666 !important; }
+.campo-row          { background:transparent !important; }
+.secao-modal        { border-color:#2a2a2a !important; }
+.secao-modal-titulo { color:#d0d0d0 !important; font-family:var(--font-titulo) !important; }
+
+input, select, textarea {
+  background:#1a1a1a !important;
+  border-color:#333 !important;
+  color:#e0e0e0 !important;
+}
+input::placeholder, textarea::placeholder { color:#555 !important; }
+select option { background:#1e1e1e !important; color:#e0e0e0 !important; }
+input:focus, select:focus, textarea:focus {
+  border-color:rgba(224,184,74,0.55) !important;
+  box-shadow:0 0 0 3px rgba(224,184,74,0.10) !important;
+  outline:none !important;
+}
+input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(0.6) !important; }
+input[type="checkbox"] { accent-color:var(--cor-primaria) !important; }
+
+.multi-select-responsaveis { background:#1a1a1a !important; border-color:#333 !important; }
+.resp-option               { color:#ccc !important; border-bottom-color:#2a2a2a !important; }
+.resp-option:hover         { background:#222 !important; }
+.resp-option.selecionado   { background:rgba(224,184,74,0.10) !important; color:#f0d080 !important; border-left-color:var(--cor-primaria) !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   16. INDICADORES GUT / PRIORIDADE
+────────────────────────────────────────────────────────────── */
+.indicador-grupo, .indicador-grupo-compact { background:transparent !important; border-color:#2a2a2a !important; }
+.indicador-header h4, .indicador-info h4,
+.indicador-info-compact strong { color:#d0d0d0 !important; }
+.indicador-header p, .indicador-info p,
+.indicador-info-compact span   { color:#777 !important; }
+
+.indicador-opcao, .indicador-opcao-compact { background:#1a1a1a !important; border-color:#333 !important; color:#bbb !important; }
+.indicador-opcao:hover, .indicador-opcao-compact:hover { background:#222 !important; border-color:rgba(224,184,74,0.3) !important; color:#f0d080 !important; }
+.indicador-opcao.selecionado, .indicador-opcao-compact.selecionado { background:rgba(224,184,74,0.10) !important; border-color:rgba(224,184,74,0.55) !important; color:#f0d080 !important; }
+
+.calculo-resultado          { background:#1a1a1a !important; border-color:#2a2a2a !important; }
+.calculo-resultado-titulo   { color:#888 !important; }
+.calculo-resultado-valor    { color:var(--cor-primaria) !important; font-family:var(--font-titulo) !important; }
+.calculo-resultado-categoria.nenhuma { color:#777 !important; }
+.calculo-resultado-categoria.alta   { color:#e07070 !important; }
+.calculo-resultado-categoria.media  { color:#d4a840 !important; }
+.calculo-resultado-categoria.baixa  { color:#5dc898 !important; }
+.calculo-formula span, .calculo-formula strong { color:var(--cor-primaria) !important; }
+.calculo-formula            { color:#777 !important; }
+.calculo-formula-compact    { color:#777 !important; }
+.calculo-resultado-valor-compact    { color:var(--cor-texto) !important; }
+.calculo-resultado-categoria-compact.nenhuma { color:#777 !important; }
+#novoProjetoValorCalculado  { color:var(--cor-primaria) !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   17. MODO FOCO
+────────────────────────────────────────────────────────────── */
+.modal-modo-foco-overlay    { background:rgba(0,0,0,0.92) !important; }
+.modal-modo-foco-conteudo   { background:#111 !important; border-color:#2a2a2a !important; box-shadow:0 24px 64px rgba(0,0,0,0.9) !important; }
+.modal-modo-foco-header     { background:linear-gradient(135deg,#0e0e0e,#181818) !important; border-bottom:1px solid rgba(224,184,74,0.18) !important; }
+.modal-modo-foco-titulo     { color:#e0e0e0 !important; }
+#modoFocoTitulo             { color:#e0e0e0 !important; font-family:var(--font-titulo) !important; }
+.modal-modo-foco-split      { background:transparent !important; }
+.modo-foco-esquerda         { background:#0d0d0d !important; border-right-color:#2a2a2a !important; }
+.modo-foco-documentos       { background:#111 !important; border-left-color:#2a2a2a !important; }
+.modo-foco-doc-header       { background:#161616 !important; border-bottom-color:#2a2a2a !important; color:#ccc !important; }
+.modo-foco-doc-tabs         { background:#0d0d0d !important; border-bottom-color:#2a2a2a !important; }
+.atas-tab                   { color:#777 !important; background:transparent !important; }
+.atas-tab:hover             { background:#1e1e1e !important; color:#ccc !important; }
+.atas-tab.ativo             { background:#1e1e1e !important; color:var(--cor-primaria) !important; border-color:#333 !important; }
+.modo-foco-doc-lista        { background:transparent !important; }
+.modo-foco-doc-viewer       { background:#0d0d0d !important; }
+.modo-foco-doc-viewer-header { background:#161616 !important; border-bottom-color:#2a2a2a !important; color:#ccc !important; }
+.modo-foco-doc-viewer-conteudo { background:transparent !important; color:#d0d0d0 !important; }
+.btn-voltar-lista           { background:transparent !important; color:#888 !important; border-color:transparent !important; }
+.btn-voltar-lista:hover     { color:var(--cor-primaria) !important; }
+.btn-modo-foco              { background:rgba(139,124,246,0.10) !important; border-color:rgba(139,124,246,0.28) !important; color:#a899f8 !important; }
+.btn-modo-foco:hover        { background:rgba(139,124,246,0.18) !important; }
+.btn-fechar-foco            { background:rgba(208,64,64,0.10) !important; border-color:rgba(208,64,64,0.25) !important; color:#e07070 !important; }
+.btn-fechar-foco:hover      { background:rgba(208,64,64,0.18) !important; }
+#modoFocoDocBadge           { background:rgba(224,184,74,0.12) !important; color:#e0b84a !important; border-color:rgba(224,184,74,0.28) !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   18. MODAL ATAS DO PROJETO
+────────────────────────────────────────────────────────────── */
+.modal-atas-content         { background:#161616 !important; }
+.modal-atas-body            { background:transparent !important; }
+.modal-atas-catalogo        { background:#111 !important; border-right-color:#2a2a2a !important; }
+.modal-atas-catalogo-header { background:#161616 !important; border-bottom-color:#2a2a2a !important; color:#ccc !important; }
+.modal-atas-catalogo-lista  { background:transparent !important; }
+.modal-atas-visualizador    { background:#0d0d0d !important; }
+.modal-atas-viewer-header   { background:#161616 !important; border-bottom-color:#2a2a2a !important; }
+.modal-atas-viewer-titulo span { color:#ccc !important; }
+.modal-atas-viewer-tabs     { background:transparent !important; }
+.modal-atas-viewer-corpo    { background:transparent !important; color:#d0d0d0 !important; }
+.ata-vazia-viewer           { color:#555 !important; }
+.ata-vazia-viewer i         { color:#2e2e2e !important; }
+#badgeContadorAtasProjeto   { background:rgba(224,184,74,0.12) !important; color:#e0b84a !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   19. BOTÕES GERAIS
+────────────────────────────────────────────────────────────── */
+.btn-acao {
+  background:linear-gradient(135deg,#e0b84a 0%,#b89030 100%) !important;
+  color:#0d0d0d !important;
+  border-color:transparent !important;
+  font-weight:700 !important;
+}
+.btn-acao:hover       { box-shadow:0 4px 16px rgba(224,184,74,0.35) !important; filter:brightness(1.08) !important; }
+.btn-acao:disabled    { opacity:0.45 !important; filter:none !important; cursor:not-allowed !important; }
+.btn-secundario       { background:transparent !important; border-color:rgba(224,184,74,0.35) !important; color:#d4a840 !important; }
+.btn-secundario:hover { background:rgba(224,184,74,0.08) !important; border-color:rgba(224,184,74,0.55) !important; }
+.btn-acao-pequeno     { background:#1e1e1e !important; border-color:#333 !important; color:#ccc !important; }
+.btn-acao-pequeno:hover { background:rgba(224,184,74,0.10) !important; border-color:rgba(224,184,74,0.35) !important; color:#f0d080 !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   20. TOASTS
+────────────────────────────────────────────────────────────── */
+.toast        { box-shadow:0 6px 24px rgba(0,0,0,0.75) !important; }
+.toast.sucesso { background:linear-gradient(135deg,#1a3d28,#112818) !important; border:1px solid rgba(58,170,110,0.35) !important; color:#7de8b0 !important; }
+.toast.info   { background:linear-gradient(135deg,#1a1a30,#111120) !important; border:1px solid rgba(85,120,200,0.35) !important; color:#90a8e8 !important; }
+.toast.aviso  { background:linear-gradient(135deg,#2e2210,#1e1608) !important; border:1px solid rgba(212,136,42,0.35) !important; color:#e0b84a !important; }
+.toast.erro   { background:linear-gradient(135deg,#2e1010,#1e0808) !important; border:1px solid rgba(208,64,64,0.35) !important; color:#e08080 !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   21. MODAL RELATÓRIO (mrel-*)
+────────────────────────────────────────────────────────────── */
+#modalRelatorio .mrel-content {
+  background:#161616 !important;
+  border-color:#2a2a2a !important;
+  box-shadow:0 24px 64px rgba(0,0,0,0.88) !important;
+}
+.mrel-header            { background:linear-gradient(135deg,#0e0e0e,#181818) !important; border-bottom-color:rgba(224,184,74,0.2) !important; }
+.mrel-header-titulo     { color:#e0e0e0 !important; font-family:var(--font-titulo) !important; }
+.mrel-header-subtitulo  { color:#888 !important; }
+.mrel-header-icon       { color:var(--cor-primaria) !important; }
+.mrel-btn-fechar        { background:#252525 !important; color:#888 !important; border-color:#333 !important; }
+.mrel-btn-fechar:hover  { background:#333 !important; color:#ccc !important; }
+
+.mrel-statusbar         { background:#0d0d0d !important; border-bottom-color:#2a2a2a !important; color:#888 !important; }
+.mrel-statusbar-item    { color:#888 !important; }
+.mrel-statusbar-item i  { color:#666 !important; }
+.mrel-statusbar-badge   { background:rgba(224,184,74,0.12) !important; color:#e0b84a !important; border-color:rgba(224,184,74,0.25) !important; }
+.mrel-statusbar-sep     { background:#2a2a2a !important; }
+.mrel-statusbar-acoes .mrel-link-btn { color:var(--cor-primaria) !important; }
+#mrelResumoAtividades, #mrelResumoDestinatarios { color:#888 !important; }
+
+.mrel-body              { background:transparent !important; }
+.mrel-painel-config     { background:#111 !important; border-right-color:#2a2a2a !important; }
+.mrel-painel-preview    { background:#0d0d0d !important; }
+
+/* Abas */
+.mrel-tabs-bar          { background:#0a0a0a !important; border-bottom-color:#2a2a2a !important; }
+.mrel-tab               { background:transparent !important; color:#777 !important; border-color:transparent !important; }
+.mrel-tab:hover         { background:#1a1a1a !important; color:#bbb !important; }
+.mrel-tab.ativo         { background:#1a1a1a !important; color:var(--cor-primaria) !important; }
+.mrel-tab-ico           { color:inherit !important; }
+.mrel-tab-badge         { background:#2a2a2a !important; color:#888 !important; }
+
+/* Paineis */
+.mrel-tab-panel         { background:transparent !important; }
+.mrel-panel-scroll      { background:transparent !important; }
+.mrel-panel-bloco       { background:transparent !important; border-color:#2a2a2a !important; }
+.mrel-panel-bloco-label { color:#999 !important; }
+.mrel-panel-bloco-label i { color:#666 !important; }
+
+/* Chips */
+.mrel-chip              { background:#1e1e1e !important; border-color:#333 !important; color:#999 !important; cursor:pointer !important; }
+.mrel-chip:hover        { background:#2a2a2a !important; color:#ccc !important; }
+.mrel-chip.ativo        { background:rgba(224,184,74,0.15) !important; border-color:rgba(224,184,74,0.45) !important; color:#f0d080 !important; }
+
+/* Check lista */
+.mrel-check-lista       { background:transparent !important; }
+.mrel-check-item        { color:#bbb !important; border-color:#2a2a2a !important; }
+.mrel-check-item:hover  { background:#1a1a1a !important; }
+.mrel-check-item-nome   { color:#ccc !important; }
+.mrel-check-item-tag    { color:#888 !important; }
+
+/* Lista projetos */
+.mrel-proj-lista        { background:transparent !important; }
+.mrel-proj-item         { border-color:#2a2a2a !important; color:#ccc !important; }
+.mrel-proj-item:hover   { background:#1a1a1a !important; }
+.mrel-proj-item-nome    { color:#d0d0d0 !important; }
+
+/* Toggle items conteúdo */
+.mrel-toggle-grid       { background:transparent !important; }
+.mrel-toggle-item       { color:#bbb !important; border-color:#2a2a2a !important; background:#1a1a1a !important; }
+.mrel-toggle-item:hover { background:#222 !important; }
+.mrel-toggle-item-texto { color:#ccc !important; }
+.mrel-toggle-item-icon  { color:#555 !important; }
+
+/* Email campos */
+.mrel-email-campo label    { color:#bbb !important; }
+.mrel-email-campo input,
+.mrel-email-campo textarea { background:#1a1a1a !important; border-color:#333 !important; color:#e0e0e0 !important; }
+.mrel-dest-grid            { background:transparent !important; }
+
+/* Preview topbar */
+.mrel-preview-topbar        { background:#161616 !important; border-bottom-color:#2a2a2a !important; }
+.mrel-preview-topbar-titulo { color:#ccc !important; }
+.mrel-preview-live-dot      { background:#3aaa6e !important; }
+.mrel-preview-topbar-sep    { background:#2a2a2a !important; }
+.mrel-preview-topbar-live   { color:#888 !important; }
+.mrel-modo-btn              { background:#1e1e1e !important; border-color:#333 !important; color:#888 !important; }
+.mrel-modo-btn.ativo        { background:rgba(224,184,74,0.12) !important; color:#f0d080 !important; border-color:rgba(224,184,74,0.35) !important; }
+
+/* Preview scroll */
+.mrel-preview-scroll        { background:#0d0d0d !important; }
+.mrel-preview-vazio         { color:#555 !important; }
+.mrel-preview-vazio-icon    { color:#2e2e2e !important; }
+.mrel-preview-vazio-titulo  { color:#555 !important; }
+.mrel-preview-vazio-sub     { color:#444 !important; }
+
+/* Email chrome */
+.mrel-email-chrome          { background:#1a1a1a !important; border-color:#2a2a2a !important; }
+.mrel-email-chrome-titlebar { background:#1e1e1e !important; border-bottom-color:#333 !important; }
+.mrel-email-chrome-titulo   { color:#888 !important; }
+.mrel-email-chrome-header   { background:#161616 !important; border-bottom-color:#2a2a2a !important; }
+.mrel-email-chrome-campo-label { color:#666 !important; }
+.mrel-email-chrome-campo-valor { color:#bbb !important; }
+.mrel-email-assunto-linha   { color:#e0e0e0 !important; font-weight:600 !important; }
+.mrel-email-body-wrapper    { background:#f5f5f5 !important; } /* O corpo do email é sempre claro */
+
+/* Footer */
+.mrel-footer                { background:#0d0d0d !important; border-top-color:#2a2a2a !important; }
+.mrel-footer-info           { color:#888 !important; }
+.mrel-footer-info i         { color:#666 !important; }
+.mrel-btn-enviar            { background:linear-gradient(135deg,#e0b84a,#b89030) !important; color:#0d0d0d !important; font-weight:700 !important; }
+.mrel-btn-enviar:disabled   { opacity:0.4 !important; cursor:not-allowed !important; }
+
+/* Personalizar */
+.mrel-tema-swatch              { background:#1a1a1a !important; border-color:#333 !important; color:#bbb !important; }
+.mrel-tema-swatch:hover        { border-color:#555 !important; background:#222 !important; }
+.mrel-tema-swatch.ativo        { border-color:var(--cor-primaria) !important; box-shadow:0 0 0 2px rgba(224,184,74,0.2) !important; }
+.mrel-tema-swatch span         { color:#ccc !important; }
+.mrel-layout-card              { background:#1a1a1a !important; border-color:#333 !important; color:#bbb !important; }
+.mrel-layout-card:hover        { background:#222 !important; border-color:#444 !important; }
+.mrel-layout-card.ativo        { border-color:var(--cor-primaria) !important; }
+.mrel-layout-card span         { color:#ccc !important; }
+.mrel-grafico-btn              { background:#1a1a1a !important; border-color:#333 !important; color:#bbb !important; }
+.mrel-grafico-btn:hover        { background:#222 !important; }
+.mrel-grafico-btn.ativo        { background:rgba(224,184,74,0.12) !important; border-color:rgba(224,184,74,0.4) !important; color:#f0d080 !important; }
+.mrel-btn-salvar-prefs         { background:linear-gradient(135deg,#e0b84a,#b89030) !important; color:#0d0d0d !important; font-weight:700 !important; }
+.mrel-prefs-status.ok          { color:#5dc898 !important; }
+.mrel-prefs-status.erro        { color:#e07070 !important; }
+.mrel-link-btn                 { color:var(--cor-primaria) !important; background:transparent !important; border-color:transparent !important; }
+.mrel-link-btn:hover           { color:#f0d080 !important; }
+.mrel-tema-preview             { border-color:#333 !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   22. MODAL SELETOR DE TEMA
+────────────────────────────────────────────────────────────── */
+#reacaoCriadorBox { background:rgba(255,255,255,0.03) !important; border-color:#2a2a2a !important; color:#888 !important; }
+#reacaoCriadorTexto { color:#777 !important; }
+
+/* ──────────────────────────────────────────────────────────────
+   23. PROGRESSO, MISC
+────────────────────────────────────────────────────────────── */
+.progresso-barra      { background:#252525 !important; }
+.progresso-barra-fill { background:linear-gradient(90deg,#e0b84a,#f0d080) !important; }
+hr                    { border-color:#2a2a2a !important; }
+strong                { color:inherit !important; }
+code                  { background:#1e1e1e !important; border-color:#333 !important; color:#f0d080 !important; }
+#contadorProjetosPriorizacao { background:rgba(224,184,74,0.12) !important; color:#e0b84a !important; border-color:rgba(224,184,74,0.28) !important; }
+
+</style>

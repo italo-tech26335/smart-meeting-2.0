@@ -81,10 +81,13 @@ let ESTADO = {
     responsavelId: 'TODOS',
     statusSelecionado: null,
     setorSelecionado: null,
-    tipoProjeto: null          // ← NOVO
+    tipoProjeto: null,
+    prioridadeSelecionada: null,
+    ocultarConcluidas: false   // ← oculta projetos com status "Concluída" em toda a página
   },
   modoFocoAberto: false,
   graficoStatusAtivos: ['A Fazer', 'Em Andamento', 'Aguardando Setor', 'Concluída', 'Suspenso'],
+  graficoPrioridadeAtivos: ['alta', 'media', 'baixa', 'nenhuma'],
   cardsExpandidos: {},
   detalhesExpandidos: {},
   ordemProjetosModificada: false,
@@ -138,17 +141,36 @@ function debounce(fn, atraso) {
   };
 }
 
+// ========================= SAUDAÇÃO =========================
+function _obterSaudacao() {
+  var h = new Date().getHours();
+  if (h >= 6  && h < 12) return 'Bom dia';
+  if (h >= 12 && h < 18) return 'Boa tarde';
+  if (h >= 18 && h < 24) return 'Boa noite';
+  return 'Boa madrugada';
+}
+
 // ========================= INICIALIZAÇÃO =========================
 document.addEventListener('DOMContentLoaded', function() {
+  // Saudação personalizada na tela de carregamento
+  var elGreet = document.getElementById('loadingGreeting');
+  if (elGreet) {
+    var nome = (typeof USUARIO_NOME !== 'undefined' && USUARIO_NOME)
+      ? USUARIO_NOME.trim().split(' ')[0]
+      : '';
+    elGreet.textContent = _obterSaudacao() + (nome ? ', ' + nome : '') + ' ☕';
+  }
+
   // Exibir nome do usuário logado no header
   var elNome = document.getElementById('headerUsuarioNome');
   if (elNome && typeof USUARIO_NOME !== 'undefined') elNome.textContent = USUARIO_NOME;
 
   atualizarStatusCarregamento('Verificando sessão...');
   verificarSessaoCliente(function() {
-    atualizarStatusCarregamento('Carregando dados...');
+    // Sessão OK → revela a página imediatamente com skeletons visíveis
+    esconderTelaCarregamento();
     inicializarLayoutPagina();
-    carregarTudo();
+    carregarTudo(); // busca dados em background; skeletons são substituídos ao chegar
   });
 });
 
@@ -162,14 +184,12 @@ function inicializarLayoutPagina() {
   }
 }
 
-/** Carrega todos os dados do servidor */
+/** Carrega todos os dados do servidor (página já visível com skeletons) */
 function carregarTudo() {
-  atualizarStatusCarregamento('Carregando dados do projeto...');
-
   if (typeof google !== 'undefined' && google.script) {
     google.script.run
       .withSuccessHandler(function(dados) {
-        esconderTelaCarregamento();
+        removerSkeletonOverlays();
         if (!dados.sucesso) {
           mostrarToast(dados.mensagem, 'erro');
           return;
@@ -178,17 +198,29 @@ function carregarTudo() {
         renderizarTudo();
       })
       .withFailureHandler(function(erro) {
-        esconderTelaCarregamento();
-        mostrarToast('Erro: ' + erro, 'erro');
+        removerSkeletonOverlays();
+        mostrarToast('Erro ao carregar dados: ' + erro, 'erro');
       })
       .carregarDadosEditorProjeto(SESSAO_TOKEN);
   } else {
     setTimeout(function() {
-      esconderTelaCarregamento();
+      removerSkeletonOverlays();
       carregarDadosDemo();
       renderizarTudo();
     }, 1500);
   }
+}
+
+/**
+ * Remove os overlays de skeleton dos gráficos Chart.js.
+ * O conteúdo textual (chips, barras, cards) é substituído automaticamente
+ * via innerHTML quando as funções de renderização são chamadas.
+ */
+function removerSkeletonOverlays() {
+  ['skDonut', 'skSetor', 'skTipo', 'skResponsaveis'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
+  });
 }
 
 /**
@@ -256,13 +288,8 @@ function preencherEstado(dados) {
   ESTADO.departamentos = dados.departamentos || [];
 
   // ← Aplicar tema vindo do servidor
-  if (dados.tema === 'azul') {
-    _injetarCssAzul();
-    _atualizarBotaoTema(true);
-  } else {
-    _removerCssAzul();
-    _atualizarBotaoTema(false);
-  }
+  var temaServidor = dados.tema || 'cafe';
+  _ativarTema(temaServidor);
 
 }
 
@@ -345,7 +372,8 @@ function mostrarToast(mensagem, tipo) {
   var icones = {
     sucesso: '<i class="fas fa-check-circle"></i>',
     erro:    '<i class="fas fa-exclamation-circle"></i>',
-    aviso:   '<i class="fas fa-info-circle"></i>'
+    aviso:   '<i class="fas fa-info-circle"></i>',
+    info:    '<i class="fas fa-info-circle"></i>'
   };
   var toast = document.createElement('div');
   toast.className = 'toast ' + (tipo || 'aviso');
@@ -355,6 +383,156 @@ function mostrarToast(mensagem, tipo) {
     toast.style.animation = 'slideInToast 0.3s reverse';
     setTimeout(function() { toast.remove(); }, 300);
   }, 3000);
+}
+
+// ========================= OVERLAY DE PROCESSAMENTO =========================
+/**
+ * Exibe um overlay sofisticado e evidente enquanto uma ação está em andamento.
+ * Cobre toda a tela — inclusive modais abertos — para evitar cliques duplos.
+ * @param {string} mensagem  Texto principal exibido (ex: "Salvando projeto...")
+ */
+function mostrarProcessando(mensagem) {
+  var anterior = document.getElementById('_processandoOverlay');
+  if (anterior) anterior.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = '_processandoOverlay';
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:9997',
+    'background:rgba(44,24,16,0.50)',
+    'backdrop-filter:blur(3px)',
+    '-webkit-backdrop-filter:blur(3px)',
+    'display:flex', 'align-items:center', 'justify-content:center',
+    'pointer-events:all'
+  ].join(';') + ';';
+
+  overlay.innerHTML =
+    '<div style="' +
+      'background:var(--cor-fundo-card,#FFF8F5);' +
+      'border-radius:var(--raio-lg,12px);' +
+      'box-shadow:0 12px 48px rgba(44,24,16,0.28),0 2px 8px rgba(44,24,16,0.15);' +
+      'padding:40px 52px;' +
+      'text-align:center;' +
+      'min-width:260px;max-width:340px;' +
+      'animation:slideUp 0.28s ease;' +
+    '">' +
+      /* ── ícone pulsante ── */
+      '<div style="' +
+        'width:72px;height:72px;margin:0 auto 22px;' +
+        'background:linear-gradient(135deg,var(--cor-primaria,#6D4C41),var(--cor-primaria-escura,#3E2723));' +
+        'border-radius:20px;' +
+        'display:flex;align-items:center;justify-content:center;' +
+        'box-shadow:0 6px 20px rgba(109,76,65,0.40);' +
+        'animation:pulse-logo 1.3s ease-in-out infinite;' +
+      '">' +
+        '<i class="fas fa-mug-hot" style="font-size:1.9rem;color:#FFF8F5;"></i>' +
+      '</div>' +
+      /* ── título ── */
+      '<div style="' +
+        'font-size:1.05rem;font-weight:700;' +
+        'color:var(--cor-texto,#2C1810);' +
+        'font-family:var(--font-titulo,\'Playfair Display\',serif);' +
+        'margin-bottom:6px;letter-spacing:0.01em;' +
+      '">' + (mensagem || 'Processando...') + '</div>' +
+      /* ── subtítulo com dots animados ── */
+      '<div style="' +
+        'font-size:0.78rem;color:var(--cor-texto-secundario,#6D4C41);' +
+        'margin-bottom:24px;letter-spacing:0.04em;' +
+      '">Aguarde um instante' +
+        '<span id="_procDots">.</span>' +
+      '</div>' +
+      /* ── barra de progresso ── */
+      '<div style="' +
+        'height:4px;background:var(--cor-borda-clara,#EFEBE9);' +
+        'border-radius:3px;overflow:hidden;' +
+      '">' +
+        '<div style="' +
+          'height:100%;' +
+          'background:linear-gradient(90deg,var(--cor-primaria,#6D4C41),var(--cafe-gold,#FF8F00));' +
+          'border-radius:3px;' +
+          'animation:progress-animation 1.8s ease-in-out infinite;' +
+        '"></div>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  /* Anima os pontos "..." para feedback visual de vida */
+  var dots = ['.', '..', '...', '..'];
+  var di = 0;
+  var _dotsInterval = setInterval(function() {
+    var el = document.getElementById('_procDots');
+    if (!el) { clearInterval(_dotsInterval); return; }
+    di = (di + 1) % dots.length;
+    el.textContent = dots[di];
+  }, 420);
+  overlay._dotsInterval = _dotsInterval;
+}
+
+/**
+ * Remove o overlay de processamento com fade-out suave.
+ */
+function esconderProcessando() {
+  var el = document.getElementById('_processandoOverlay');
+  if (!el) return;
+  if (el._dotsInterval) clearInterval(el._dotsInterval);
+  el.style.transition = 'opacity 0.22s ease';
+  el.style.opacity = '0';
+  setTimeout(function() { if (el.parentNode) el.remove(); }, 230);
+}
+
+// ========================= CONFIRM DIALOG (sem native confirm()) =========================
+/**
+ * Exibe um diálogo de confirmação estilizado (substitui o confirm() nativo,
+ * que é bloqueado em iframes do GAS).
+ * @param {string} mensagem  Texto da pergunta
+ * @param {Function} onConfirm  Callback chamado se o usuário confirmar
+ * @param {string} [textoBotao]  Texto do botão de confirmação (default: "Confirmar")
+ */
+function mostrarConfirm(mensagem, onConfirm, textoBotao) {
+  var anterior = document.getElementById('_confirmDialogOverlay');
+  if (anterior) anterior.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = '_confirmDialogOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(44,24,16,0.55);' +
+    'backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;';
+
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--cor-fundo-card);border-radius:var(--raio-lg);' +
+    'box-shadow:var(--sombra-xl);width:min(420px,92vw);padding:28px 24px;' +
+    'font-family:var(--font-corpo);';
+
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+      '<div style="width:44px;height:44px;border-radius:50%;background:rgba(229,57,53,0.1);' +
+        'border:2px solid rgba(229,57,53,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+        '<i class="fas fa-exclamation-triangle" style="color:var(--cor-perigo);font-size:1.1rem;"></i>' +
+      '</div>' +
+      '<div>' +
+        '<div style="font-size:0.95rem;font-weight:600;color:var(--cor-texto);margin-bottom:4px;">Confirmar ação</div>' +
+        '<div style="font-size:0.82rem;color:var(--cor-texto-secundario);">' + mensagem + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+      '<button id="_confirmBtnCancelar" style="background:transparent;border:1px solid var(--cor-borda);' +
+        'color:var(--cor-texto-secundario);padding:8px 18px;border-radius:var(--raio);cursor:pointer;' +
+        'font-size:0.82rem;font-weight:500;font-family:var(--font-corpo);">Cancelar</button>' +
+      '<button id="_confirmBtnOk" style="background:var(--cor-perigo);border:none;color:#fff;' +
+        'padding:8px 18px;border-radius:var(--raio);cursor:pointer;font-size:0.82rem;font-weight:600;' +
+        'font-family:var(--font-corpo);">' + (textoBotao || 'Confirmar') + '</button>' +
+    '</div>';
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  var fechar = function() { overlay.remove(); };
+  document.getElementById('_confirmBtnCancelar').onclick = fechar;
+  overlay.onclick = function(e) { if (e.target === overlay) fechar(); };
+  document.getElementById('_confirmBtnOk').onclick = function() {
+    fechar();
+    if (typeof onConfirm === 'function') onConfirm();
+  };
 }
 
 // ========================= UTILITÁRIOS =========================
@@ -726,15 +904,17 @@ function aplicarFiltroGlobal(tipo, valor) {
 /** Limpa todos os filtros */
 function limparFiltrosGlobais() {
   ESTADO.filtrosGlobais = {
-    responsavelId:     'TODOS',
-    statusSelecionado: null,
-    setorSelecionado:  null,
-    tipoProjeto:       null   // ← NOVO
+    responsavelId:        'TODOS',
+    statusSelecionado:    null,
+    setorSelecionado:     null,
+    tipoProjeto:          null,
+    prioridadeSelecionada: null,
+    ocultarConcluidas:    false
   };
   ESTADO.filtroSetor = null;
 
   // Remove todos os avisos de filtro ativos
-  ['avisoFiltroSetor', 'avisoFiltroTipo'].forEach(function(id) {
+  ['avisoFiltroSetor', 'avisoFiltroTipo', 'avisoFiltroStatus', 'avisoFiltroPrioridade'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.remove();
   });
@@ -776,12 +956,66 @@ function obterProjetosFiltrados() {
     });
   }
 
+  // Filtro por prioridade (vindo do card Distribuição por Prioridade)
+  if (filtros.prioridadeSelecionada) {
+    projetos = projetos.filter(function(p) {
+      return obterCategoriaPrioridade(p.valorPrioridade) === filtros.prioridadeSelecionada;
+    });
+  }
+
   // Filtro por busca textual
   if (ESTADO.textoBusca) {
     var termo = ESTADO.textoBusca.toLowerCase();
     projetos = projetos.filter(function(p) {
-      return p.nome.toLowerCase().includes(termo);
+      return (p.nome || '').toLowerCase().includes(termo);
     });
+  }
+
+  // Exclusão de projetos Concluídos (toggle "Ocultar Concluídas")
+  if (filtros.ocultarConcluidas) {
+    projetos = projetos.filter(function(p) { return p.status !== 'Concluída'; });
+  }
+
+  return projetos;
+}
+
+/**
+ * Projetos filtrados por TUDO exceto statusSelecionado.
+ * Usado pelo donut para sempre exibir a distribuição completa como contexto,
+ * mesmo quando um filtro de status está ativo na lista de projetos.
+ */
+function obterProjetosContextoStatus() {
+  var projetos = ESTADO.listaProjetos.slice();
+  var filtros = ESTADO.filtrosGlobais;
+
+  if (filtros.responsavelId && filtros.responsavelId !== 'TODOS') {
+    if (filtros.responsavelId === 'sem-responsavel') {
+      projetos = projetos.filter(function(p) { return !p.responsaveisIds || p.responsaveisIds.length === 0; });
+    } else {
+      projetos = projetos.filter(function(p) {
+        return p.responsaveisIds && p.responsaveisIds.includes(filtros.responsavelId);
+      });
+    }
+  }
+  if (filtros.setorSelecionado) {
+    projetos = projetos.filter(function(p) { return (p.setor || 'Sem Setor') === filtros.setorSelecionado; });
+  }
+  if (filtros.tipoProjeto) {
+    projetos = projetos.filter(function(p) { return (p.tipo || 'Sem Tipo') === filtros.tipoProjeto; });
+  }
+  if (filtros.prioridadeSelecionada) {
+    projetos = projetos.filter(function(p) {
+      return obterCategoriaPrioridade(p.valorPrioridade) === filtros.prioridadeSelecionada;
+    });
+  }
+  if (ESTADO.textoBusca) {
+    var termo = ESTADO.textoBusca.toLowerCase();
+    projetos = projetos.filter(function(p) { return (p.nome || '').toLowerCase().includes(termo); });
+  }
+
+  // Respeita o toggle "Ocultar Concluídas" — afeta também o donut/legenda
+  if (ESTADO.filtrosGlobais.ocultarConcluidas) {
+    projetos = projetos.filter(function(p) { return p.status !== 'Concluída'; });
   }
 
   return projetos;
@@ -876,7 +1110,7 @@ function renderizarFiltroHeader() {
   }
 
   // Botão limpar filtros
-  if (ESTADO.filtrosGlobais.statusSelecionado) {
+  if (ESTADO.filtrosGlobais.statusSelecionado || ESTADO.filtrosGlobais.prioridadeSelecionada) {
     html += '<div class="header-chip" style="background:rgba(166,61,64,0.3);border-color:rgba(166,61,64,0.5);" onclick="limparFiltrosGlobais()">' +
       '<i class="fas fa-times"></i> Limpar</div>';
   }
@@ -894,6 +1128,7 @@ function renderizarDashboard() {
   renderizarFiltrosGrafico();
   renderizarGraficoDonut();
   renderizarLegendaGrafico();
+  renderizarFiltrosPrioridade();
   renderizarBarrasPrioridade();
   renderizarProjetosCriticos();
   renderizarGraficoSetor();
@@ -974,21 +1209,24 @@ function renderizarMetricas() {
   container.innerHTML = html;
 }
 
-/** Filtros de status para o gráfico donut */
+/** Filtros de status para o gráfico donut (single-select toggle) */
 function renderizarFiltrosGrafico() {
   var container = document.getElementById('graficoFiltrosStatus');
   if (!container) return;
 
-  var projetos = obterProjetosFiltrados();
+  // Usa contexto sem filtro de status — contagens sempre somam o total visível
+  var projetos = obterProjetosContextoStatus();
+  var statusAtivo = ESTADO.filtrosGlobais.statusSelecionado;
   var html = '';
 
   LISTA_STATUS_PROJETOS.forEach(function(status) {
-    var ativo = ESTADO.graficoStatusAtivos.includes(status);
     var count = projetos.filter(function(p) { return p.status === status; }).length;
+    if (count === 0 && !statusAtivo) return; // esconde status vazios quando não há filtro
+    var ativo = status === statusAtivo;
     var classe = obterClasseStatus(status);
 
     html += '<div class="grafico-filtro-chip ' + classe + (ativo ? ' ativo' : '') + '" ' +
-      'onclick="alternarStatusGrafico(\'' + status + '\')">' +
+      'onclick="alternarStatusGrafico(\'' + status + '\')" title="' + (ativo ? 'Remover filtro' : 'Filtrar por ' + status) + '">' +
       '<i class="fas fa-' + (ativo ? 'check-circle' : 'circle') + '"></i> ' +
       status + ' (' + count + ')</div>';
   });
@@ -996,21 +1234,84 @@ function renderizarFiltrosGrafico() {
   container.innerHTML = html;
 }
 
+/**
+ * Alterna o filtro de status da página (single-select toggle).
+ * O donut usa obterProjetosContextoStatus() — sempre mostra todos os status como contexto.
+ * A fatia/chip do status ativo fica destacada; as demais ficam dimmed.
+ */
 function alternarStatusGrafico(status) {
-  var idx = ESTADO.graficoStatusAtivos.indexOf(status);
-  if (idx > -1) {
-    if (ESTADO.graficoStatusAtivos.length > 1) {
-      ESTADO.graficoStatusAtivos.splice(idx, 1);
-    } else {
-      mostrarToast('Mantenha pelo menos um status', 'aviso');
-      return;
-    }
-  } else {
-    ESTADO.graficoStatusAtivos.push(status);
+  filtrarPorStatus(status);
+}
+
+/**
+ * Liga/desliga o filtro global "Ocultar Concluídas".
+ * Remove projetos com status "Concluída" de toda a interface — lista, donut, gráficos.
+ */
+function toggleOcultarConcluidas() {
+  ESTADO.filtrosGlobais.ocultarConcluidas = !ESTADO.filtrosGlobais.ocultarConcluidas;
+  var ativo = ESTADO.filtrosGlobais.ocultarConcluidas;
+
+  // Atualiza visual do botão
+  var btn = document.getElementById('btnOcultarConcluidas');
+  if (btn) {
+    btn.classList.toggle('ativo', ativo);
+    btn.title = ativo ? 'Exibir projetos concluídos' : 'Ocultar projetos concluídos';
   }
-  renderizarFiltrosGrafico();
-  atualizarGraficoDonut();
-  renderizarLegendaGrafico();
+
+  // Aviso na coluna de projetos (padrão dos outros filtros)
+  var avisoCont = document.getElementById('avisoOcultarConcluidas');
+  if (ativo) {
+    if (!avisoCont) {
+      avisoCont = document.createElement('div');
+      avisoCont.id = 'avisoOcultarConcluidas';
+      avisoCont.className = 'setor-filtro-ativo-aviso';
+      var lista = document.getElementById('projetosCardsLista');
+      if (lista) lista.parentNode.insertBefore(avisoCont, lista);
+    }
+    avisoCont.innerHTML =
+      '<i class="fas fa-eye-slash"></i> Ocultando projetos <strong>Concluídos</strong>' +
+      '<span class="setor-filtro-limpar" onclick="toggleOcultarConcluidas()">' +
+        '<i class="fas fa-times"></i> Exibir' +
+      '</span>';
+  } else {
+    if (avisoCont) avisoCont.remove();
+  }
+
+  // Se havia filtro de status "Concluída" ativo, limpa (não faz sentido filtrar por algo oculto)
+  if (ativo && ESTADO.filtrosGlobais.statusSelecionado === 'Concluída') {
+    filtrarPorStatus(null);
+    return; // filtrarPorStatus já chama atualizarTodosComponentes
+  }
+
+  atualizarTodosComponentes();
+}
+
+/** Aplica ou remove o filtro global por status (toggle) */
+function filtrarPorStatus(status) {
+  if (status !== null && ESTADO.filtrosGlobais.statusSelecionado === status) {
+    status = null;
+  }
+  ESTADO.filtrosGlobais.statusSelecionado = status;
+
+  var avisoCont = document.getElementById('avisoFiltroStatus');
+  if (status) {
+    if (!avisoCont) {
+      avisoCont = document.createElement('div');
+      avisoCont.id = 'avisoFiltroStatus';
+      avisoCont.className = 'setor-filtro-ativo-aviso';
+      var lista = document.getElementById('projetosCardsLista');
+      if (lista) lista.parentNode.insertBefore(avisoCont, lista);
+    }
+    avisoCont.innerHTML =
+      '<i class="fas fa-circle-dot"></i> Filtrando por status: <strong>' + status + '</strong>' +
+      '<span class="setor-filtro-limpar" onclick="filtrarPorStatus(null)">' +
+        '<i class="fas fa-times"></i> Limpar' +
+      '</span>';
+  } else {
+    if (avisoCont) avisoCont.remove();
+  }
+
+  atualizarTodosComponentes();
 }
 
 /** Gráfico Donut (Chart.js) */
@@ -1020,7 +1321,8 @@ function renderizarGraficoDonut() {
 
   if (ESTADO.graficoDonut) ESTADO.graficoDonut.destroy();
 
-  var projetos = obterProjetosFiltrados();
+  // Contexto sem filtro de status — donut sempre mostra a distribuição completa
+  var projetos = obterProjetosContextoStatus();
   var dados = prepararDadosDonut(projetos);
   atualizarCentroGrafico(dados.total);
 
@@ -1028,7 +1330,7 @@ function renderizarGraficoDonut() {
     type: 'doughnut',
     data: {
       labels: dados.labels,
-      datasets: [{ data: dados.valores, backgroundColor: dados.cores, borderColor: '#fffdf8', borderWidth: 3, hoverOffset: 8 }]
+      datasets: [{ data: dados.valores, backgroundColor: dados.cores, borderColor: dados.bordas, borderWidth: 3, hoverOffset: 8 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '65%',
@@ -1050,32 +1352,49 @@ function renderizarGraficoDonut() {
       onClick: function(evt, elements) {
         if (elements.length > 0) {
           var status = dados.labels[elements[0].index];
-          aplicarFiltroGlobal('status', status);
+          alternarStatusGrafico(status);
         }
       }
     }
   });
 }
 
+/**
+ * Prepara os dados do donut a partir dos projetos de contexto (sem filtro de status).
+ * Quando um status está ativo como filtro, as outras fatias ficam com opacidade reduzida
+ * para destacar visualmente o status selecionado sem remover nenhuma fatia do gráfico.
+ */
 function prepararDadosDonut(projetos) {
-  var labels = [], valores = [], cores = [], total = 0;
-  ESTADO.graficoStatusAtivos.forEach(function(status) {
+  var labels = [], valores = [], cores = [], bordas = [], total = 0;
+  var statusAtivo = ESTADO.filtrosGlobais.statusSelecionado;
+
+  LISTA_STATUS_PROJETOS.forEach(function(status) {
     var count = projetos.filter(function(p) { return p.status === status; }).length;
+    if (count === 0) return; // oculta fatias sem projetos (sem distorcer o gráfico)
+
+    var corBase = CORES_STATUS[status]?.cor || '#9ca3af';
+    var dimmed = statusAtivo && status !== statusAtivo;
+
     labels.push(status);
     valores.push(count);
-    cores.push(CORES_STATUS[status]?.cor || '#9ca3af');
+    // Fatia não selecionada: cor com 35% de opacidade
+    cores.push(dimmed ? corBase + '59' : corBase);
+    bordas.push(dimmed ? corBase + '80' : corBase);
     total += count;
   });
-  return { labels: labels, valores: valores, cores: cores, total: total };
+
+  return { labels: labels, valores: valores, cores: cores, bordas: bordas, total: total };
 }
 
 function atualizarGraficoDonut() {
   if (!ESTADO.graficoDonut) return;
-  var projetos = obterProjetosFiltrados();
+  // Sempre usa contexto sem filtro de status para o donut
+  var projetos = obterProjetosContextoStatus();
   var dados = prepararDadosDonut(projetos);
   ESTADO.graficoDonut.data.labels = dados.labels;
   ESTADO.graficoDonut.data.datasets[0].data = dados.valores;
   ESTADO.graficoDonut.data.datasets[0].backgroundColor = dados.cores;
+  ESTADO.graficoDonut.data.datasets[0].borderColor = dados.bordas;
   ESTADO.graficoDonut.update('active');
   atualizarCentroGrafico(dados.total);
 }
@@ -1091,16 +1410,19 @@ function renderizarLegendaGrafico() {
   var container = document.getElementById('graficoLegenda');
   if (!container) return;
 
-  var projetos = obterProjetosFiltrados();
+  // Contexto sem filtro de status — legenda reflete a distribuição real
+  var projetos = obterProjetosContextoStatus();
+  var statusAtivo = ESTADO.filtrosGlobais.statusSelecionado;
   var html = '';
 
   LISTA_STATUS_PROJETOS.forEach(function(status) {
     var count = projetos.filter(function(p) { return p.status === status; }).length;
-    var ativo = ESTADO.graficoStatusAtivos.includes(status);
+    if (count === 0) return;
     var corObj = CORES_STATUS[status];
+    var dimmed = statusAtivo && status !== statusAtivo;
 
-    html += '<div class="legenda-item ' + (!ativo ? 'inativo' : '') + '" onclick="alternarStatusGrafico(\'' + status + '\')">' +
-      '<span class="legenda-cor" style="background:' + (corObj?.cor || '#9ca3af') + ';"></span>' +
+    html += '<div class="legenda-item ' + (dimmed ? 'inativo' : '') + '" onclick="alternarStatusGrafico(\'' + status + '\')" title="' + (statusAtivo === status ? 'Remover filtro' : 'Filtrar por ' + status) + '">' +
+      '<span class="legenda-cor" style="background:' + (corObj?.cor || '#9ca3af') + '; opacity:' + (dimmed ? '0.35' : '1') + ';"></span>' +
       '<span>' + status + '</span><span class="legenda-valor">' + count + '</span></div>';
   });
 
@@ -1149,6 +1471,77 @@ function renderizarListaProjetosStatus() {
 }
 
 /** Barras de distribuição por prioridade */
+var CATEGORIAS_PRIORIDADE = [
+  { chave: 'alta',    label: '🔴 Alta',        classe: 'prio-alta' },
+  { chave: 'media',   label: '🟡 Média',       classe: 'prio-media' },
+  { chave: 'baixa',   label: '🟢 Baixa',       classe: 'prio-baixa' },
+  { chave: 'nenhuma', label: '⚪ Sem cálculo', classe: 'prio-nenhuma' }
+];
+
+function renderizarFiltrosPrioridade() {
+  var container = document.getElementById('graficoFiltrosPrioridade');
+  if (!container) return;
+
+  var projetos = obterProjetosFiltrados();
+  var html = '';
+
+  CATEGORIAS_PRIORIDADE.forEach(function(cat) {
+    var ativo = ESTADO.graficoPrioridadeAtivos.includes(cat.chave);
+    var count = projetos.filter(function(p) { return obterCategoriaPrioridade(p.valorPrioridade) === cat.chave; }).length;
+
+    html += '<div class="grafico-filtro-chip ' + cat.classe + (ativo ? ' ativo' : '') + '" ' +
+      'onclick="alternarPrioridadeGrafico(\'' + cat.chave + '\')">' +
+      '<i class="fas fa-' + (ativo ? 'check-circle' : 'circle') + '"></i> ' +
+      cat.label.replace(/^[^ ]+ /, '') + ' (' + count + ')</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function alternarPrioridadeGrafico(chave) {
+  // Atualiza visibilidade nas barras (multi-select)
+  var idx = ESTADO.graficoPrioridadeAtivos.indexOf(chave);
+  if (idx > -1) {
+    if (ESTADO.graficoPrioridadeAtivos.length > 1) {
+      ESTADO.graficoPrioridadeAtivos.splice(idx, 1);
+    }
+  } else {
+    ESTADO.graficoPrioridadeAtivos.push(chave);
+  }
+  // Aplica também como filtro global da página
+  filtrarPorPrioridade(chave);
+}
+
+/** Aplica ou remove o filtro global por prioridade (toggle) */
+function filtrarPorPrioridade(chave) {
+  if (chave !== null && ESTADO.filtrosGlobais.prioridadeSelecionada === chave) {
+    chave = null;
+  }
+  ESTADO.filtrosGlobais.prioridadeSelecionada = chave;
+
+  var avisoCont = document.getElementById('avisoFiltroPrioridade');
+  if (chave) {
+    var cat = CATEGORIAS_PRIORIDADE.filter(function(c) { return c.chave === chave; })[0];
+    var label = cat ? cat.label : chave;
+    if (!avisoCont) {
+      avisoCont = document.createElement('div');
+      avisoCont.id = 'avisoFiltroPrioridade';
+      avisoCont.className = 'setor-filtro-ativo-aviso';
+      var lista = document.getElementById('projetosCardsLista');
+      if (lista) lista.parentNode.insertBefore(avisoCont, lista);
+    }
+    avisoCont.innerHTML =
+      '<i class="fas fa-signal"></i> Filtrando por prioridade: <strong>' + label + '</strong>' +
+      '<span class="setor-filtro-limpar" onclick="filtrarPorPrioridade(null)">' +
+        '<i class="fas fa-times"></i> Limpar' +
+      '</span>';
+  } else {
+    if (avisoCont) avisoCont.remove();
+  }
+
+  atualizarTodosComponentes();
+}
+
 function renderizarBarrasPrioridade() {
   var container = document.getElementById('dashboardPrioridadeBars');
   if (!container) return;
@@ -1156,20 +1549,15 @@ function renderizarBarrasPrioridade() {
   var projetos = obterProjetosFiltrados();
   var total = projetos.length || 1;
 
-  var categorias = [
-    { chave: 'alta', label: '🔴 Alta', classe: 'alta' },
-    { chave: 'media', label: '🟡 Média', classe: 'media' },
-    { chave: 'baixa', label: '🟢 Baixa', classe: 'baixa' },
-    { chave: 'nenhuma', label: '⚪ Sem cálculo', classe: 'nenhuma' }
-  ];
-
   var html = '';
-  categorias.forEach(function(cat) {
+  CATEGORIAS_PRIORIDADE.forEach(function(cat) {
+    var ativo = ESTADO.graficoPrioridadeAtivos.includes(cat.chave);
     var qtd = projetos.filter(function(p) { return obterCategoriaPrioridade(p.valorPrioridade) === cat.chave; }).length;
     var perc = Math.round((qtd / total) * 100);
 
-    html += '<div class="prioridade-bar-item"><span class="prioridade-bar-label">' + cat.label + '</span>' +
-      '<div class="prioridade-bar-container"><div class="prioridade-bar-fill ' + cat.classe + '" style="width:' + perc + '%;">' +
+    html += '<div class="prioridade-bar-item' + (ativo ? '' : ' inativo') + '">' +
+      '<span class="prioridade-bar-label">' + cat.label + '</span>' +
+      '<div class="prioridade-bar-container"><div class="prioridade-bar-fill ' + cat.chave + '" style="width:' + perc + '%;">' +
       (perc > 10 ? '<span class="prioridade-bar-valor">' + perc + '%</span>' : '') +
       '</div></div><span class="prioridade-bar-count">' + qtd + '</span></div>';
   });
@@ -1177,10 +1565,12 @@ function renderizarBarrasPrioridade() {
   container.innerHTML = html;
 }
 
-/** Projetos críticos (prioridade alta, não concluídos) */
+/** Projetos críticos → carrossel fino no topo */
 function renderizarProjetosCriticos() {
-  var container = document.getElementById('dashboardCriticos');
-  if (!container) return;
+  var banner  = document.getElementById('criticosBanner');
+  var track   = document.getElementById('criticosBannerTrack');
+  var indicador = document.getElementById('criticosBannerIndicador');
+  if (!banner || !track) return;
 
   var projetos = obterProjetosFiltrados();
   var criticos = projetos.filter(function(p) {
@@ -1189,22 +1579,57 @@ function renderizarProjetosCriticos() {
   }).sort(function(a, b) { return (b.valorPrioridade || 0) - (a.valorPrioridade || 0); });
 
   if (criticos.length === 0) {
-    container.innerHTML = '<div class="dashboard-vazio"><i class="fas fa-check-circle"></i><p>Nenhum projeto crítico!</p></div>';
+    banner.style.display = 'none';
     return;
   }
 
   var html = '';
-  criticos.slice(0, 5).forEach(function(proj) {
+  criticos.forEach(function(proj) {
     var resp = obterPrimeiroResponsavel(proj.responsaveisIds || []);
-    html += '<div class="critico-item" onclick="selecionarProjeto(\'' + proj.id + '\')">' +
-      '<div class="critico-icone"><i class="fas fa-exclamation"></i></div>' +
-      '<div class="critico-info"><div class="critico-nome">' + proj.nome + '</div>' +
-      '<div class="critico-meta"><span><i class="fas fa-user"></i> ' + resp + '</span> • ' +
-      '<span><i class="fas fa-' + obterIconeStatus(proj.status) + '"></i> ' + proj.status + '</span></div></div>' +
-      '<div class="critico-valor">' + (proj.valorPrioridade || 0) + '</div></div>';
+    html += '<div class="critico-banner-item" onclick="selecionarProjeto(\'' + proj.id + '\')">' +
+      '<i class="fas fa-exclamation-circle"></i>' +
+      '<span class="critico-banner-nome">' + proj.nome + '</span>' +
+      '<span class="critico-banner-badge"><i class="fas fa-user"></i> ' + resp + '</span>' +
+      '<span class="critico-banner-badge">' + proj.status + '</span>' +
+      '<span class="critico-banner-badge">GUT ' + (proj.valorPrioridade || 0) + '</span>' +
+      '</div>';
   });
 
-  container.innerHTML = html;
+  track.innerHTML = html;
+  banner.style.display = 'flex';
+  if (indicador) indicador.textContent = criticos.length + ' projeto' + (criticos.length > 1 ? 's' : '');
+
+  // Reset posição
+  ESTADO._criticosBannerIdx = 0;
+  track.style.transform = 'translateX(0)';
+  _atualizarNavCriticos();
+}
+
+function navegarCriticosBanner(direcao) {
+  var track = document.getElementById('criticosBannerTrack');
+  if (!track) return;
+  var items = track.querySelectorAll('.critico-banner-item');
+  if (!items.length) return;
+
+  var total = items.length;
+  if (!ESTADO._criticosBannerIdx) ESTADO._criticosBannerIdx = 0;
+  ESTADO._criticosBannerIdx = Math.max(0, Math.min(ESTADO._criticosBannerIdx + direcao, total - 1));
+
+  var itemW = items[0].offsetWidth + 8; // largura + gap
+  track.style.transform = 'translateX(-' + (ESTADO._criticosBannerIdx * itemW) + 'px)';
+  _atualizarNavCriticos();
+}
+
+function _atualizarNavCriticos() {
+  var track = document.getElementById('criticosBannerTrack');
+  if (!track) return;
+  var total = track.querySelectorAll('.critico-banner-item').length;
+  var idx   = ESTADO._criticosBannerIdx || 0;
+  var nav   = document.getElementById('criticosBanner');
+  if (!nav) return;
+  var btns = nav.querySelectorAll('.criticos-banner-nav button');
+  if (btns[0]) btns[0].disabled = idx === 0;
+  if (btns[1]) btns[1].disabled = idx >= total - 1;
 }
 
 function renderizarGraficoSetor() {
@@ -1704,62 +2129,83 @@ function renderizarProjetosCards() {
     html += '<i class="fas fa-grip-vertical projeto-card-handle"></i>';
     html += '</div></div>';
 
-    // Corpo (expandível)
+    // Corpo (expandível) — BENTO GRID
     html += '<div class="projeto-card-corpo"><div class="projeto-card-grid">';
 
-    // Descrição
-    html += '<div class="projeto-card-campo full"><div class="projeto-card-campo-label"><i class="fas fa-align-left"></i> Descrição</div>' +
-      '<div class="projeto-card-campo-valor ' + (!proj.descricao ? 'vazio' : '') + '">' + (proj.descricao || 'Não informada') + '</div></div>';
+    // [A] Descrição — 2 colunas × 2 linhas (célula principal)
+    html += '<div class="projeto-card-campo bento-desc">' +
+      '<div class="projeto-card-campo-label"><i class="fas fa-align-left"></i> Descrição</div>' +
+      '<div class="projeto-card-campo-valor ' + (!proj.descricao ? 'vazio' : '') + '">' + (proj.descricao || 'Sem descrição') + '</div>' +
+      '</div>';
 
-    // ★ BLOCO DE DATAS E DURAÇÃO ★
-    html += '<div class="projeto-card-campo full">' +
-      '<div class="projeto-card-campo-label"><i class="fas fa-calendar-alt"></i> Período do Projeto</div>' +
-      '<div class="projeto-card-datas-wrapper">';
-
-    html += '<span class="projeto-card-data-item ' + (!textoInicio ? 'vazio' : '') + '">' +
-      '<i class="fas fa-play-circle" style="color:var(--cor-sucesso);"></i> ' +
-      '<strong>Início:</strong> ' + (textoInicio || 'Não definida') + '</span>';
-
-    html += '<span class="projeto-card-data-sep">→</span>';
-
-    html += '<span class="projeto-card-data-item ' + (!textoFim ? 'vazio' : '') + '">' +
-      '<i class="fas fa-stop-circle" style="color:var(--cor-perigo);"></i> ' +
-      '<strong>Fim:</strong> ' + (textoFim || 'Não definida') + '</span>';
-
-    if (textoDuracaoCard) {
-      html += '<span class="projeto-card-duracao">' +
-        '<i class="fas fa-hourglass-half"></i> <strong>' + textoDuracaoCard + '</strong></span>';
+    // [B] Responsáveis — 1 coluna × 2 linhas (lateral)
+    html += '<div class="projeto-card-campo bento-resp">' +
+      '<div class="projeto-card-campo-label"><i class="fas fa-user-tie"></i> Resp.</div>' +
+      '<div class="projeto-card-resp-list">';
+    if (nomesResp.length > 0) {
+      nomesResp.forEach(function(r) {
+        var nome = r.nome || r;
+        html += '<span class="resp-chip"><i class="fas fa-circle-user"></i>' + nome + '</span>';
+      });
+    } else {
+      html += '<span class="projeto-card-campo-valor vazio">—</span>';
     }
-
     html += '</div></div>';
 
-    // Tipo e Para Quem
-    html += '<div class="projeto-card-campo"><div class="projeto-card-campo-label"><i class="fas fa-tag"></i> Tipo</div>' +
-      '<div class="projeto-card-campo-valor ' + (!proj.tipo ? 'vazio' : '') + '">' + (proj.tipo || 'Não informado') + '</div></div>';
-    html += '<div class="projeto-card-campo"><div class="projeto-card-campo-label"><i class="fas fa-user"></i> Para Quem</div>' +
-      '<div class="projeto-card-campo-valor ' + (!proj.paraQuem ? 'vazio' : '') + '">' + (proj.paraQuem || 'Não informado') + '</div></div>';
+    // [C] Tipo
+    html += '<div class="projeto-card-campo bento-tipo">' +
+      '<div class="projeto-card-campo-label"><i class="fas fa-tag"></i> Tipo</div>' +
+      '<div class="projeto-card-campo-valor ' + (!proj.tipo ? 'vazio' : '') + '">' + (proj.tipo || '—') + '</div>' +
+      '</div>';
 
-    // Gravidade e Urgência
-    html += '<div class="projeto-card-campo"><div class="projeto-card-campo-label"><i class="fas fa-exclamation-triangle"></i> Gravidade</div>' +
-      '<div class="projeto-card-campo-valor ' + (!proj.gravidade ? 'vazio' : '') + '">' + (proj.gravidade || 'Não definida') + '</div></div>';
-    html += '<div class="projeto-card-campo"><div class="projeto-card-campo-label"><i class="fas fa-clock"></i> Urgência</div>' +
-      '<div class="projeto-card-campo-valor ' + (!proj.urgencia ? 'vazio' : '') + '">' + (proj.urgencia || 'Não definida') + '</div></div>';
+    // [D] Para Quem
+    html += '<div class="projeto-card-campo bento-paraquem">' +
+      '<div class="projeto-card-campo-label"><i class="fas fa-bullseye"></i> Para Quem</div>' +
+      '<div class="projeto-card-campo-valor ' + (!proj.paraQuem ? 'vazio' : '') + '">' + (proj.paraQuem || '—') + '</div>' +
+      '</div>';
 
-    // Responsáveis e Setor
-    html += '<div class="projeto-card-campo"><div class="projeto-card-campo-label"><i class="fas fa-user-tie"></i> Responsáveis</div>' +
-      '<div class="projeto-card-campo-valor ' + (nomesResp.length === 0 ? 'vazio' : '') + '">' + textoResp + '</div></div>';
-    html += '<div class="projeto-card-campo"><div class="projeto-card-campo-label"><i class="fas fa-building"></i> Setor</div>' +
-      '<div class="projeto-card-campo-valor ' + (!proj.setor ? 'vazio' : '') + '">' + (proj.setor || 'Não informado') + '</div></div>';
+    // [E] Setor
+    html += '<div class="projeto-card-campo bento-setor">' +
+      '<div class="projeto-card-campo-label"><i class="fas fa-building"></i> Setor</div>' +
+      '<div class="projeto-card-campo-valor ' + (!proj.setor ? 'vazio' : '') + '">' + (proj.setor || '—') + '</div>' +
+      '</div>';
 
-    // Link
+    // [F] Gravidade + Urgência — linha completa com divisor interno
+    html += '<div class="projeto-card-campo bento-row bento-gut">' +
+      '<div class="bento-gut-item">' +
+      '<div class="projeto-card-campo-label"><i class="fas fa-exclamation-triangle"></i> Gravidade</div>' +
+      '<div class="projeto-card-campo-valor ' + (!proj.gravidade ? 'vazio' : '') + '">' + (proj.gravidade || '—') + '</div>' +
+      '</div>' +
+      '<div class="bento-gut-divisor"></div>' +
+      '<div class="bento-gut-item">' +
+      '<div class="projeto-card-campo-label"><i class="fas fa-clock"></i> Urgência</div>' +
+      '<div class="projeto-card-campo-valor ' + (!proj.urgencia ? 'vazio' : '') + '">' + (proj.urgencia || '—') + '</div>' +
+      '</div></div>';
+
+    // [G] Período — linha completa
+    html += '<div class="projeto-card-campo bento-row">' +
+      '<div class="projeto-card-campo-label"><i class="fas fa-calendar-alt"></i> Período</div>' +
+      '<div class="projeto-card-datas-wrapper">';
+    html += '<span class="projeto-card-data-item ' + (!textoInicio ? 'vazio' : '') + '">' +
+      '<i class="fas fa-play-circle" style="color:var(--cor-sucesso);"></i> <strong>Início:</strong> ' + (textoInicio || 'Não definida') + '</span>';
+    html += '<span class="projeto-card-data-sep">→</span>';
+    html += '<span class="projeto-card-data-item ' + (!textoFim ? 'vazio' : '') + '">' +
+      '<i class="fas fa-stop-circle" style="color:var(--cor-perigo);"></i> <strong>Fim:</strong> ' + (textoFim || 'Não definida') + '</span>';
+    if (textoDuracaoCard) {
+      html += '<span class="projeto-card-duracao"><i class="fas fa-hourglass-half"></i> <strong>' + textoDuracaoCard + '</strong></span>';
+    }
+    html += '</div></div>';
+
+    // [H] Link — linha completa (condicional)
     if (proj.link) {
-      html += '<div class="projeto-card-campo full"><div class="projeto-card-campo-label"><i class="fas fa-folder-open"></i> Documentos do Projeto</div>' +
+      html += '<div class="projeto-card-campo bento-row">' +
+        '<div class="projeto-card-campo-label"><i class="fas fa-folder-open"></i> Documentos</div>' +
         '<div class="campo-link-wrapper"><input type="text" readonly class="campo-link-readonly" value="' + proj.link + '">' +
         '<a href="' + proj.link + '" target="_blank" class="btn-abrir-link" title="Abrir no Drive"><i class="fas fa-external-link-alt"></i></a></div></div>';
     }
 
-    // ★ BOTÃO VER ATAS ★
-    html += '<div class="projeto-card-campo full projeto-card-atas-btn-wrap">' +
+    // [I] Ver Atas — linha completa
+    html += '<div class="projeto-card-campo bento-row projeto-card-atas-btn-wrap">' +
       '<button class="btn-ver-atas-projeto" onclick="abrirModalAtasProjeto(\'' + proj.id + '\', \'' + proj.nome.replace(/'/g, "\\'") + '\', event)">' +
       '<i class="fas fa-book-open"></i> Ver Atas e Documentos</button></div>';
 
@@ -2629,6 +3075,19 @@ function renderizarAtividade(atividade, todasAtividades, idx, isDraggable) {
   return html;
 }
 
+// ========================= MODAL RELATÓRIO DE PROJETOS =========================
+// Módulo movido para ModalRelatorio-JS🟡.html
+// Mantido aqui apenas o esc() como utilitário legado (usado em outros lugares)
+
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Funções migradas para ModalRelatorio-JS🟡.html — removidas daqui.
+
+// Funções do relatório migradas para ModalRelatorio-JS🟡.html.
+
 // ========================= CHECKLIST DE ATIVIDADES =========================
 
 function alternarConclusaoAtividade(atividadeId, event) {
@@ -3325,13 +3784,12 @@ function salvarProjeto() {
     departamentoId:  (document.getElementById('itemDepartamento') ? document.getElementById('itemDepartamento').value : '') || (projetoExistente.departamentoId || '')
   };
 
-  var modalBody = document.querySelector('#modalEdicao .modal-body');
-  mostrarSpinner(modalBody);
+  mostrarProcessando('Salvando projeto...');
 
   if (typeof google !== 'undefined' && google.script) {
     google.script.run
       .withSuccessHandler(function(res) {
-        esconderSpinner(modalBody);
+        esconderProcessando();
         if (res.sucesso) {
           mostrarToast('Projeto atualizado!', 'sucesso');
           if (ESTADO.projeto && ESTADO.projeto.id === id) Object.assign(ESTADO.projeto, dados);
@@ -3344,13 +3802,13 @@ function salvarProjeto() {
         }
       })
       .withFailureHandler(function(e) {
-        esconderSpinner(modalBody);
+        esconderProcessando();
         mostrarToast('Erro: ' + e, 'erro');
       })
       .salvarProjetoCompleto(dados, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
-      esconderSpinner(modalBody);
+      esconderProcessando();
       if (ESTADO.projeto && ESTADO.projeto.id === id) Object.assign(ESTADO.projeto, dados);
       var idx = ESTADO.listaProjetos.findIndex(function(p) { return p.id === id; });
       if (idx !== -1) Object.assign(ESTADO.listaProjetos[idx], dados);
@@ -3374,13 +3832,12 @@ function salvarAtividade() {
 
   if (!dados.nome) { mostrarToast('Nome é obrigatório', 'aviso'); return; }
 
-  var modalBody = document.querySelector('#modalEdicao .modal-body');
-  mostrarSpinner(modalBody);
+  mostrarProcessando(id ? 'Salvando atividade...' : 'Criando atividade...');
 
   if (typeof google !== 'undefined' && google.script) {
     google.script.run
       .withSuccessHandler(function(res) {
-        esconderSpinner(modalBody);
+        esconderProcessando();
         if (res.sucesso) {
           mostrarToast(id ? 'Atividade atualizada!' : 'Atividade criada!', 'sucesso');
           fecharModalEdicao();
@@ -3391,13 +3848,13 @@ function salvarAtividade() {
         }
       })
       .withFailureHandler(function(e) {
-        esconderSpinner(modalBody);
+        esconderProcessando();
         mostrarToast('Erro: ' + e, 'erro');
       })
       .salvarEtapaCompleta(dados, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
-      esconderSpinner(modalBody);
+      esconderProcessando();
       if (id) {
         var at = ESTADO.etapas.find(function(e) { return e.id === id; });
         if (at) Object.assign(at, dados);
@@ -3457,8 +3914,14 @@ function confirmarExcluirAtividade(atividadeId) {
   var at = ESTADO.etapas.find(function(e) { return e.id === atividadeId; });
   if (!at) return;
 
-  if (!confirm('Excluir a atividade "' + at.nome + '"?\nEsta ação não pode ser desfeita.')) return;
+  mostrarConfirm(
+    'Excluir a atividade <strong>"' + (at.nome || '') + '"</strong>? Esta ação não pode ser desfeita.',
+    function() { _executarExclusaoAtividade(atividadeId); },
+    '<i class="fas fa-trash"></i> Excluir'
+  );
+}
 
+function _executarExclusaoAtividade(atividadeId) {
   var containerDiagrama = document.getElementById('diagramaArvore');
   mostrarSpinner(containerDiagrama);
 
@@ -3644,13 +4107,12 @@ function salvarNovoProjeto() {
     departamentoId:  departamentoPadrao
   };
 
-  var modalBody = document.querySelector('#modalNovoProjeto .modal-body');
-  mostrarSpinner(modalBody);
+  mostrarProcessando('Criando projeto...');
 
   if (typeof google !== 'undefined' && google.script) {
     google.script.run
       .withSuccessHandler(function(res) {
-        esconderSpinner(modalBody);
+        esconderProcessando();
         if (res.sucesso) {
           fecharModalNovoProjeto();
           mostrarToast('Projeto criado!', 'sucesso');
@@ -3663,13 +4125,13 @@ function salvarNovoProjeto() {
         }
       })
       .withFailureHandler(function(e) {
-        esconderSpinner(modalBody);
+        esconderProcessando();
         mostrarToast('Erro: ' + e, 'erro');
       })
       .salvarProjetoCompleto(dados, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
-      esconderSpinner(modalBody);
+      esconderProcessando();
       fecharModalNovoProjeto();
       var novoId = 'proj_demo_' + Date.now();
       ESTADO.listaProjetos.push(Object.assign({}, dados, { id: novoId }));
@@ -3853,13 +4315,12 @@ function salvarCalculoPrioridade() {
     esforcoLabel:     c.esforcoLabel            // ← novo
   };
 
-  var modalBody = document.querySelector('#modalCalculoPrioridade .modal-body');
-  mostrarSpinner(modalBody);
+  mostrarProcessando('Calculando prioridade...');
 
   if (typeof google !== 'undefined' && google.script) {
     google.script.run
       .withSuccessHandler(function(res) {
-        esconderSpinner(modalBody);
+        esconderProcessando();
         if (res.sucesso) {
           mostrarToast(res.mensagem, 'sucesso');
           var proj = ESTADO.listaProjetos.find(function(p) { return p.id === c.projetoId; });
@@ -3869,7 +4330,7 @@ function salvarCalculoPrioridade() {
             proj.urgencia  = dadosCalculo.urgenciaLabel;
             proj.paraQuem  = dadosCalculo.paraQuemLabel;
             proj.tipo      = dadosCalculo.tipoProjetoLabel;
-            proj.esforco   = dadosCalculo.esforcoLabel;   // ← novo
+            proj.esforco   = dadosCalculo.esforcoLabel;
             proj.prioridade = res.categoriaPrioridade;
           }
           if (ESTADO.projeto && ESTADO.projeto.id === c.projetoId) {
@@ -3879,7 +4340,7 @@ function salvarCalculoPrioridade() {
               urgencia:  dadosCalculo.urgenciaLabel,
               paraQuem:  dadosCalculo.paraQuemLabel,
               tipo:      dadosCalculo.tipoProjetoLabel,
-              esforco:   dadosCalculo.esforcoLabel    // ← novo
+              esforco:   dadosCalculo.esforcoLabel
             });
           }
           fecharModalCalculoPrioridade();
@@ -3889,13 +4350,13 @@ function salvarCalculoPrioridade() {
         }
       })
       .withFailureHandler(function(e) {
-        esconderSpinner(modalBody);
+        esconderProcessando();
         mostrarToast('Erro: ' + e, 'erro');
       })
       .salvarValorPrioridadeProjeto(c.projetoId, valorCalculado, dadosCalculo, SESSAO_TOKEN);
   } else {
     setTimeout(function() {
-      esconderSpinner(modalBody);
+      esconderProcessando();
       var proj = ESTADO.listaProjetos.find(function(p) { return p.id === c.projetoId; });
       if (proj) {
         proj.valorPrioridade = valorCalculado;
@@ -3915,8 +4376,27 @@ function toggleChat() {
   ESTADO.chatVisivel = !ESTADO.chatVisivel;
   var mainLayout = document.getElementById('mainLayout');
   var btn = document.getElementById('btnToggleChat');
-  mainLayout.classList.toggle('chat-oculto', !ESTADO.chatVisivel);
+  var painelChat = document.querySelector('.painel-chat');
+  var backdrop = document.getElementById('chatBackdrop');
+  var isMobile = window.innerWidth <= 1024;
+
+  if (isMobile) {
+    if (painelChat) painelChat.classList.toggle('visivel', ESTADO.chatVisivel);
+    if (backdrop) backdrop.classList.toggle('visivel', ESTADO.chatVisivel);
+  } else {
+    mainLayout.classList.toggle('chat-oculto', !ESTADO.chatVisivel);
+  }
   if (btn) btn.classList.toggle('ativo', ESTADO.chatVisivel);
+}
+
+function fecharChatBackdrop() {
+  ESTADO.chatVisivel = false;
+  var painelChat = document.querySelector('.painel-chat');
+  var backdrop = document.getElementById('chatBackdrop');
+  var btn = document.getElementById('btnToggleChat');
+  if (painelChat) painelChat.classList.remove('visivel');
+  if (backdrop) backdrop.classList.remove('visivel');
+  if (btn) btn.classList.remove('ativo');
 }
 
 function trocarAbaSidebar(nomeAba) {
@@ -4505,6 +4985,8 @@ style.textContent =
   '.btn-lixeira-excluir{background:rgba(166,61,64,0.08);color:var(--cor-perigo);border:1px solid rgba(166,61,64,0.25);width:32px;height:32px;border-radius:var(--raio);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.82rem;transition:var(--transicao);}' +
   '.btn-lixeira-excluir:hover{background:var(--cor-perigo);color:#faf6ee;}' +
 
+  // ── CSS do Modal Relatório migrado para ModalRelatorio-CSS🟡.html ──
+
   // ── Progresso das atividades ──
   '.diagrama-progresso-wrapper{margin:0 0 2px;padding:12px 16px;background:var(--cor-fundo);border-top:1px solid var(--cor-borda-clara);}' +
   '.diagrama-progresso-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;}' +
@@ -4631,7 +5113,19 @@ style.textContent =
   '.btn-filtro-status.andamento.ativo{border-color:var(--cor-info);background:rgba(74,111,165,0.1);color:var(--cor-info);}' +
   '.btn-filtro-status.aguardando.ativo{border-color:var(--cor-aguardando);background:rgba(194,133,90,0.1);color:var(--cor-aguardando);}' +
   '.btn-filtro-status.concluida.ativo{border-color:var(--cor-sucesso);background:rgba(90,114,71,0.1);color:var(--cor-sucesso);}' +
-  '.atividades-contador{font-size:0.72rem;color:var(--cor-texto-secundario);white-space:nowrap;display:flex;align-items:center;gap:4px;}' 
+  '.atividades-contador{font-size:0.72rem;color:var(--cor-texto-secundario);white-space:nowrap;display:flex;align-items:center;gap:4px;}' +
+
+  // ── Grupos de botões no header ──
+  '.btn-header-grupo{display:flex;align-items:center;gap:3px;}' +
+
+  // ── Dropdown "Criar" ──
+  '.btn-criar-dropdown-wrapper{position:relative;}' +
+  '.btn-criar-mais{gap:4px!important;}' +
+  '.dropdown-criar{display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--cor-fundo-card);border:1px solid var(--cor-borda);border-radius:var(--raio);box-shadow:var(--sombra-md,0 4px 16px rgba(44,26,14,0.18));min-width:170px;z-index:600;padding:4px;animation:fadeIn 0.15s ease;}' +
+  '.dropdown-criar.visivel{display:block;}' +
+  '.dropdown-criar-item{display:flex;align-items:center;gap:9px;width:100%;padding:9px 13px;background:none;border:none;border-radius:calc(var(--raio) - 2px);cursor:pointer;font-size:0.82rem;color:var(--cor-texto);text-align:left;font-family:inherit;transition:var(--transicao);white-space:nowrap;}' +
+  '.dropdown-criar-item:hover{background:var(--cor-primaria-bg);color:var(--cor-primaria);}' +
+  '.dropdown-criar-item i{width:14px;text-align:center;color:var(--cor-primaria);font-size:0.8rem;flex-shrink:0;}'
 
 document.head.appendChild(style);
 })();
@@ -4649,83 +5143,410 @@ document.addEventListener('keydown', function(e) {
 
 
 
-// ========================= ALTERNÂNCIA DE TEMA =========================
+// ========================= DROPDOWN "CRIAR" =========================
+function toggleDropdownCriar(event) {
+  if (event) event.stopPropagation();
+  var dd = document.getElementById('dropdownCriar');
+  if (!dd) return;
+  var aberto = dd.classList.contains('visivel');
+  dd.classList.toggle('visivel', !aberto);
 
-/** Abre o modal correto conforme o tema visual atual */
-function abrirModalTema() {
-  var styleEl = document.getElementById('tema-azul-styles');
-  var estaAzul = styleEl && !styleEl.disabled;
-  if (estaAzul) {
-    abrirModal('modalTemaParaClassico');
-  } else {
-    abrirModal('modalTemaParaAzul');
+  // Fechar ao clicar fora
+  if (!aberto) {
+    setTimeout(function() {
+      document.addEventListener('click', _fecharDropdownCriarExterno);
+    }, 0);
   }
 }
 
-/** Aplica o tema azul: injeta o CSS e salva no servidor */
-function aplicarTemaAzul() {
-  fecharModal('modalTemaParaAzul');
-  _injetarCssAzul();
-  _atualizarBotaoTema(true);
-  mostrarToast('Tema azul aplicado... espero que você esteja satisfeito! 😤', 'info');
+function fecharDropdownCriar() {
+  var dd = document.getElementById('dropdownCriar');
+  if (dd) dd.classList.remove('visivel');
+  document.removeEventListener('click', _fecharDropdownCriarExterno);
+}
 
-  // Persistir no servidor (não depende de localStorage)
-  if (typeof google !== 'undefined' && google.script) {
-    google.script.run.salvarPreferenciaTema('azul');
+function _fecharDropdownCriarExterno(e) {
+  var wrapper = document.getElementById('wrapperDropdownCriar');
+  if (wrapper && !wrapper.contains(e.target)) {
+    fecharDropdownCriar();
   }
 }
 
-/** Restaura o tema clássico: remove o CSS azul e salva no servidor */
-function aplicarTemaClassico() {
-  fecharModal('modalTemaParaClassico');
-  _removerCssAzul();
-  _atualizarBotaoTema(false);
-  mostrarToast('Bem-vindo de volta ao bom gosto! ☕', 'sucesso');
-
-  // Persistir no servidor
-  if (typeof google !== 'undefined' && google.script) {
-    google.script.run.salvarPreferenciaTema('cafe');
-  }
+// ========================= MODAL NOVO / EDITAR SETOR =========================
+function _esc(str) {
+  return (str || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function _injetarCssAzul() {
-  var styleEl = document.getElementById('tema-azul-styles');
-  if (styleEl) {
-    styleEl.disabled = false;   // ← reabilita sem recriar
+var _editandoSetorId = null;
+
+function abrirModalNovoSetor() {
+  _editandoSetorId = null;
+  var nome = document.getElementById('novoSetorNome');
+  var desc = document.getElementById('novoSetorDescricao');
+  if (nome) nome.value = '';
+  if (desc) desc.value = '';
+  var tit = document.getElementById('modalNovoSetorTitulo');
+  var btn = document.getElementById('modalNovoSetorBtnSalvar');
+  if (tit) tit.innerHTML = '<i class="fas fa-building"></i> Novo Setor';
+  if (btn) btn.innerHTML = '<i class="fas fa-save"></i> Criar Setor';
+  abrirModal('modalNovoSetor');
+  setTimeout(function() { if (nome) nome.focus(); }, 100);
+}
+
+function abrirEditarSetor(id) {
+  var setor = (ESTADO.setores || []).find(function(s) { return s.id === id; });
+  if (!setor) { mostrarToast('Setor não encontrado', 'erro'); return; }
+  _editandoSetorId = id;
+  var nome = document.getElementById('novoSetorNome');
+  var desc = document.getElementById('novoSetorDescricao');
+  if (nome) nome.value = setor.nome || '';
+  if (desc) desc.value = setor.descricao || '';
+  var tit = document.getElementById('modalNovoSetorTitulo');
+  var btn = document.getElementById('modalNovoSetorBtnSalvar');
+  if (tit) tit.innerHTML = '<i class="fas fa-pen"></i> Editar Setor';
+  if (btn) btn.innerHTML = '<i class="fas fa-save"></i> Salvar Alterações';
+  fecharModal('modalGerenciarSetores');
+  abrirModal('modalNovoSetor');
+  setTimeout(function() { if (nome) nome.focus(); }, 100);
+}
+
+function abrirModalGerenciarSetores() {
+  _renderListaSetores();
+  abrirModal('modalGerenciarSetores');
+}
+
+function _renderListaSetores() {
+  var lista = document.getElementById('listaGerenciarSetores');
+  if (!lista) return;
+  var setores = ESTADO.setores || [];
+  if (!setores.length) {
+    lista.innerHTML = '<p style="color:var(--cor-texto-secundario);font-size:0.82rem;text-align:center;padding:20px 0;">Nenhum setor cadastrado.</p>';
     return;
   }
-  var cssContent = document.createElement('div');
-  cssContent.innerHTML = '<?!= include("TemaAzul-CSS"); ?>';
-  var novoStyle = cssContent.querySelector('style');
-  if (novoStyle) {
-    novoStyle.id = 'tema-azul-styles';
-    document.head.appendChild(novoStyle);
+  var html = '<table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr>'
+    + '<th style="text-align:left;font-size:0.72rem;color:var(--cor-texto-secundario);font-weight:600;padding:6px 10px;border-bottom:2px solid var(--cor-borda-clara);text-transform:uppercase;">Nome</th>'
+    + '<th style="text-align:left;font-size:0.72rem;color:var(--cor-texto-secundario);font-weight:600;padding:6px 10px;border-bottom:2px solid var(--cor-borda-clara);text-transform:uppercase;">Descrição</th>'
+    + '<th style="width:60px;border-bottom:2px solid var(--cor-borda-clara);"></th>'
+    + '</tr></thead><tbody>';
+  setores.forEach(function(s) {
+    html += '<tr style="border-bottom:1px solid var(--cor-borda-clara);">'
+      + '<td style="padding:9px 10px;font-size:0.85rem;color:var(--cor-texto);font-weight:500;">' + _esc(s.nome) + '</td>'
+      + '<td style="padding:9px 10px;font-size:0.78rem;color:var(--cor-texto-secundario);">' + (s.descricao ? _esc(s.descricao) : '—') + '</td>'
+      + '<td style="padding:6px 10px;text-align:right;">'
+      + '<button onclick="abrirEditarSetor(\'' + s.id + '\')" style="background:var(--cor-primaria-bg);border:1px solid var(--cor-primaria);color:var(--cor-primaria);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.75rem;font-weight:600;">'
+      + '<i class="fas fa-pen"></i></button>'
+      + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  lista.innerHTML = html;
+}
+
+function fecharModalNovoSetor() {
+  _editandoSetorId = null;
+  fecharModal('modalNovoSetor');
+}
+
+function salvarNovoSetor() {
+  var nome = (document.getElementById('novoSetorNome').value || '').trim();
+  if (!nome) { mostrarToast('Nome do setor é obrigatório', 'erro'); return; }
+
+  var descricao = (document.getElementById('novoSetorDescricao').value || '').trim();
+  var editando  = !!_editandoSetorId;
+  var btnSalvar = document.getElementById('modalNovoSetorBtnSalvar');
+  if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...'; }
+
+  var dados = { nome: nome, descricao: descricao };
+  if (editando) dados.id = _editandoSetorId;
+
+  function _aoSalvar(res) {
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = '<i class="fas fa-save"></i> ' + (editando ? 'Salvar Alterações' : 'Criar Setor'); }
+    if (res && res.sucesso) {
+      if (editando) {
+        var idx = ESTADO.setores.findIndex(function(s) { return s.id === _editandoSetorId; });
+        if (idx >= 0) ESTADO.setores[idx] = { id: _editandoSetorId, nome: nome, descricao: descricao };
+        mostrarToast('Setor "' + nome + '" atualizado!', 'sucesso');
+      } else {
+        ESTADO.setores.push({ id: res.id, nome: nome, descricao: descricao });
+        mostrarToast('Setor "' + nome + '" criado com sucesso!', 'sucesso');
+      }
+      popularSelectsModais();
+      fecharModalNovoSetor();
+    } else {
+      mostrarToast('Erro: ' + (res ? res.mensagem : 'Falha ao salvar'), 'erro');
+    }
+  }
+
+  if (typeof google !== 'undefined' && google.script) {
+    google.script.run
+      .withSuccessHandler(_aoSalvar)
+      .withFailureHandler(function(e) {
+        if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = '<i class="fas fa-save"></i> ' + (editando ? 'Salvar Alterações' : 'Criar Setor'); }
+        mostrarToast('Erro: ' + e, 'erro');
+      })
+      .salvarSetor(dados);
+  } else {
+    var idDemo = _editandoSetorId || ('set_' + Date.now());
+    _aoSalvar({ sucesso: true, id: idDemo });
   }
 }
 
-function _removerCssAzul() {
-  var style = document.getElementById('tema-azul-styles');
-  if (style) style.disabled = true;  // ← desabilita sem destruir
-  var link = document.getElementById('link-tema-azul');
-  if (link) link.remove();
+// ========================= MODAL NOVO / EDITAR RESPONSÁVEL =========================
+var _editandoResponsavelId = null;
+
+function abrirModalNovoResponsavel() {
+  _editandoResponsavelId = null;
+  ['novoResponsavelNome', 'novoResponsavelEmail', 'novoResponsavelCargo'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var tit = document.getElementById('modalNovoResponsavelTitulo');
+  var btn = document.getElementById('modalNovoResponsavelBtnSalvar');
+  if (tit) tit.innerHTML = '<i class="fas fa-user-plus"></i> Novo Responsável';
+  if (btn) btn.innerHTML = '<i class="fas fa-save"></i> Criar Responsável';
+  abrirModal('modalNovoResponsavel');
+  setTimeout(function() {
+    var el = document.getElementById('novoResponsavelNome');
+    if (el) el.focus();
+  }, 100);
 }
 
-/** Atualiza visual do botão de tema */
-function _atualizarBotaoTema(estaAzul) {
+function abrirEditarResponsavel(id) {
+  var resp = (ESTADO.responsaveis || []).find(function(r) { return r.id === id; });
+  if (!resp) { mostrarToast('Responsável não encontrado', 'erro'); return; }
+  _editandoResponsavelId = id;
+  var fnome  = document.getElementById('novoResponsavelNome');
+  var femail = document.getElementById('novoResponsavelEmail');
+  var fcargo = document.getElementById('novoResponsavelCargo');
+  if (fnome)  fnome.value  = resp.nome  || '';
+  if (femail) femail.value = resp.email || '';
+  if (fcargo) fcargo.value = resp.cargo || '';
+  var tit = document.getElementById('modalNovoResponsavelTitulo');
+  var btn = document.getElementById('modalNovoResponsavelBtnSalvar');
+  if (tit) tit.innerHTML = '<i class="fas fa-pen"></i> Editar Responsável';
+  if (btn) btn.innerHTML = '<i class="fas fa-save"></i> Salvar Alterações';
+  fecharModal('modalGerenciarResponsaveis');
+  abrirModal('modalNovoResponsavel');
+  setTimeout(function() { if (fnome) fnome.focus(); }, 100);
+}
+
+function abrirModalGerenciarResponsaveis() {
+  _renderListaResponsaveis();
+  abrirModal('modalGerenciarResponsaveis');
+}
+
+function _renderListaResponsaveis() {
+  var lista = document.getElementById('listaGerenciarResponsaveis');
+  if (!lista) return;
+  var resps = ESTADO.responsaveis || [];
+  if (!resps.length) {
+    lista.innerHTML = '<p style="color:var(--cor-texto-secundario);font-size:0.82rem;text-align:center;padding:20px 0;">Nenhum responsável cadastrado.</p>';
+    return;
+  }
+  var html = '<table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr>'
+    + '<th style="text-align:left;font-size:0.72rem;color:var(--cor-texto-secundario);font-weight:600;padding:6px 10px;border-bottom:2px solid var(--cor-borda-clara);text-transform:uppercase;">Nome</th>'
+    + '<th style="text-align:left;font-size:0.72rem;color:var(--cor-texto-secundario);font-weight:600;padding:6px 10px;border-bottom:2px solid var(--cor-borda-clara);text-transform:uppercase;">Email</th>'
+    + '<th style="text-align:left;font-size:0.72rem;color:var(--cor-texto-secundario);font-weight:600;padding:6px 10px;border-bottom:2px solid var(--cor-borda-clara);text-transform:uppercase;">Cargo</th>'
+    + '<th style="width:60px;border-bottom:2px solid var(--cor-borda-clara);"></th>'
+    + '</tr></thead><tbody>';
+  resps.forEach(function(r) {
+    html += '<tr style="border-bottom:1px solid var(--cor-borda-clara);">'
+      + '<td style="padding:9px 10px;font-size:0.85rem;color:var(--cor-texto);font-weight:500;">' + _esc(r.nome) + '</td>'
+      + '<td style="padding:9px 10px;font-size:0.78rem;color:var(--cor-texto-secundario);">' + (r.email ? _esc(r.email) : '—') + '</td>'
+      + '<td style="padding:9px 10px;font-size:0.78rem;color:var(--cor-texto-secundario);">' + (r.cargo ? _esc(r.cargo) : '—') + '</td>'
+      + '<td style="padding:6px 10px;text-align:right;">'
+      + '<button onclick="abrirEditarResponsavel(\'' + r.id + '\')" style="background:var(--cor-primaria-bg);border:1px solid var(--cor-primaria);color:var(--cor-primaria);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.75rem;font-weight:600;">'
+      + '<i class="fas fa-pen"></i></button>'
+      + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  lista.innerHTML = html;
+}
+
+function fecharModalNovoResponsavel() {
+  _editandoResponsavelId = null;
+  fecharModal('modalNovoResponsavel');
+}
+
+function salvarNovoResponsavel() {
+  var nome  = (document.getElementById('novoResponsavelNome').value  || '').trim();
+  var email = (document.getElementById('novoResponsavelEmail').value || '').trim();
+  var cargo = (document.getElementById('novoResponsavelCargo').value || '').trim();
+
+  if (!nome)  { mostrarToast('Nome é obrigatório', 'erro'); return; }
+  if (!email) { mostrarToast('Email é obrigatório', 'erro'); return; }
+
+  var editando  = !!_editandoResponsavelId;
+  var btnSalvar = document.getElementById('modalNovoResponsavelBtnSalvar');
+  if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...'; }
+
+  var dados = { nome: nome, email: email, cargo: cargo };
+  if (editando) dados.id = _editandoResponsavelId;
+
+  function _aoSalvar(res) {
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = '<i class="fas fa-save"></i> ' + (editando ? 'Salvar Alterações' : 'Criar Responsável'); }
+    if (res && res.sucesso) {
+      if (editando) {
+        var idx = ESTADO.responsaveis.findIndex(function(r) { return r.id === _editandoResponsavelId; });
+        if (idx >= 0) ESTADO.responsaveis[idx] = { id: _editandoResponsavelId, nome: nome, email: email, cargo: cargo };
+        mostrarToast('Responsável "' + nome + '" atualizado!', 'sucesso');
+      } else {
+        ESTADO.responsaveis.push({ id: res.id, nome: nome, email: email, cargo: cargo });
+        mostrarToast('Responsável "' + nome + '" criado com sucesso!', 'sucesso');
+      }
+      popularCheckboxesResponsaveis('itemResponsaveisContainer', _obterResponsaveisSelecionadosAtual('itemResponsaveisContainer'));
+      popularCheckboxesResponsaveis('novoProjetoResponsaveisContainer', []);
+      fecharModalNovoResponsavel();
+    } else {
+      mostrarToast('Erro: ' + (res ? res.mensagem : 'Falha ao salvar'), 'erro');
+    }
+  }
+
+  if (typeof google !== 'undefined' && google.script) {
+    google.script.run
+      .withSuccessHandler(_aoSalvar)
+      .withFailureHandler(function(e) {
+        if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = '<i class="fas fa-save"></i> ' + (editando ? 'Salvar Alterações' : 'Criar Responsável'); }
+        mostrarToast('Erro: ' + e, 'erro');
+      })
+      .salvarResponsavelCompleto(dados);
+  } else {
+    var idDemo = _editandoResponsavelId || ('resp_' + Date.now());
+    _aoSalvar({ sucesso: true, id: idDemo });
+  }
+}
+
+/** Lê os IDs de responsáveis atualmente marcados em um container de checkboxes */
+function _obterResponsaveisSelecionadosAtual(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return [];
+  return Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(function(cb) { return cb.value; });
+}
+
+// ========================= ALTERNÂNCIA DE TEMA (3 temas) =========================
+
+/** Tema atual em memória: 'cafe' | 'azul' | 'preto' */
+var _temaAtual = 'cafe';
+
+/** Abre o modal seletor de tema */
+function abrirModalTema() {
+  _atualizarBadgesTema(_temaAtual);
+  abrirModal('modalSeletorTema');
+}
+
+/**
+ * Aplica um dos 3 temas disponíveis e persiste no servidor.
+ * @param {string} tema - 'cafe' | 'azul' | 'preto'
+ */
+function aplicarTema(tema) {
+  fecharModal('modalSeletorTema');
+  _ativarTema(tema);
+
+  var msgs = {
+    cafe:  'Vintage Creme! Que alívio. Você tem bom gosto. ☕',
+    azul:  'Oceano Azul ativado. Tá bom... eu aguento. 😤💙',
+    preto: 'Black Night? Combinando o sistema com sua alma, hein. 🖤😑'
+  };
+  mostrarToast(msgs[tema] || 'Tema alterado.', tema === 'cafe' ? 'sucesso' : 'aviso');
+
+  if (typeof google !== 'undefined' && google.script) {
+    google.script.run.salvarPreferenciaTema(tema);
+  }
+}
+
+/**
+ * Atualiza a caixa de "reação ao vivo do criador" no modal de temas.
+ * @param {string|null} tema - tema hovered, ou null para resetar
+ */
+function _reacaoCriador(tema) {
+  var emojiEl = document.getElementById('reacaoCriadorEmoji');
+  var textoEl = document.getElementById('reacaoCriadorTexto');
+  if (!emojiEl || !textoEl) return;
+
+  var reacoes = {
+    cafe:  { emoji: '🥰', cor: 'var(--cor-sucesso)',
+             texto: 'AH SIM! Você tem um gosto impecável. Somos almas gêmeas. Você me entende. Respeito isso profundamente.' },
+    azul:  { emoji: '😒', cor: 'var(--cor-aviso)',
+             texto: 'Sério? O AZUL? Tudo bem, não vou chorar. Fica na sua consciência. Eu só passei dias escolhendo as cores, mas tudo bem mesmo.' },
+    preto: { emoji: '😑', cor: 'var(--cor-perigo)',
+             texto: 'Dark mode. Claro. Você é daqueles que usa Discord no escuro às 3 da manhã. Eu sei exatamente quem você é. E estou desapontado.' }
+  };
+
+  if (!tema || !reacoes[tema]) {
+    emojiEl.textContent = '🎭';
+    textoEl.textContent = 'Passe o mouse sobre um tema para ver minha reação ao vivo...';
+    textoEl.style.color = '';
+    textoEl.style.fontWeight = '';
+  } else {
+    var r = reacoes[tema];
+    emojiEl.textContent = r.emoji;
+    textoEl.textContent = r.texto;
+    textoEl.style.color = r.cor;
+    textoEl.style.fontWeight = tema === 'cafe' ? '600' : '500';
+  }
+}
+
+/**
+ * Ativa internamente um tema: desabilita os demais, habilita o correto,
+ * define data-tema no body e atualiza o botão no header.
+ * @param {string} tema - 'cafe' | 'azul' | 'preto'
+ */
+function _ativarTema(tema) {
+  // Desabilita todos os temas de override
+  var azulEl  = document.getElementById('tema-azul-styles');
+  var pretoEl = document.getElementById('tema-preto-styles');
+  if (azulEl)  azulEl.disabled  = true;
+  if (pretoEl) pretoEl.disabled = true;
+
+  // Seta data-tema para controlar loading screen e skeleton via CSS
+  document.body.setAttribute('data-tema', tema);
+  _temaAtual = tema;
+
+  // Habilita o tema escolhido
+  if (tema === 'azul'  && azulEl)  azulEl.disabled  = false;
+  if (tema === 'preto' && pretoEl) pretoEl.disabled = false;
+
+  _atualizarBotaoTema(tema);
+}
+
+/** Atualiza o visual do botão de tema no header */
+function _atualizarBotaoTema(tema) {
   var btn = document.getElementById('btnTemaToggle');
   if (!btn) return;
-  if (estaAzul) {
-    btn.innerHTML = '<i class="fas fa-coffee"></i><span>Tema</span>';
-    btn.title = 'Voltar ao tema original';
-    btn.style.background = 'rgba(255,255,255,0.2)';
-    btn.style.borderColor = 'rgba(255,255,255,0.4)';
-  } else {
-    btn.innerHTML = '<i class="fas fa-palette"></i><span>Tema</span>';
-    btn.title = 'Mudar tema (socorra-nos)';
-    btn.style.background = '';
-    btn.style.borderColor = '';
+
+  var icones = { cafe: 'fa-mug-hot', azul: 'fa-water', preto: 'fa-moon' };
+  btn.innerHTML = '<i class="fas ' + (icones[tema] || 'fa-palette') + '"></i><span>Tema</span>';
+  btn.title = 'Mudar tema';
+
+  // Reseta estilos inline
+  btn.style.background   = '';
+  btn.style.borderColor  = '';
+  btn.style.color        = '';
+
+  if (tema === 'azul') {
+    btn.style.background  = 'rgba(255,255,255,0.18)';
+    btn.style.borderColor = 'rgba(255,255,255,0.35)';
+  } else if (tema === 'preto') {
+    btn.style.background  = 'rgba(224,184,74,0.18)';
+    btn.style.borderColor = 'rgba(224,184,74,0.38)';
+    btn.style.color       = '#f0d080';
   }
 }
+
+/** Atualiza os badges "Ativo" no modal seletor de tema */
+function _atualizarBadgesTema(tema) {
+  ['cafe', 'azul', 'preto'].forEach(function(t) {
+    var badge = document.getElementById('temaBadge' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (badge) badge.style.display = (t === tema) ? 'inline-block' : 'none';
+  });
+}
+
+// ── Aliases de compatibilidade com chamadas antigas (modais antigos removidos) ──
+function aplicarTemaAzul()    { aplicarTema('azul'); }
+function aplicarTemaClassico() { aplicarTema('cafe'); }
+function _injetarCssAzul()    { _ativarTema('azul'); }
+function _removerCssAzul()    { _ativarTema('cafe'); }
 
 // ========================= MÓDULO: ATAS DO PROJETO =========================
 
@@ -4755,7 +5576,7 @@ function abrirModalAtasProjeto(projetoId, nomeProjeto, event) {
   // Resetar viewer
   _resetarViewerAtas();
 
-  modal.classList.add('visivel');
+  modal.classList.add('visible');
   document.body.style.overflow = 'hidden';
 
   // Buscar dados no backend
@@ -4780,7 +5601,7 @@ function abrirModalAtasProjeto(projetoId, nomeProjeto, event) {
 /** Fecha o modal de atas */
 function fecharModalAtasProjeto() {
   var modal = document.getElementById('modalAtasProjeto');
-  if (modal) modal.classList.remove('visivel');
+  if (modal) modal.classList.remove('visible');
   document.body.style.overflow = '';
   _atasProjetoEstado.reuniaoAtiva = null;
 }
@@ -5014,6 +5835,34 @@ function _escaparHtml(str) {
 }
 
 // ========================= GERENCIAMENTO DE PERMISSÕES =========================
+
+// ========================= SHIMMER SEQUENCIAL BENTO =========================
+(function initBentoShimmer() {
+  const ORDER = [
+    'bento-donut', 'bento-setor',
+    'bento-prioridade', 'bento-tipo', 'bento-responsaveis'
+  ];
+  const DURATION = 2800; // ms — sincronizado com bento-spin 2.8s
+
+  function start() {
+    const cells = ORDER.map(cls => document.querySelector('.' + cls)).filter(Boolean);
+    if (!cells.length) return;
+    let idx = 0;
+    function next() {
+      cells.forEach(c => c.classList.remove('shimmer-active'));
+      cells[idx].classList.add('shimmer-active');
+      idx = (idx + 1) % cells.length;
+      setTimeout(next, DURATION);
+    }
+    next();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+})();
 
 
 </script>

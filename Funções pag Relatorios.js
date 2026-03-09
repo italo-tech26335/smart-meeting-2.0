@@ -202,6 +202,52 @@ function formatarTamanhoArquivoBackend(bytes) {
  * @param {string} arquivoId - ID do arquivo no Drive
  * @returns {Object} - Dados parseados do relatório
  */
+/**
+ * Salva preferências de personalização do relatório para o usuário atual.
+ * Armazenamento permanente via PropertiesService.getUserProperties().
+ */
+function salvarPrefsRelatorio(token, prefs) {
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    PropertiesService.getUserProperties().setProperty('mrel_prefs_v1', JSON.stringify(prefs));
+    return { sucesso: true };
+  } catch (e) {
+    Logger.log('ERRO salvarPrefsRelatorio: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Carrega preferências de personalização do relatório do usuário atual.
+ */
+function carregarPrefsRelatorio(token) {
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    const raw = PropertiesService.getUserProperties().getProperty('mrel_prefs_v1');
+    return { sucesso: true, prefs: raw ? JSON.parse(raw) : null };
+  } catch (e) {
+    Logger.log('ERRO carregarPrefsRelatorio: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Retorna todas as etapas para uso no preview e envio do relatório.
+ */
+function carregarEtapasParaRelatorio(token) {
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, etapas: [] };
+    const etapas = obterTodasEtapas();
+    return { sucesso: true, etapas: etapas };
+  } catch (e) {
+    Logger.log('ERRO carregarEtapasParaRelatorio: ' + e.toString());
+    return { sucesso: false, etapas: [] };
+  }
+}
+
 function obterConteudoRelatorio(arquivoId) {
   try {
     const arquivo = DriveApp.getFileById(arquivoId);

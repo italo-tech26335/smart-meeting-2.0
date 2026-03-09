@@ -1460,6 +1460,232 @@ function obterPrioridadeEtapa(etapaId, projetoId) {
   }
 }
 
+/**
+ * Gera e envia um relatório consolidado de projetos selecionados por email.
+ * opcoes: { projetoIds, apenasAtivos, incluirDescricao, incluirAtividades,
+ *           incluirPrioridade, destinatariosIds, emailsCC, assunto, mensagem }
+ */
+function enviarRelatorioProjetosEmail(token, opcoes) {
+  try {
+    const sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+
+    opcoes = opcoes || {};
+    const projetoIds       = opcoes.projetoIds       || [];
+    const apenasAtivos     = opcoes.apenasAtivos     !== false;
+    const incluirDescricao = opcoes.incluirDescricao !== false;
+    const incluirAtividades= opcoes.incluirAtividades !== false;
+    const incluirPrioridade= opcoes.incluirPrioridade !== false;
+    const destinatariosIds = opcoes.destinatariosIds || [];
+    const emailsCC         = (opcoes.emailsCC || []).filter(e => e && e.includes('@'));
+    const assunto          = opcoes.assunto || '📊 Relatório de Projetos';
+    const mensagem         = opcoes.mensagem || '';
+
+    if (projetoIds.length === 0) return { sucesso: false, mensagem: 'Nenhum projeto selecionado.' };
+
+    const todosResponsaveis = listarResponsaveisCompletos();
+    const todosProjetos     = listarProjetosCompletos(token);
+    const todasEtapas       = obterTodasEtapas();
+
+    // Filtra e ordena projetos por prioridade
+    const projetos = todosProjetos
+      .filter(p => projetoIds.includes(p.id))
+      .sort((a, b) => (b.valorPrioridade || 0) - (a.valorPrioridade || 0));
+
+    if (projetos.length === 0) return { sucesso: false, mensagem: 'Projetos não encontrados.' };
+
+    // Resolve destinatários
+    const emailsTo = destinatariosIds
+      .map(id => todosResponsaveis.find(r => r.id === id))
+      .filter(r => r && r.email)
+      .map(r => r.email);
+
+    if (emailsTo.length === 0 && emailsCC.length === 0) {
+      return { sucesso: false, mensagem: 'Nenhum destinatário com email válido.' };
+    }
+
+    // Monta HTML do relatório — usa corpoHtml pré-gerado (personalizado) se fornecido
+    const corpo = opcoes.corpoHtml || _montarCorpoRelatorioHTML(projetos, todasEtapas, todosResponsaveis, {
+      apenasAtivos, incluirDescricao, incluirAtividades, incluirPrioridade, mensagem
+    });
+
+    // Envia
+    const emailOpts = { subject: assunto, htmlBody: corpo };
+    if (emailsCC.length > 0) emailOpts.cc = emailsCC.join(',');
+
+    if (emailsTo.length > 0) {
+      emailOpts.to = emailsTo.join(',');
+      MailApp.sendEmail(emailOpts);
+    } else {
+      // Apenas CC: envia para o primeiro CC, restante em CC
+      MailApp.sendEmail(Object.assign({}, emailOpts, {
+        to: emailsCC[0],
+        cc: emailsCC.slice(1).join(',') || undefined
+      }));
+    }
+
+    Logger.log('[enviarRelatorioProjetosEmail] Enviado para: ' + (emailsTo.concat(emailsCC)).join(', '));
+    return { sucesso: true, mensagem: 'Relatório enviado para ' + (emailsTo.length + emailsCC.length) + ' destinatário(s).' };
+
+  } catch (e) {
+    Logger.log('ERRO enviarRelatorioProjetosEmail: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function _montarCorpoRelatorioHTML(projetos, todasEtapas, todosResponsaveis, opc) {
+  const data = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  function corStatus(status) {
+    const m = {
+      'A Fazer':          { bg: '#f0e6d3', cor: '#8b6b58' },
+      'Em Andamento':     { bg: '#e0e8f0', cor: '#4a6fa5' },
+      'Aguardando Setor': { bg: '#f5ede3', cor: '#c2855a' },
+      'Concluída':        { bg: '#e8f0e5', cor: '#5a7247' },
+      'Suspenso':         { bg: '#ede9f7', cor: '#7c5cbf' }
+    };
+    return m[status] || { bg: '#f0ece8', cor: '#7a6555' };
+  }
+
+  function corPrioridade(valor) {
+    if (!valor) return null;
+    if (valor >= 2102) return { bg: '#fce8e8', cor: '#a63d40', label: '🔴 ALTA' };
+    if (valor >= 1078) return { bg: '#fef9e7', cor: '#b8860b', label: '🟡 MÉDIA' };
+    return { bg: '#e8f5e9', cor: '#5a7247', label: '🟢 BAIXA' };
+  }
+
+  function nomeResps(ids) {
+    if (!ids || ids.length === 0) return '—';
+    return ids.map(id => { const r = todosResponsaveis.find(x => x.id === id); return r ? r.nome : null; })
+      .filter(Boolean).join(', ') || '—';
+  }
+
+  // Contadores globais
+  let totalAtvGlobal = 0;
+  projetos.forEach(p => {
+    let atv = todasEtapas.filter(e => e.projetoId === p.id);
+    if (opc.apenasAtivos) atv = atv.filter(e => e.status !== 'Concluída' && e.status !== 'Suspenso');
+    totalAtvGlobal += atv.length;
+  });
+
+  // ── Monta HTML ──
+  let corpo = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{margin:0;padding:0;background:#f5f0e8;font-family:'Segoe UI',Arial,sans-serif;}
+table{border-collapse:collapse;}td,th{padding:0;}
+</style></head><body>
+<div style="max-width:700px;margin:28px auto;background:#fffdf8;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">`;
+
+  // Banner
+  corpo += `<div style="background:linear-gradient(135deg,#3d2b1f 0%,#6b4c3b 55%,#8b6b58 100%);padding:28px 28px 22px;">
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+<div style="width:52px;height:52px;background:rgba(255,255,255,0.14);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;">📊</div>
+<div><h1 style="margin:0;color:#faf6ee;font-size:1.35rem;font-family:Georgia,serif;">Relatório de Projetos</h1>
+<p style="margin:3px 0 0;color:rgba(250,246,238,0.7);font-size:0.78rem;">${data}</p></div></div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;">
+<div style="background:rgba(255,255,255,0.12);border-radius:8px;padding:8px 16px;text-align:center;">
+<div style="color:rgba(250,246,238,0.65);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;">Projetos</div>
+<div style="color:#faf6ee;font-size:1.2rem;font-weight:700;">${projetos.length}</div></div>
+<div style="background:rgba(255,255,255,0.12);border-radius:8px;padding:8px 16px;text-align:center;">
+<div style="color:rgba(250,246,238,0.65);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;">${opc.apenasAtivos ? 'Pendentes' : 'Atividades'}</div>
+<div style="color:#faf6ee;font-size:1.2rem;font-weight:700;">${totalAtvGlobal}</div></div>
+</div></div>`;
+
+  // Mensagem de abertura
+  if (opc.mensagem) {
+    corpo += `<div style="padding:14px 28px;background:#faf6ee;border-bottom:1px solid #d4c5b0;font-size:0.85rem;color:#5a4333;line-height:1.6;">${opc.mensagem.replace(/\n/g, '<br>')}</div>`;
+  }
+
+  // Projetos
+  corpo += `<div style="padding:22px 28px;">`;
+
+  projetos.forEach((p, idx) => {
+    let etapas = todasEtapas.filter(e => e.projetoId === p.id);
+    if (opc.apenasAtivos) etapas = etapas.filter(e => e.status !== 'Concluída' && e.status !== 'Suspenso');
+
+    const totalEtapas  = todasEtapas.filter(e => e.projetoId === p.id).length;
+    const conclEtapas  = todasEtapas.filter(e => e.projetoId === p.id && e.status === 'Concluída').length;
+    const pct          = totalEtapas > 0 ? Math.round((conclEtapas / totalEtapas) * 100) : 0;
+    const corPct       = pct === 100 ? '#5a7247' : pct >= 50 ? '#b8860b' : '#6b4c3b';
+    const stCor        = corStatus(p.status);
+    const prioCor      = opc.incluirPrioridade ? corPrioridade(p.valorPrioridade) : null;
+    const respsStr     = nomeResps(p.responsaveisIds);
+
+    corpo += `<div style="margin-bottom:20px;background:#fffdf8;border:1px solid #d4c5b0;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(74,50,40,0.07);">`;
+
+    // Header do projeto
+    corpo += `<div style="padding:14px 18px;background:linear-gradient(135deg,#faf6ee,#f0e8d8);border-bottom:1px solid #d4c5b0;">
+<div style="display:flex;align-items:flex-start;gap:12px;">
+<div style="flex:1;">
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px;">
+<span style="font-size:0.72rem;color:#9a8878;font-weight:700;">#${String(idx + 1).padStart(2, '0')}</span>
+<strong style="font-size:1rem;color:#3d2b1f;font-family:Georgia,serif;">${p.nome || ''}</strong>
+<span style="display:inline-block;padding:2px 10px;border-radius:100px;font-size:0.68rem;font-weight:600;background:${stCor.bg};color:${stCor.cor};">${p.status || 'A Fazer'}</span>
+${prioCor ? `<span style="display:inline-block;padding:2px 10px;border-radius:100px;font-size:0.68rem;font-weight:600;background:${prioCor.bg};color:${prioCor.cor};">${prioCor.label}</span>` : ''}
+${p.tipo ? `<span style="display:inline-block;padding:2px 10px;border-radius:100px;font-size:0.68rem;background:#f0ece8;color:#7a6555;">${p.tipo}</span>` : ''}
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:0.72rem;color:#7a6555;">
+${p.setor ? `<span>🏢 ${p.setor}</span>` : ''}
+${respsStr !== '—' ? `<span>👤 ${respsStr}</span>` : ''}
+${p.dataInicio ? `<span>📅 ${p.dataInicio}</span>` : ''}
+${p.dataFim ? `<span>🏁 ${p.dataFim}</span>` : ''}
+${opc.incluirPrioridade && p.valorPrioridade ? `<span>⚡ Score: ${p.valorPrioridade}</span>` : ''}
+</div>
+</div>
+<div style="text-align:center;min-width:56px;">
+<div style="font-size:1.35rem;font-weight:700;color:${corPct};">${pct}%</div>
+<div style="font-size:0.62rem;color:#9a8878;">${conclEtapas}/${totalEtapas} concl.</div>
+</div>
+</div></div>`;
+
+    // Barra de progresso
+    corpo += `<div style="height:4px;background:#e8dfd2;"><div style="height:100%;width:${pct}%;background:${corPct};transition:width 0.4s;"></div></div>`;
+
+    // Descrição
+    if (opc.incluirDescricao && p.descricao) {
+      corpo += `<div style="padding:10px 18px;border-bottom:1px solid #e8dfd2;font-size:0.8rem;color:#5a4333;line-height:1.55;">${p.descricao}</div>`;
+    }
+
+    // Atividades
+    if (opc.incluirAtividades) {
+      corpo += `<div style="padding:12px 18px;">`;
+      if (etapas.length === 0) {
+        corpo += `<p style="margin:0;font-size:0.78rem;color:#9a8878;font-style:italic;">Nenhuma atividade${opc.apenasAtivos ? ' pendente' : ''}.</p>`;
+      } else {
+        corpo += `<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+<thead><tr style="background:#f5f0e8;">
+<th style="padding:6px 10px;text-align:left;color:#7a6555;font-weight:600;border-bottom:2px solid #d4c5b0;font-size:0.68rem;text-transform:uppercase;">Atividade</th>
+<th style="padding:6px 10px;text-align:center;color:#7a6555;font-weight:600;border-bottom:2px solid #d4c5b0;font-size:0.68rem;text-transform:uppercase;white-space:nowrap;">Status</th>
+<th style="padding:6px 10px;text-align:left;color:#7a6555;font-weight:600;border-bottom:2px solid #d4c5b0;font-size:0.68rem;text-transform:uppercase;">Responsável</th>
+</tr></thead><tbody>`;
+        etapas.forEach((e, ei) => {
+          const ec  = corStatus(e.status);
+          const bgR = ei % 2 === 0 ? '#fffdf8' : '#faf6ee';
+          corpo += `<tr style="background:${bgR};">
+<td style="padding:7px 10px;border-bottom:1px solid #e8dfd2;color:#3d2b1f;">${e.nome || ''}</td>
+<td style="padding:7px 10px;border-bottom:1px solid #e8dfd2;text-align:center;">
+<span style="display:inline-block;padding:2px 9px;border-radius:100px;font-size:0.66rem;font-weight:600;background:${ec.bg};color:${ec.cor};">${e.status || ''}</span></td>
+<td style="padding:7px 10px;border-bottom:1px solid #e8dfd2;color:#7a6555;font-size:0.75rem;">${nomeResps(e.responsaveisIds)}</td>
+</tr>`;
+        });
+        corpo += `</tbody></table>`;
+      }
+      corpo += `</div>`;
+    }
+
+    corpo += `</div>`; // /projeto card
+  });
+
+  corpo += `</div>`; // /projetos area
+
+  // Footer
+  corpo += `<div style="padding:14px 28px;background:#f5f0e8;border-top:1px solid #d4c5b0;text-align:center;">
+<p style="margin:0;font-size:0.7rem;color:#9a8878;">Gerado automaticamente pelo <strong>Smart Meeting</strong></p>
+</div>`;
+
+  corpo += `</div></body></html>`;
+  return corpo;
+}
+
 function enviarEmailParaResponsaveisComCopia(idsResponsaveis, projetoId, assuntoPersonalizado, mensagemAdicional, emailsEmCopia) {
   Logger.log('Iniciando envio de emails com CC. Responsáveis: ' + JSON.stringify(idsResponsaveis));
   Logger.log('Emails em cópia: ' + JSON.stringify(emailsEmCopia));
@@ -2397,12 +2623,14 @@ function calcularDuracaoProjetoHoras(dataInicioStr, dataFimStr) {
 
 /**
  * Salva a preferência de tema do usuário no servidor
- * @param {string} tema - 'cafe' ou 'azul'
+ * @param {string} tema - 'cafe', 'azul' ou 'preto'
  */
 function salvarPreferenciaTema(tema) {
   try {
+    var temasValidos = ['cafe', 'azul', 'preto'];
+    var temaFinal = temasValidos.indexOf(tema) >= 0 ? tema : 'cafe';
     var props = PropertiesService.getUserProperties();
-    props.setProperty('smartmeeting_tema', tema || 'cafe');
+    props.setProperty('smartmeeting_tema', temaFinal);
     return { sucesso: true };
   } catch (e) {
     Logger.log('ERRO salvarPreferenciaTema: ' + e.toString());
@@ -2412,12 +2640,14 @@ function salvarPreferenciaTema(tema) {
 
 /**
  * Obtém a preferência de tema do usuário
- * @returns {string} 'cafe' ou 'azul'
+ * @returns {string} 'cafe', 'azul' ou 'preto'
  */
 function obterPreferenciaTema() {
   try {
     var props = PropertiesService.getUserProperties();
-    return props.getProperty('smartmeeting_tema') || 'cafe';
+    var tema = props.getProperty('smartmeeting_tema') || 'cafe';
+    var temasValidos = ['cafe', 'azul', 'preto'];
+    return temasValidos.indexOf(tema) >= 0 ? tema : 'cafe';
   } catch (e) {
     Logger.log('ERRO obterPreferenciaTema: ' + e.toString());
     return 'cafe';

@@ -264,6 +264,7 @@ function doGet(e) {
     tmpl.usuarioPerfil     = sessao.perfil;
     tmpl.modoAdmin         = (sessao.perfil === 'admin');
     tmpl.baseUrl           = obterUrlWebAppAtual();
+    tmpl.temaUsuario       = obterPreferenciaTema();
     // [] = sem restrição (admin sempre passa, usuário sem limitação também)
     tmpl.paginasPermitidas = JSON.stringify(
       sessao.perfil === 'admin' ? [] : (sessao.paginasPermitidas || [])

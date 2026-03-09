@@ -1,0 +1,1178 @@
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+//  MÓDULO: MODAL RELATÓRIO DE PROJETOS
+//  Arquivo: ModalRelatorio-JS🟡.html
+//  Responsabilidades:
+//    • Filtros (setores, responsáveis)
+//    • Lista de projetos com checkboxes
+//    • Opções de conteúdo (toggles)
+//    • Configuração de email (assunto, mensagem, destinatários, CC)
+//    • Preview em tempo real — simula exatamente o email que será enviado
+//    • Modo "raw" para ver o HTML do email
+//    • Disparo via google.script.run → enviarRelatorioProjetosEmail
+// ══════════════════════════════════════════════════════════════════════════════
+
+/* ─── Estado do módulo ─── */
+var _mrel = {
+  setoresSelecionados: new Set(['__todos__']),
+  responsaveisSelecionados: new Set(),
+  statusSelecionados: new Set(['__todos__']),
+  modoPreview: 'email',
+  timerDebounce: null,
+  enviando: false,
+  todasEtapas: []   // carregado do backend ao abrir o modal
+};
+
+/* ─── Preferências de personalização ─── */
+var _mrelPrefs = {
+  tema: 'cafe',
+  layoutCard: 'classico',
+  graficoDona: true,
+  graficoEstilo: 'donut',
+  rodapeTexto: ''
+};
+
+/* ─── Paletas de temas ─── */
+var _MREL_TEMAS = {
+  cafe: {
+    headerGrad: 'linear-gradient(135deg,#3e2010 0%,#6b3a1a 60%,#8b5230 100%)',
+    acento: '#c68642', bodyBg: '#f5f0e8', cardBg: '#fff8f0',
+    cardGradH: 'linear-gradient(135deg,#faf0e0 0%,#f0e4cc 100%)',
+    cardBorda: '#e0d8cc', textoPrimario: '#3e2010', textoSec: '#8b6b58',
+    tabelaBg: '#faf6ee', tabelaBorda: '#e0d4c0', icone: '☕'
+  },
+  oceano: {
+    headerGrad: 'linear-gradient(135deg,#0a2540 0%,#1a4a7a 60%,#2a7aaa 100%)',
+    acento: '#3a9abf', bodyBg: '#eef6fb', cardBg: '#f0f8ff',
+    cardGradH: 'linear-gradient(135deg,#e8f4fb 0%,#d0e8f5 100%)',
+    cardBorda: '#b0d4e8', textoPrimario: '#0a2540', textoSec: '#3a6080',
+    tabelaBg: '#e8f4fb', tabelaBorda: '#b0d4e8', icone: '🌊'
+  },
+  verde: {
+    headerGrad: 'linear-gradient(135deg,#1a3a1a 0%,#2a6a2a 60%,#4a8a4a 100%)',
+    acento: '#5a9a5a', bodyBg: '#f0f5ee', cardBg: '#f5faf3',
+    cardGradH: 'linear-gradient(135deg,#eef5ec 0%,#ddeedd 100%)',
+    cardBorda: '#b8d8b8', textoPrimario: '#1a3a1a', textoSec: '#4a6a4a',
+    tabelaBg: '#eef5ec', tabelaBorda: '#b8d8b8', icone: '🌿'
+  },
+  noite: {
+    headerGrad: 'linear-gradient(135deg,#0d0d1a 0%,#1a1a35 60%,#2a2a50 100%)',
+    acento: '#7070e0', bodyBg: '#1a1a2e', cardBg: '#16213e',
+    cardGradH: 'linear-gradient(135deg,#1e2a4a 0%,#162040 100%)',
+    cardBorda: '#2a3a5a', textoPrimario: '#e0e0ff', textoSec: '#a0a0cc',
+    tabelaBg: '#1e2a4a', tabelaBorda: '#2a3a5a', icone: '🌙'
+  },
+  roxo: {
+    headerGrad: 'linear-gradient(135deg,#2a0a3a 0%,#4a1a6a 60%,#6a2a8a 100%)',
+    acento: '#9a5abf', bodyBg: '#f5eefa', cardBg: '#faf5ff',
+    cardGradH: 'linear-gradient(135deg,#f5eaff 0%,#ead5ff 100%)',
+    cardBorda: '#d0a8e8', textoPrimario: '#2a0a3a', textoSec: '#6a3a8a',
+    tabelaBg: '#f0e8fa', tabelaBorda: '#d0a8e8', icone: '🍇'
+  }
+};
+
+/* ─── Utilitário: escapa HTML ─── */
+function _mrelEsc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  ABERTURA / FECHAMENTO
+// ──────────────────────────────────────────────────────────────────────────────
+
+function abrirModalRelatorio() {
+  var modal = document.getElementById('modalRelatorio');
+  if (!modal) return;
+  _mrelInicializar();
+  modal.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+}
+
+function mrelFechar() {
+  var modal = document.getElementById('modalRelatorio');
+  if (modal) modal.classList.remove('visible');
+  document.body.style.overflow = '';
+  if (_mrel.timerDebounce) clearTimeout(_mrel.timerDebounce);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  INICIALIZAÇÃO
+// ──────────────────────────────────────────────────────────────────────────────
+
+function _mrelInicializar() {
+  // Reset estado
+  _mrel.setoresSelecionados = new Set(['__todos__']);
+  _mrel.responsaveisSelecionados = new Set();
+  _mrel.enviando = false;
+
+  // Assunto padrão
+  var inpAssunto = document.getElementById('mrelAssunto');
+  if (inpAssunto) inpAssunto.value = '📊 Relatório de Projetos — ' + new Date().toLocaleDateString('pt-BR');
+
+  var inpMsg = document.getElementById('mrelMensagem');
+  if (inpMsg) inpMsg.value = '';
+
+  var inpCC = document.getElementById('mrelEmailsCC');
+  if (inpCC) inpCC.value = '';
+
+  // Garante que btn enviar comece desabilitado
+  var btn = document.getElementById('mrelBtnEnviar');
+  if (btn) btn.disabled = true;
+
+  // Popula todos os painéis
+  _mrelPopularSetores();
+  _mrelPopularResponsaveis();
+  _mrelPopularDestinatarios();
+  _mrelAtualizarProjetos();   // popula lista e dispara preview inicial
+
+  // Carrega todas as etapas do backend (necessário para o relatório multi-projeto)
+  _mrel.todasEtapas = [];
+  if (typeof google !== 'undefined' && google.script) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.sucesso) {
+          _mrel.todasEtapas = res.etapas || [];
+          _mrelAtualizarStatusBar();
+          mrelAtualizarPreview();
+        }
+      })
+      .withFailureHandler(function() {})
+      .carregarEtapasParaRelatorio(SESSAO_TOKEN);
+  }
+
+  // Carrega preferências salvas
+  mrelCarregarPrefs();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  SEÇÕES COLAPSÁVEIS
+// ──────────────────────────────────────────────────────────────────────────────
+
+function mrelToggleSecao(idSecao) {
+  var el = document.getElementById(idSecao);
+  if (el) el.classList.toggle('fechada');
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  PREFERÊNCIAS DE PERSONALIZAÇÃO
+// ──────────────────────────────────────────────────────────────────────────────
+
+function mrelCarregarPrefs() {
+  if (typeof google === 'undefined' || !google.script) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (res && res.sucesso && res.prefs) {
+        var p = res.prefs;
+        if (p.tema)         _mrelPrefs.tema         = p.tema;
+        if (p.layoutCard)   _mrelPrefs.layoutCard   = p.layoutCard;
+        if (typeof p.graficoDona === 'boolean') _mrelPrefs.graficoDona = p.graficoDona;
+        if (p.graficoEstilo) _mrelPrefs.graficoEstilo = p.graficoEstilo;
+        if (p.rodapeTexto !== undefined) _mrelPrefs.rodapeTexto = p.rodapeTexto;
+        _mrelSincronizarUIPrefs();
+        mrelAtualizarPreview();
+      }
+    })
+    .withFailureHandler(function() {}) // silencioso
+    .carregarPrefsRelatorio(SESSAO_TOKEN);
+}
+
+function mrelSalvarPrefs() {
+  // Coleta estado atual da UI de personalização
+  _mrelPrefs.rodapeTexto = ((document.getElementById('mrelRodapeTexto') || {}).value || '').trim();
+
+  var btn = document.getElementById('mrelBtnSalvarPrefs');
+  var status = document.getElementById('mrelPrefsStatus');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...'; }
+  if (status) { status.textContent = ''; status.className = 'mrel-prefs-status'; }
+
+  if (typeof google === 'undefined' || !google.script) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Salvar Preferências'; }
+    if (status) { status.textContent = 'Indisponível fora do GAS'; status.className = 'mrel-prefs-status erro'; }
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Salvar Preferências'; }
+      if (res && res.sucesso) {
+        if (status) { status.textContent = '✓ Preferências salvas!'; status.className = 'mrel-prefs-status ok'; }
+        mostrarToast('✓ Estilo salvo permanentemente', 'sucesso');
+      } else {
+        if (status) { status.textContent = 'Erro: ' + ((res && res.mensagem) || 'desconhecido'); status.className = 'mrel-prefs-status erro'; }
+      }
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> Salvar Preferências'; }
+      if (status) { status.textContent = 'Falha: ' + (e.message || e); status.className = 'mrel-prefs-status erro'; }
+    })
+    .salvarPrefsRelatorio(SESSAO_TOKEN, _mrelPrefs);
+}
+
+function _mrelSincronizarUIPrefs() {
+  // Tema
+  document.querySelectorAll('.mrel-tema-swatch').forEach(function(el) {
+    el.classList.toggle('ativo', el.dataset.tema === _mrelPrefs.tema);
+  });
+  // Layout
+  document.querySelectorAll('.mrel-layout-card').forEach(function(el) {
+    el.classList.toggle('ativo', el.dataset.layout === _mrelPrefs.layoutCard);
+  });
+  // Gráfico toggle
+  var chkGrafico = document.getElementById('mrelOpcGrafico');
+  if (chkGrafico) chkGrafico.checked = _mrelPrefs.graficoDona;
+  // Estilo gráfico
+  document.querySelectorAll('.mrel-grafico-btn').forEach(function(el) {
+    el.classList.toggle('ativo', el.dataset.estilo === _mrelPrefs.graficoEstilo);
+  });
+  // Rodapé
+  var inpRodape = document.getElementById('mrelRodapeTexto');
+  if (inpRodape && _mrelPrefs.rodapeTexto) inpRodape.value = _mrelPrefs.rodapeTexto;
+}
+
+function mrelAplicarTema(tema) {
+  _mrelPrefs.tema = tema;
+  document.querySelectorAll('.mrel-tema-swatch').forEach(function(el) {
+    el.classList.toggle('ativo', el.dataset.tema === tema);
+  });
+  mrelAtualizarPreview();
+}
+
+function mrelAplicarLayout(layout) {
+  _mrelPrefs.layoutCard = layout;
+  document.querySelectorAll('.mrel-layout-card').forEach(function(el) {
+    el.classList.toggle('ativo', el.dataset.layout === layout);
+  });
+  mrelAtualizarPreview();
+}
+
+function mrelAplicarGrafico(estilo) {
+  _mrelPrefs.graficoEstilo = estilo;
+  document.querySelectorAll('.mrel-grafico-btn').forEach(function(el) {
+    el.classList.toggle('ativo', el.dataset.estilo === estilo);
+  });
+  mrelAtualizarPreview();
+}
+
+function _mrelOnGraficoChange() {
+  var chk = document.getElementById('mrelOpcGrafico');
+  _mrelPrefs.graficoDona = chk ? chk.checked : true;
+  mrelAtualizarPreview();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  SISTEMA DE ABAS
+// ──────────────────────────────────────────────────────────────────────────────
+
+function mrelTrocarAba(aba) {
+  var abas = ['Filtros', 'Projetos', 'Conteudo', 'Email', 'Personalizar'];
+  abas.forEach(function(a) {
+    var t = document.getElementById('mrelTab' + a);
+    var p = document.getElementById('mrelPanel' + a);
+    if (t) t.classList.remove('ativo');
+    if (p) p.classList.remove('ativo');
+  });
+  var cap = aba.charAt(0).toUpperCase() + aba.slice(1);
+  var tab   = document.getElementById('mrelTab'   + cap);
+  var panel = document.getElementById('mrelPanel' + cap);
+  if (tab)   tab.classList.add('ativo');
+  if (panel) panel.classList.add('ativo');
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  FILTROS: SETORES
+// ──────────────────────────────────────────────────────────────────────────────
+
+function _mrelPopularSetores() {
+  var container = document.getElementById('mrelFiltroSetores');
+  if (!container) return;
+  var setores = ESTADO.setores || [];
+  var html = '<span class="mrel-chip ativo" onclick="mrelToggleSetor(\'__todos__\', this)">Todos</span>';
+  setores.forEach(function(s) {
+    html += '<span class="mrel-chip" onclick="mrelToggleSetor(\'' + s.id + '\', this)" data-setor-id="' + s.id + '">'
+      + _mrelEsc(s.nome) + '</span>';
+  });
+  container.innerHTML = html;
+}
+
+function mrelToggleSetor(setorId, el) {
+  if (setorId === '__todos__') {
+    _mrel.setoresSelecionados = new Set(['__todos__']);
+    document.querySelectorAll('#mrelFiltroSetores .mrel-chip').forEach(function(c) {
+      c.classList.toggle('ativo', !c.dataset.setorId);
+    });
+  } else {
+    _mrel.setoresSelecionados.delete('__todos__');
+    if (_mrel.setoresSelecionados.has(setorId)) {
+      _mrel.setoresSelecionados.delete(setorId);
+      el.classList.remove('ativo');
+      if (_mrel.setoresSelecionados.size === 0) {
+        _mrel.setoresSelecionados.add('__todos__');
+        var chipTodos = document.querySelector('#mrelFiltroSetores .mrel-chip:not([data-setor-id])');
+        if (chipTodos) chipTodos.classList.add('ativo');
+      }
+    } else {
+      _mrel.setoresSelecionados.add(setorId);
+      el.classList.add('ativo');
+      var chipTodos2 = document.querySelector('#mrelFiltroSetores .mrel-chip:not([data-setor-id])');
+      if (chipTodos2) chipTodos2.classList.remove('ativo');
+    }
+  }
+  _mrelAtualizarProjetos();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  FILTROS: STATUS
+// ──────────────────────────────────────────────────────────────────────────────
+
+function mrelToggleStatus(statusId, el) {
+  if (statusId === '__todos__') {
+    _mrel.statusSelecionados = new Set(['__todos__']);
+    document.querySelectorAll('#mrelFiltroStatus .mrel-chip').forEach(function(c) {
+      c.classList.toggle('ativo', !c.dataset.statusId);
+    });
+  } else {
+    _mrel.statusSelecionados.delete('__todos__');
+    if (_mrel.statusSelecionados.has(statusId)) {
+      _mrel.statusSelecionados.delete(statusId);
+      el.classList.remove('ativo');
+      if (_mrel.statusSelecionados.size === 0) {
+        _mrel.statusSelecionados.add('__todos__');
+        var chipTodos = document.querySelector('#mrelFiltroStatus .mrel-chip:not([data-status-id])');
+        if (chipTodos) chipTodos.classList.add('ativo');
+      }
+    } else {
+      _mrel.statusSelecionados.add(statusId);
+      el.classList.add('ativo');
+      var chipTodos2 = document.querySelector('#mrelFiltroStatus .mrel-chip:not([data-status-id])');
+      if (chipTodos2) chipTodos2.classList.remove('ativo');
+    }
+  }
+  _mrelAtualizarProjetos();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  FILTROS: RESPONSÁVEIS
+// ──────────────────────────────────────────────────────────────────────────────
+
+function _mrelPopularResponsaveis() {
+  var container = document.getElementById('mrelFiltroResps');
+  if (!container) return;
+  var resps = ESTADO.responsaveis || [];
+  if (!resps.length) {
+    container.innerHTML = '<span style="color:var(--cor-texto-secundario);font-size:0.75rem;">Nenhum responsável</span>';
+    return;
+  }
+  var html = '';
+  resps.forEach(function(r) {
+    html += '<label class="mrel-check-item">'
+      + '<input type="checkbox" data-resp-id="' + r.id + '" onchange="_mrelOnRespChange(this)">'
+      + '<span class="mrel-check-item-nome">' + _mrelEsc(r.nome) + '</span>'
+      + '</label>';
+  });
+  container.innerHTML = html;
+}
+
+function mrelToggleTodosResps() {
+  var cbs = document.querySelectorAll('#mrelFiltroResps input[type="checkbox"]');
+  var algum = Array.from(cbs).some(function(c) { return c.checked; });
+  cbs.forEach(function(c) {
+    c.checked = !algum;
+    if (!algum) _mrel.responsaveisSelecionados.add(c.dataset.respId);
+    else _mrel.responsaveisSelecionados.delete(c.dataset.respId);
+  });
+  _mrelAtualizarProjetos();
+}
+
+function _mrelOnRespChange(cb) {
+  if (cb.checked) _mrel.responsaveisSelecionados.add(cb.dataset.respId);
+  else _mrel.responsaveisSelecionados.delete(cb.dataset.respId);
+  _mrelAtualizarProjetos();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  LISTA DE PROJETOS (filtrada)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function _mrelGetProjetosFiltrados() {
+  var projetos = ESTADO.listaProjetos || [];
+  var eTodosSetores  = _mrel.setoresSelecionados.has('__todos__');
+  var eTodosStatus   = _mrel.statusSelecionados.has('__todos__');
+  var semResp        = _mrel.responsaveisSelecionados.size === 0;
+  return projetos.filter(function(p) {
+    if (!eTodosSetores) {
+      var setorNome = (p.setor || '').trim();
+      var setor = (ESTADO.setores || []).find(function(s) {
+        return s.nome === setorNome || s.id === setorNome;
+      });
+      if (!setor || !_mrel.setoresSelecionados.has(setor.id)) return false;
+    }
+    if (!eTodosStatus) {
+      var statusProjeto = p.status || 'A Fazer';
+      if (!_mrel.statusSelecionados.has(statusProjeto)) return false;
+    }
+    if (!semResp) {
+      var rIds = p.responsaveisIds || [];
+      if (!rIds.some(function(id) { return _mrel.responsaveisSelecionados.has(id); })) return false;
+    }
+    return true;
+  });
+}
+
+function _mrelAtualizarProjetos() {
+  var container = document.getElementById('mrelListaProjetos');
+  var badge     = document.getElementById('mrelBadgeProjetosTab');
+  if (!container) return;
+
+  var projetos = _mrelGetProjetosFiltrados()
+    .slice().sort(function(a, b) { return (b.valorPrioridade || 0) - (a.valorPrioridade || 0); });
+
+  if (badge) {
+    badge.textContent = projetos.length;
+    badge.classList.remove('pop');
+    void badge.offsetWidth; // força reflow para reiniciar animação
+    badge.classList.add('pop');
+  }
+
+  if (!projetos.length) {
+    container.innerHTML = '<span style="color:var(--cor-texto-secundario);font-size:0.75rem;padding:4px 0;display:block;">Nenhum projeto nos filtros selecionados</span>';
+    _mrelAtualizarStatusBar();
+    mrelAtualizarPreview();
+    return;
+  }
+
+  var html = '';
+  projetos.forEach(function(p) {
+    var cls = obterClasseStatus(p.status);
+    var catPrio = obterCategoriaPrioridade(p.valorPrioridade || 0);
+    var corPrio = catPrio === 'alta' ? '#a63d40' : catPrio === 'media' ? '#b8860b' : '#5a7247';
+    var dotHtml = p.valorPrioridade
+      ? '<span style="width:7px;height:7px;border-radius:50%;background:' + corPrio + ';flex-shrink:0;display:inline-block;"></span>'
+      : '';
+    html += '<label class="mrel-proj-item" title="' + _mrelEsc(p.nome) + '">'
+      + '<input type="checkbox" data-proj-id="' + p.id + '" checked onchange="_mrelOnProjetoChange()">'
+      + dotHtml
+      + '<span class="mrel-proj-item-nome">' + _mrelEsc(p.nome) + '</span>'
+      + '<span class="badge badge-' + cls + ' mrel-check-item-tag" style="font-size:0.6rem;">'
+      + _mrelEsc(p.status || 'A Fazer') + '</span>'
+      + '</label>';
+  });
+  container.innerHTML = html;
+
+  _mrelAtualizarStatusBar();
+  mrelAtualizarPreview();
+}
+
+function _mrelOnProjetoChange() {
+  _mrelAtualizarStatusBar();
+  mrelAtualizarPreview();
+}
+
+function mrelToggleTodosProjetos(marcar) {
+  document.querySelectorAll('#mrelListaProjetos input[type="checkbox"]').forEach(function(cb) {
+    cb.checked = marcar !== false;
+  });
+  _mrelOnProjetoChange();
+}
+
+function _mrelGetProjetosMarcados() {
+  return Array.from(document.querySelectorAll('#mrelListaProjetos input[type="checkbox"]:checked'))
+    .map(function(cb) { return cb.dataset.projId; });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  DESTINATÁRIOS
+// ──────────────────────────────────────────────────────────────────────────────
+
+function _mrelPopularDestinatarios() {
+  var container = document.getElementById('mrelDestinatarios');
+  if (!container) return;
+  var resps = (ESTADO.responsaveis || []).filter(function(r) { return r.email; });
+  if (!resps.length) {
+    container.innerHTML = '<span style="color:var(--cor-texto-secundario);font-size:0.75rem;grid-column:1/-1;">Nenhum responsável com email cadastrado</span>';
+    return;
+  }
+  var html = '';
+  resps.forEach(function(r) {
+    html += '<label class="mrel-check-item" title="' + _mrelEsc(r.email) + '">'
+      + '<input type="checkbox" data-dest-id="' + r.id + '" onchange="_mrelOnDestChange()">'
+      + '<span class="mrel-check-item-nome">' + _mrelEsc(r.nome) + '</span>'
+      + '</label>';
+  });
+  container.innerHTML = html;
+}
+
+function _mrelGetDestinatariosIds() {
+  return Array.from(document.querySelectorAll('#mrelDestinatarios input[type="checkbox"]:checked'))
+    .map(function(cb) { return cb.dataset.destId; });
+}
+
+function _mrelOnDestChange() {
+  _mrelAtualizarStatusBar();
+  mrelAtualizarPreview();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  STATUS BAR
+// ──────────────────────────────────────────────────────────────────────────────
+
+function _mrelAtualizarStatusBar() {
+  var ids = _mrelGetProjetosMarcados();
+
+  // badge projetos
+  var badge = document.getElementById('mrelBadgeProjetos');
+  if (badge) badge.textContent = ids.length;
+
+  // atividades pendentes
+  var totalAtv = 0;
+  var apenasAtivos = document.getElementById('mrelOpcApenasAtivos');
+  ids.forEach(function(id) {
+    var atv = (_mrel.todasEtapas || []).filter(function(e) {
+      if (e.projetoId !== id) return false;
+      if (apenasAtivos && apenasAtivos.checked) return e.status !== 'Concluída' && e.status !== 'Suspenso';
+      return true;
+    });
+    totalAtv += atv.length;
+  });
+  var elAtv = document.getElementById('mrelResumoAtividades');
+  if (elAtv) elAtv.textContent = totalAtv + ' atividade(s) ' + (apenasAtivos && apenasAtivos.checked ? 'pendente(s)' : 'no total');
+
+  // destinatários
+  var destIds = _mrelGetDestinatariosIds();
+  var emailsCC = (document.getElementById('mrelEmailsCC') || {}).value || '';
+  var ccLista = emailsCC.split(',').map(function(e) { return e.trim(); }).filter(Boolean);
+  var totalDest = destIds.length + ccLista.length;
+  var elDest = document.getElementById('mrelResumoDestinatarios');
+  if (elDest) elDest.textContent = totalDest > 0 ? totalDest + ' destinatário(s)' : 'Nenhum destinatário';
+
+  // footer info
+  var elFooter = document.getElementById('mrelFooterInfo');
+  if (elFooter) {
+    if (!ids.length) {
+      elFooter.innerHTML = '<i class="fas fa-exclamation-circle" style="color:var(--cor-aviso);"></i> Selecione ao menos um projeto';
+    } else if (!totalDest) {
+      elFooter.innerHTML = '<i class="fas fa-exclamation-circle" style="color:var(--cor-aviso);"></i> ' + ids.length + ' projeto(s) · Informe ao menos um destinatário';
+    } else {
+      elFooter.innerHTML = '<i class="fas fa-check-circle" style="color:var(--cor-sucesso);"></i> ' + ids.length + ' projeto(s) · ' + totalDest + ' destinatário(s)';
+    }
+  }
+
+  // btn enviar
+  var btn = document.getElementById('mrelBtnEnviar');
+  if (btn) btn.disabled = _mrel.enviando || ids.length === 0 || totalDest === 0;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  DEBOUNCE para inputs de texto
+// ──────────────────────────────────────────────────────────────────────────────
+
+function mrelOnInputDebounce() {
+  if (_mrel.timerDebounce) clearTimeout(_mrel.timerDebounce);
+  _mrel.timerDebounce = setTimeout(function() {
+    _mrelAtualizarStatusBar();
+    mrelAtualizarPreview();
+  }, 320);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  MODO DO PREVIEW (email chrome | raw html)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function mrelTrocarModo(modo) {
+  _mrel.modoPreview = modo;
+  document.getElementById('mrelModoBtnEmail').classList.toggle('ativo', modo === 'email');
+  document.getElementById('mrelModoBtnRaw').classList.toggle('ativo', modo === 'raw');
+  mrelAtualizarPreview();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  PREVIEW EM TEMPO REAL
+// ──────────────────────────────────────────────────────────────────────────────
+
+function mrelAtualizarPreview() {
+  var ids = _mrelGetProjetosMarcados();
+  var scroll = document.getElementById('mrelPreviewScroll');
+  if (!scroll) return;
+
+  if (!ids.length) {
+    scroll.innerHTML = '<div class="mrel-preview-vazio">'
+      + '<div class="mrel-preview-vazio-icon"><i class="fas fa-envelope-open-text"></i></div>'
+      + '<div class="mrel-preview-vazio-titulo">Nenhum projeto selecionado</div>'
+      + '<div class="mrel-preview-vazio-sub">Marque ao menos um projeto no painel de configuração para ver a pré-visualização.</div>'
+      + '</div>';
+    return;
+  }
+
+  var opc = _mrelGetOpcoes();
+  var emailHtml = _mrelMontarEmailHTML(opc);
+
+  if (_mrel.modoPreview === 'raw') {
+    _mrelRenderizarRaw(emailHtml, scroll);
+  } else {
+    _mrelRenderizarEmailChrome(opc, emailHtml, scroll);
+  }
+}
+
+function _mrelRenderizarEmailChrome(opc, emailHtml, scroll) {
+  // Monta campos do cabeçalho do "chrome"
+  var assunto = opc.assunto || '(sem assunto)';
+  var dataHoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+
+  // Resolve nomes dos destinatários selecionados
+  var resps = ESTADO.responsaveis || [];
+  var nomesTo = opc.destinatariosIds.map(function(id) {
+    var r = resps.find(function(x) { return x.id === id; });
+    return r ? r.nome : null;
+  }).filter(Boolean);
+  var toText = nomesTo.length ? nomesTo.join(', ') : '(nenhum destinatário selecionado)';
+  var ccText = opc.emailsCC.length ? opc.emailsCC.join(', ') : '';
+
+  scroll.innerHTML =
+    '<div class="mrel-email-chrome">'
+    // Barra de título simulando cliente de email
+    + '<div class="mrel-email-chrome-titlebar">'
+    +   '<div class="mrel-email-chrome-dot vermelho"></div>'
+    +   '<div class="mrel-email-chrome-dot amarelo"></div>'
+    +   '<div class="mrel-email-chrome-dot verde"></div>'
+    +   '<div class="mrel-email-chrome-titulo">Pré-visualização do Email</div>'
+    + '</div>'
+    // Cabeçalho do email
+    + '<div class="mrel-email-chrome-header">'
+    +   '<div class="mrel-email-chrome-campo"><span class="mrel-email-chrome-campo-label">De:</span><span class="mrel-email-chrome-campo-valor">Smart Meeting &lt;noreply@smartmeeting.app&gt;</span></div>'
+    +   '<div class="mrel-email-chrome-campo"><span class="mrel-email-chrome-campo-label">Para:</span><span class="mrel-email-chrome-campo-valor">' + _mrelEsc(toText) + '</span></div>'
+    + (ccText ? '<div class="mrel-email-chrome-campo"><span class="mrel-email-chrome-campo-label">CC:</span><span class="mrel-email-chrome-campo-valor">' + _mrelEsc(ccText) + '</span></div>' : '')
+    +   '<div class="mrel-email-chrome-campo"><span class="mrel-email-chrome-campo-label">Data:</span><span class="mrel-email-chrome-campo-valor">' + _mrelEsc(dataHoje) + '</span></div>'
+    +   '<div class="mrel-email-assunto-linha">' + _mrelEsc(assunto) + '</div>'
+    + '</div>'
+    // Corpo do email (o HTML real que será enviado)
+    + '<div class="mrel-email-chrome-corpo mrel-email-body-wrapper">' + emailHtml + '</div>'
+    + '</div>';
+}
+
+function _mrelRenderizarRaw(emailHtml, scroll) {
+  var escaped = emailHtml
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  scroll.innerHTML =
+    '<div style="width:100%;max-width:900px;">'
+    + '<pre style="font-family:\'Courier New\',monospace;font-size:0.72rem;line-height:1.5;'
+    + 'background:#1e1e2e;color:#cdd6f4;padding:20px 24px;border-radius:10px;'
+    + 'overflow-x:auto;white-space:pre-wrap;word-break:break-all;'
+    + 'box-shadow:0 4px 24px rgba(0,0,0,0.3);">'
+    + escaped
+    + '</pre></div>';
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  MONTAGEM DO HTML DO EMAIL (espelho fiel do backend)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function _mrelGetOpcoes() {
+  var projetoIds = _mrelGetProjetosMarcados();
+  var emailsCC = ((document.getElementById('mrelEmailsCC') || {}).value || '')
+    .split(',').map(function(e) { return e.trim(); }).filter(Boolean);
+  // Snapshot de prefs com rodapé ao vivo
+  var prefsSnap = {
+    tema:         _mrelPrefs.tema,
+    layoutCard:   _mrelPrefs.layoutCard,
+    graficoDona:  _mrelPrefs.graficoDona,
+    graficoEstilo: _mrelPrefs.graficoEstilo,
+    rodapeTexto:  ((document.getElementById('mrelRodapeTexto') || {}).value || _mrelPrefs.rodapeTexto || '').trim()
+  };
+  return {
+    projetoIds:        projetoIds,
+    apenasAtivos:      (document.getElementById('mrelOpcApenasAtivos') || {}).checked !== false,
+    incluirDescricao:  (document.getElementById('mrelOpcDescricao') || {}).checked !== false,
+    incluirAtividades: (document.getElementById('mrelOpcAtividades') || {}).checked !== false,
+    incluirPrioridade: (document.getElementById('mrelOpcPrioridade') || {}).checked !== false,
+    incluirProgresso:  (document.getElementById('mrelOpcProgresso') || {}).checked !== false,
+    destinatariosIds:  _mrelGetDestinatariosIds(),
+    emailsCC:          emailsCC,
+    assunto:           ((document.getElementById('mrelAssunto') || {}).value || '').trim(),
+    mensagem:          ((document.getElementById('mrelMensagem') || {}).value || '').trim(),
+    prefs:             prefsSnap
+  };
+}
+
+/** Gera o HTML do corpo do email com suporte a temas, layouts e gráficos */
+function _mrelMontarEmailHTML(opc) {
+  var pr = opc.prefs || _mrelPrefs;
+  var t  = _MREL_TEMAS[pr.tema] || _MREL_TEMAS.cafe;
+
+  var projetos = (ESTADO.listaProjetos || [])
+    .filter(function(p) { return opc.projetoIds.indexOf(p.id) >= 0; })
+    .slice().sort(function(a, b) { return (b.valorPrioridade || 0) - (a.valorPrioridade || 0); });
+
+  var data = new Date().toLocaleDateString('pt-BR', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  // ── Helpers ──
+  function corStatus(status) {
+    var m = {
+      'A Fazer':          { bg: '#f0e6d3', cor: '#8b6b58', borda: '#d4b896' },
+      'Em Andamento':     { bg: '#e0eaf5', cor: '#3a6199', borda: '#a3bedd' },
+      'Aguardando Setor': { bg: '#f5ede3', cor: '#c2855a', borda: '#e0bfa0' },
+      'Concluída':        { bg: '#e8f0e5', cor: '#4a7240', borda: '#a3c498' },
+      'Suspenso':         { bg: '#ede9f7', cor: '#6b4db8', borda: '#c0b0e0' }
+    };
+    return m[status] || { bg: '#f0ece8', cor: '#7a6555', borda: '#d0c8c0' };
+  }
+
+  function corPrio(valor) {
+    if (!valor) return null;
+    if (valor >= 2102) return { bg: '#fce8e8', cor: '#a63d40', label: '🔴 ALTA' };
+    if (valor >= 1078) return { bg: '#fef9e7', cor: '#b8860b', label: '🟡 MÉDIA' };
+    return { bg: '#e8f5e9', cor: '#4a7240', label: '🟢 BAIXA' };
+  }
+
+  function nomeResps(ids) {
+    if (!ids || !ids.length) return '—';
+    return (ids.map(function(id) {
+      var r = (ESTADO.responsaveis || []).find(function(x) { return x.id === id; });
+      return r ? r.nome : null;
+    }).filter(Boolean).join(', ')) || '—';
+  }
+
+  // ── Contadores globais ──
+  var totalAtvsGlobal = 0;
+  var totalProjetos = projetos.length;
+  projetos.forEach(function(p) {
+    var atv = (_mrel.todasEtapas || []).filter(function(e) { return e.projetoId === p.id; });
+    if (opc.apenasAtivos) atv = atv.filter(function(e) { return e.status !== 'Concluída' && e.status !== 'Suspenso'; });
+    totalAtvsGlobal += atv.length;
+  });
+
+  // ── Distribuição de status para o gráfico ──
+  var distStatus = {};
+  projetos.forEach(function(p) {
+    var s = p.status || 'A Fazer';
+    distStatus[s] = (distStatus[s] || 0) + 1;
+  });
+
+  // ── HTML ──
+  var html = '';
+  html += '<div style="font-family:\'Segoe UI\',Arial,sans-serif;background:' + t.bodyBg + ';padding:28px 16px;min-height:100%;">';
+  html += '<div style="max-width:700px;margin:0 auto;">';
+
+  // Cabeçalho
+  var linkSistema = 'https://script.google.com/macros/s/AKfycbyhsJTWEyVs8xgrqyNgtr2bkfEfYm2x2vE14IGk8bUoy2a0H9GFGjdu_D5KxJF0ifRg/exec';
+  html += '<div style="background:' + t.headerGrad + ';border-radius:14px 14px 0 0;padding:28px 32px;text-align:center;">'
+    + '<div style="font-size:2rem;margin-bottom:6px;">' + t.icone + '</div>'
+    + '<div style="font-family:Georgia,serif;font-size:1.5rem;font-weight:700;color:#faf3e0;letter-spacing:0.5px;">Relatório de Projetos</div>'
+    + '<div style="color:' + t.acento + ';font-size:0.82rem;margin-top:4px;">' + data + '</div>'
+    + '<div style="margin-top:14px;">'
+    + '<a href="' + linkSistema + '" style="display:inline-block;background:rgba(255,255,255,0.18);color:#ffffff;text-decoration:none;font-size:0.75rem;font-weight:700;padding:9px 24px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.4);letter-spacing:0.02em;">🔗 Acessar o Sistema</a>'
+    + '</div>'
+    + '</div>';
+
+  // Resumo executivo (table para compatibilidade Gmail)
+  html += '<table cellpadding="0" cellspacing="0" width="100%" style="background:' + t.cardBg + ';border:1px solid ' + t.cardBorda + ';border-top:none;">'
+    + '<tr>'
+    + _mrelResumoCelula('📁', totalProjetos, 'Projeto' + (totalProjetos !== 1 ? 's' : ''), t)
+    + _mrelResumoCelula('⚙️', totalAtvsGlobal, 'Atividade' + (totalAtvsGlobal !== 1 ? 's' : '') + (opc.apenasAtivos ? ' Pend.' : ''), t)
+    + '</tr></table>';
+
+  // Gráfico de status
+  if (pr.graficoDona && totalProjetos > 0) {
+    html += '<div style="background:' + t.cardBg + ';border:1px solid ' + t.cardBorda + ';border-top:none;padding:16px 24px;text-align:center;">';
+    html += '<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:' + t.textoSec + ';margin-bottom:12px;font-weight:700;">Distribuição de Status</div>';
+    if (pr.graficoEstilo === 'donut') {
+      html += _mrelGerarDonut(distStatus, t);
+    } else {
+      html += _mrelGerarBarras(distStatus, t);
+    }
+    html += '</div>';
+  }
+
+  // Mensagem de abertura
+  if (opc.mensagem) {
+    html += '<div style="background:' + t.cardBg + ';border:1px solid ' + t.cardBorda + ';border-top:none;padding:16px 32px;">'
+      + '<div style="font-size:0.88rem;color:' + t.textoPrimario + ';line-height:1.7;white-space:pre-line;">' + _mrelEsc(opc.mensagem) + '</div>'
+      + '</div>';
+  }
+
+  // Cards de projetos
+  html += '<div style="background:' + t.cardBg + ';border:1px solid ' + t.cardBorda + ';border-top:none;border-radius:0 0 14px 14px;padding:' + (pr.layoutCard === 'compacto' ? '12px 16px' : '20px 24px') + ';">';
+
+  projetos.forEach(function(p, idx) {
+    var etapas = (_mrel.todasEtapas || []).filter(function(e) { return e.projetoId === p.id; });
+    if (opc.apenasAtivos) {
+      etapas = etapas.filter(function(e) { return e.status !== 'Concluída' && e.status !== 'Suspenso'; });
+    }
+    var totalAtv = (_mrel.todasEtapas || []).filter(function(e) { return e.projetoId === p.id; }).length;
+    var conclAtv = (_mrel.todasEtapas || []).filter(function(e) { return e.projetoId === p.id && e.status === 'Concluída'; }).length;
+    var pct      = totalAtv > 0 ? Math.round((conclAtv / totalAtv) * 100) : 0;
+    var cStatus  = corStatus(p.status);
+    var cPrio    = opc.incluirPrioridade ? corPrio(p.valorPrioridade) : null;
+    var nResp    = nomeResps(p.responsaveisIds || []);
+
+    var margTop = idx === 0 ? '0' : (pr.layoutCard === 'compacto' ? '8px' : '20px');
+
+    if (pr.layoutCard === 'moderno') {
+      html += _mrelCardModerno(p, etapas, pct, totalAtv, conclAtv, cStatus, cPrio, nResp, opc, t, margTop);
+    } else if (pr.layoutCard === 'compacto') {
+      html += _mrelCardCompacto(p, etapas, pct, cStatus, cPrio, nResp, opc, t, margTop);
+    } else {
+      html += _mrelCardClassico(p, etapas, pct, totalAtv, conclAtv, cStatus, cPrio, nResp, opc, t, margTop);
+    }
+  });
+
+  // Rodapé
+  var rodapeCustom = pr.rodapeTexto || '';
+  html += '<div style="text-align:center;margin-top:24px;padding:16px;border-top:1px solid ' + t.cardBorda + ';">';
+  if (rodapeCustom) {
+    html += '<div style="font-size:0.72rem;color:' + t.textoSec + ';font-weight:600;">' + _mrelEsc(rodapeCustom) + '</div>';
+    html += '<div style="font-size:0.66rem;color:' + t.textoSec + ';opacity:0.7;margin-top:4px;">Gerado pelo Smart Meeting</div>';
+  } else {
+    html += '<div style="font-size:0.7rem;color:' + t.textoSec + ';">Relatório gerado automaticamente pelo <strong>Smart Meeting</strong>.</div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; // /cards container
+  html += '</div>'; // /max-width
+  html += '</div>'; // /wrapper
+  return html;
+}
+
+// ── Card Clássico (table-based, Gmail-safe) ──
+function _mrelCardClassico(p, etapas, pct, totalAtv, conclAtv, cStatus, cPrio, nResp, opc, t, margTop) {
+  var corBarra = pct === 100 ? '#4a7240' : pct >= 60 ? '#b8860b' : '#a63d40';
+  var h = '<table cellpadding="0" cellspacing="0" width="100%" style="border:1px solid ' + t.cardBorda + ';border-radius:12px;overflow:hidden;margin-top:' + margTop + ';border-collapse:separate;">';
+
+  // Header row
+  h += '<tr style="background:' + t.cardGradH + ';">';
+  // Coluna esquerda: título + badges + meta
+  h += '<td style="padding:14px 20px;vertical-align:top;">';
+  h += '<div style="font-size:0.95rem;font-weight:700;color:' + t.textoPrimario + ';font-family:Georgia,serif;margin-bottom:6px;">' + _mrelEsc(p.nome) + '</div>';
+  h += '<div style="margin-bottom:6px;">'
+    + '<span style="background:' + cStatus.bg + ';color:' + cStatus.cor + ';border:1px solid ' + cStatus.borda + ';font-size:0.65rem;padding:2px 9px;border-radius:100px;font-weight:700;">' + _mrelEsc(p.status || 'A Fazer') + '</span>'
+    + (cPrio ? '&nbsp;<span style="background:' + cPrio.bg + ';color:' + cPrio.cor + ';font-size:0.65rem;padding:2px 9px;border-radius:100px;font-weight:700;">' + cPrio.label + '</span>' : '')
+    + '</div>';
+  h += '<div style="font-size:0.72rem;color:' + t.textoSec + ';">'
+    + (p.setor ? '🏢 ' + _mrelEsc(p.setor) + '&nbsp;&nbsp;' : '')
+    + '👤 ' + _mrelEsc(nResp)
+    + (p.dataFim ? '&nbsp;&nbsp;🏁 ' + _mrelEsc(p.dataFim) : '')
+    + '</div>';
+  h += '</td>';
+
+  // Coluna direita: progresso
+  if (opc.incluirProgresso) {
+    h += '<td style="padding:14px 20px;vertical-align:middle;text-align:center;width:72px;white-space:nowrap;">'
+      + '<div style="font-size:1.4rem;font-weight:800;color:' + corBarra + ';line-height:1;">' + pct + '%</div>'
+      + '<div style="font-size:0.62rem;color:' + t.textoSec + ';margin-top:3px;">' + conclAtv + '/' + totalAtv + ' ✓</div>'
+      + '</td>';
+  }
+  h += '</tr>';
+
+  // Linha da barra de progresso (bgcolor para Gmail)
+  if (opc.incluirProgresso) {
+    var fillW = Math.max(0, Math.min(100, pct));
+    var emptyW = 100 - fillW;
+    h += '<tr style="background:' + t.cardGradH + ';">'
+      + '<td colspan="2" style="padding:0 20px 12px;">'
+      + '<table cellpadding="0" cellspacing="0" width="100%"><tr>'
+      + (fillW > 0 ? '<td bgcolor="' + corBarra + '" width="' + fillW + '%" style="background:' + corBarra + ';padding:0;"><div style="height:6px;font-size:1px;line-height:1px;mso-line-height-rule:exactly;">&nbsp;</div></td>' : '')
+      + (emptyW > 0 ? '<td bgcolor="' + t.cardBorda + '" width="' + emptyW + '%" style="background:' + t.cardBorda + ';padding:0;"><div style="height:6px;font-size:1px;line-height:1px;mso-line-height-rule:exactly;">&nbsp;</div></td>' : '')
+      + '</tr></table>'
+      + '</td></tr>';
+  }
+
+  // Descrição
+  if (opc.incluirDescricao && p.descricao) {
+    h += '<tr><td colspan="2" style="padding:12px 20px;border-top:1px solid ' + t.cardBorda + ';font-size:0.8rem;color:' + t.textoPrimario + ';line-height:1.6;background:' + t.cardBg + ';">' + _mrelEsc(p.descricao) + '</td></tr>';
+  }
+
+  h += '</table>';
+
+  if (opc.incluirAtividades) {
+    h += _mrelTabelaAtividades(etapas, opc, t);
+  }
+  return h;
+}
+
+// ── Card Moderno (table-based, Gmail-safe) ──
+function _mrelCardModerno(p, etapas, pct, totalAtv, conclAtv, cStatus, cPrio, nResp, opc, t, margTop) {
+  var corBarra = pct === 100 ? '#4a7240' : pct >= 60 ? '#b8860b' : '#a63d40';
+  var h = '<table cellpadding="0" cellspacing="0" width="100%" style="border:1px solid ' + t.cardBorda + ';border-radius:12px;overflow:hidden;margin-top:' + margTop + ';border-collapse:separate;background:' + t.cardBg + ';">';
+
+  h += '<tr>';
+  // Faixa lateral colorida
+  h += '<td style="width:5px;background:' + t.acento + ';padding:0;">&nbsp;</td>';
+  // Conteúdo principal
+  h += '<td style="padding:14px 18px;vertical-align:top;">';
+  h += '<div style="font-size:0.92rem;font-weight:700;color:' + t.textoPrimario + ';margin-bottom:5px;">' + _mrelEsc(p.nome) + '</div>';
+  h += '<div style="margin-bottom:6px;">'
+    + '<span style="background:' + cStatus.bg + ';color:' + cStatus.cor + ';border:1px solid ' + cStatus.borda + ';font-size:0.62rem;padding:1px 8px;border-radius:100px;font-weight:700;">' + _mrelEsc(p.status || 'A Fazer') + '</span>'
+    + (cPrio ? '&nbsp;<span style="background:' + cPrio.bg + ';color:' + cPrio.cor + ';font-size:0.62rem;padding:1px 8px;border-radius:100px;font-weight:700;">' + cPrio.label + '</span>' : '')
+    + '</div>';
+  h += '<div style="font-size:0.7rem;color:' + t.textoSec + ';">'
+    + (p.setor ? '🏢 ' + _mrelEsc(p.setor) + '&nbsp;&nbsp;' : '')
+    + '👤 ' + _mrelEsc(nResp)
+    + (p.dataFim ? '&nbsp;&nbsp;🏁 ' + _mrelEsc(p.dataFim) : '')
+    + '</div>';
+
+  if (opc.incluirProgresso) {
+    var fillW2 = Math.max(0, Math.min(100, pct));
+    var emptyW2 = 100 - fillW2;
+    h += '<table cellpadding="0" cellspacing="0" width="100%" style="margin-top:8px;"><tr>'
+      + (fillW2 > 0 ? '<td bgcolor="' + corBarra + '" width="' + fillW2 + '%" style="background:' + corBarra + ';padding:0;"><div style="height:4px;font-size:1px;line-height:1px;mso-line-height-rule:exactly;">&nbsp;</div></td>' : '')
+      + (emptyW2 > 0 ? '<td bgcolor="' + t.cardBorda + '" width="' + emptyW2 + '%" style="background:' + t.cardBorda + ';padding:0;"><div style="height:4px;font-size:1px;line-height:1px;mso-line-height-rule:exactly;">&nbsp;</div></td>' : '')
+      + '</tr></table>';
+  }
+
+  if (opc.incluirDescricao && p.descricao) {
+    h += '<div style="margin-top:10px;font-size:0.78rem;color:' + t.textoSec + ';line-height:1.5;border-top:1px solid ' + t.cardBorda + ';padding-top:8px;">' + _mrelEsc(p.descricao) + '</div>';
+  }
+  h += '</td>';
+
+  // Coluna de progresso
+  if (opc.incluirProgresso) {
+    h += '<td style="padding:14px 18px 14px 0;vertical-align:middle;text-align:right;width:60px;white-space:nowrap;">'
+      + '<div style="font-size:1.2rem;font-weight:800;color:' + corBarra + ';line-height:1;">' + pct + '%</div>'
+      + '<div style="font-size:0.6rem;color:' + t.textoSec + ';margin-top:2px;">' + conclAtv + '/' + totalAtv + '</div>'
+      + '</td>';
+  }
+  h += '</tr></table>';
+
+  if (opc.incluirAtividades) {
+    h += _mrelTabelaAtividades(etapas, opc, t);
+  }
+  return h;
+}
+
+// ── Card Compacto (table-based, Gmail-safe) ──
+function _mrelCardCompacto(p, etapas, pct, cStatus, cPrio, nResp, opc, t, margTop) {
+  var h = '<table cellpadding="0" cellspacing="0" width="100%" style="border:1px solid ' + t.cardBorda + ';border-radius:8px;overflow:hidden;margin-top:' + margTop + ';border-collapse:separate;background:' + t.cardBg + ';">';
+  h += '<tr>';
+  // Coluna nome + meta
+  h += '<td style="padding:10px 14px;vertical-align:middle;">'
+    + '<div style="font-size:0.82rem;font-weight:700;color:' + t.textoPrimario + ';margin-bottom:2px;">' + _mrelEsc(p.nome) + '</div>'
+    + '<div style="font-size:0.68rem;color:' + t.textoSec + ';">'
+    + (p.setor ? '🏢 ' + _mrelEsc(p.setor) + ' &middot; ' : '')
+    + '👤 ' + _mrelEsc(nResp)
+    + (p.dataFim ? ' &middot; 🏁 ' + _mrelEsc(p.dataFim) : '')
+    + '</div>'
+    + '</td>';
+  // Coluna badges + progresso
+  h += '<td style="padding:10px 14px;vertical-align:middle;text-align:right;white-space:nowrap;width:1%;">'
+    + '<span style="background:' + cStatus.bg + ';color:' + cStatus.cor + ';border:1px solid ' + cStatus.borda + ';font-size:0.6rem;padding:1px 7px;border-radius:100px;font-weight:700;">' + _mrelEsc(p.status || 'A Fazer') + '</span>'
+    + (cPrio ? '&nbsp;<span style="background:' + cPrio.bg + ';color:' + cPrio.cor + ';font-size:0.6rem;padding:1px 7px;border-radius:100px;font-weight:700;">' + cPrio.label + '</span>' : '')
+    + (opc.incluirProgresso ? '&nbsp;<span style="font-size:0.75rem;font-weight:800;color:' + t.textoPrimario + ';">' + pct + '%</span>' : '')
+    + '</td>';
+  h += '</tr></table>';
+
+  if (opc.incluirAtividades && etapas.length > 0) {
+    h += _mrelTabelaAtividades(etapas, opc, t);
+  }
+  return h;
+}
+
+// ── Tabela de atividades compartilhada ──
+function _mrelTabelaAtividades(etapas, opc, t) {
+  var h = '<div style="padding:10px 14px 10px;">';
+  if (!etapas.length) {
+    return h + '<p style="color:' + t.textoSec + ';font-size:0.76rem;font-style:italic;margin:0;">Nenhuma atividade' + (opc.apenasAtivos ? ' pendente' : '') + '.</p></div>';
+  }
+  function corStatus(status) {
+    var m = {
+      'A Fazer':          { bg: '#f0e6d3', cor: '#8b6b58', borda: '#d4b896' },
+      'Em Andamento':     { bg: '#e0eaf5', cor: '#3a6199', borda: '#a3bedd' },
+      'Aguardando Setor': { bg: '#f5ede3', cor: '#c2855a', borda: '#e0bfa0' },
+      'Concluída':        { bg: '#e8f0e5', cor: '#4a7240', borda: '#a3c498' },
+      'Suspenso':         { bg: '#ede9f7', cor: '#6b4db8', borda: '#c0b0e0' }
+    };
+    return m[status] || { bg: '#f0ece8', cor: '#7a6555', borda: '#d0c8c0' };
+  }
+  function nomeResps(ids) {
+    if (!ids || !ids.length) return '—';
+    return (ids.map(function(id) {
+      var r = (ESTADO.responsaveis || []).find(function(x) { return x.id === id; });
+      return r ? r.nome : null;
+    }).filter(Boolean).join(', ')) || '—';
+  }
+  h += '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;">'
+    + '<thead><tr>'
+    + '<th style="padding:6px 10px;text-align:left;color:' + t.textoSec + ';font-weight:700;border-bottom:2px solid ' + t.tabelaBorda + ';font-size:0.63rem;text-transform:uppercase;letter-spacing:0.05em;background:' + t.tabelaBg + ';">Atividade</th>'
+    + '<th style="padding:6px 10px;text-align:center;color:' + t.textoSec + ';font-weight:700;border-bottom:2px solid ' + t.tabelaBorda + ';font-size:0.63rem;text-transform:uppercase;letter-spacing:0.05em;background:' + t.tabelaBg + ';white-space:nowrap;">Status</th>'
+    + '<th style="padding:6px 10px;text-align:left;color:' + t.textoSec + ';font-weight:700;border-bottom:2px solid ' + t.tabelaBorda + ';font-size:0.63rem;text-transform:uppercase;letter-spacing:0.05em;background:' + t.tabelaBg + ';">Responsável</th>'
+    + '</tr></thead><tbody>';
+  etapas.forEach(function(e, ei) {
+    var cs   = corStatus(e.status);
+    var respE = nomeResps(e.responsaveisIds || []);
+    var bg   = ei % 2 === 0 ? 'transparent' : t.tabelaBg;
+    h += '<tr style="background:' + bg + ';">'
+      + '<td style="padding:6px 10px;border-bottom:1px solid ' + t.tabelaBorda + ';color:' + t.textoPrimario + ';">' + _mrelEsc(e.nome || '') + '</td>'
+      + '<td style="padding:6px 10px;border-bottom:1px solid ' + t.tabelaBorda + ';text-align:center;">'
+      + '<span style="background:' + cs.bg + ';color:' + cs.cor + ';border:1px solid ' + cs.borda + ';font-size:0.6rem;padding:1px 7px;border-radius:100px;font-weight:700;white-space:nowrap;">' + _mrelEsc(e.status || '') + '</span>'
+      + '</td>'
+      + '<td style="padding:6px 10px;border-bottom:1px solid ' + t.tabelaBorda + ';color:' + t.textoSec + ';">' + _mrelEsc(respE) + '</td>'
+      + '</tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+}
+
+// ── Gráfico: Barra segmentada proporcional (Gmail-safe: bgcolor + div interno) ──
+function _mrelGerarDonut(distStatus, t) {
+  var CORES_STATUS = {
+    'A Fazer': '#8b6b58', 'Em Andamento': '#3a6199',
+    'Aguardando Setor': '#c2855a', 'Concluída': '#4a7240', 'Suspenso': '#6b4db8'
+  };
+  var entries = Object.keys(distStatus)
+    .map(function(k) { return { label: k, val: distStatus[k], cor: CORES_STATUS[k] || '#999' }; })
+    .filter(function(e) { return e.val > 0; });
+  var total = entries.reduce(function(s, e) { return s + e.val; }, 0);
+  if (!total) return '';
+
+  // Barra segmentada com larguras em px (mais confiável que % no Gmail)
+  // e bgcolor como atributo HTML (suportado mesmo quando CSS é removido)
+  var BAR_W = 500;
+  var segCells = '';
+  entries.forEach(function(e) {
+    var w = Math.max(4, Math.round((e.val / total) * BAR_W));
+    segCells += '<td bgcolor="' + e.cor + '" width="' + w + '" style="background:' + e.cor + ';padding:0;">'
+      + '<div style="height:18px;font-size:1px;line-height:1px;mso-line-height-rule:exactly;">&nbsp;</div>'
+      + '</td>';
+  });
+
+  // Legenda: uma linha por item (mais estável que colunas no Gmail)
+  var legendRows = '';
+  entries.forEach(function(e) {
+    var pct = Math.round((e.val / total) * 100);
+    legendRows += '<tr>'
+      + '<td width="14" style="padding:3px 6px 3px 0;vertical-align:middle;">'
+      + '<table cellpadding="0" cellspacing="0"><tr>'
+      + '<td bgcolor="' + e.cor + '" width="10" height="10" style="background:' + e.cor + ';border-radius:50%;font-size:1px;line-height:1px;">&nbsp;</td>'
+      + '</tr></table>'
+      + '</td>'
+      + '<td style="padding:3px 0;font-size:12px;color:' + t.textoSec + ';vertical-align:middle;">'
+      + _mrelEsc(e.label) + '&nbsp;<strong style="color:' + t.textoPrimario + ';">' + e.val + '</strong>&nbsp;(' + pct + '%)'
+      + '</td>'
+      + '</tr>';
+  });
+
+  return '<table cellpadding="0" cellspacing="0" width="' + BAR_W + '" style="margin:0 auto 10px;table-layout:fixed;">'
+    + '<tr>' + segCells + '</tr>'
+    + '</table>'
+    + '<table cellpadding="0" cellspacing="0" style="margin:0 auto;">'
+    + legendRows
+    + '</table>';
+}
+
+// ── Gráfico de Barras horizontais (Gmail-safe: table, bgcolor, px widths) ──
+function _mrelGerarBarras(distStatus, t) {
+  var CORES_STATUS = {
+    'A Fazer': '#8b6b58', 'Em Andamento': '#3a6199',
+    'Aguardando Setor': '#c2855a', 'Concluída': '#4a7240', 'Suspenso': '#6b4db8'
+  };
+  var entries = Object.keys(distStatus)
+    .map(function(k) { return { label: k, val: distStatus[k], cor: CORES_STATUS[k] || '#999' }; })
+    .filter(function(e) { return e.val > 0; });
+  var maxVal = Math.max.apply(null, entries.map(function(e) { return e.val; }));
+  if (!maxVal) return '';
+
+  var BAR_MAX = 300;
+  var rows = '';
+  entries.forEach(function(e) {
+    var barW = Math.max(4, Math.round((e.val / maxVal) * BAR_MAX));
+    rows += '<tr>'
+      + '<td width="130" style="padding:4px 8px 4px 0;font-size:12px;color:' + t.textoSec + ';text-align:right;vertical-align:middle;white-space:nowrap;">'
+      + _mrelEsc(e.label) + '</td>'
+      + '<td style="padding:4px 6px 4px 0;vertical-align:middle;">'
+      + '<table cellpadding="0" cellspacing="0" width="' + BAR_MAX + '"><tr>'
+      + '<td bgcolor="' + e.cor + '" width="' + barW + '" style="background:' + e.cor + ';padding:0;">'
+      + '<div style="height:14px;font-size:1px;line-height:1px;mso-line-height-rule:exactly;">&nbsp;</div>'
+      + '</td>'
+      + '<td bgcolor="' + t.cardBorda + '" style="background:' + t.cardBorda + ';padding:0;">'
+      + '<div style="height:14px;font-size:1px;line-height:1px;mso-line-height-rule:exactly;">&nbsp;</div>'
+      + '</td>'
+      + '</tr></table>'
+      + '</td>'
+      + '<td width="24" style="padding:4px 0;font-size:12px;font-weight:700;color:' + t.textoPrimario + ';vertical-align:middle;">' + e.val + '</td>'
+      + '</tr>';
+  });
+
+  return '<table cellpadding="0" cellspacing="0" style="margin:0 auto;">' + rows + '</table>';
+}
+
+function _mrelResumoCelula(icone, valor, label, t) {
+  t = t || _MREL_TEMAS.cafe;
+  return '<td style="text-align:center;padding:14px 8px;width:50%;">'
+    + '<div style="font-size:1.3rem;">' + icone + '</div>'
+    + '<div style="font-size:1.4rem;font-weight:800;color:' + t.textoPrimario + ';line-height:1.1;margin-top:4px;">' + valor + '</div>'
+    + '<div style="font-size:0.7rem;color:' + t.textoSec + ';margin-top:2px;">' + label + '</div>'
+    + '</td>';
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  ENVIO DO EMAIL
+// ──────────────────────────────────────────────────────────────────────────────
+
+function mrelEnviarEmail() {
+  var opc = _mrelGetOpcoes();
+
+  if (!opc.projetoIds.length) {
+    mostrarToast('Selecione ao menos um projeto', 'aviso');
+    return;
+  }
+  if (!opc.destinatariosIds.length && !opc.emailsCC.length) {
+    mostrarToast('Informe ao menos um destinatário ou email em cópia', 'aviso');
+    return;
+  }
+
+  _mrel.enviando = true;
+  var btn = document.getElementById('mrelBtnEnviar');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+  }
+
+  if (typeof google === 'undefined' || !google.script) {
+    _mrelFinalizarEnvio(btn, false, 'Envio indisponível fora do Google Apps Script');
+    return;
+  }
+
+  // Gera o HTML personalizado no frontend e passa pronto para o backend
+  opc.corpoHtml = _mrelMontarEmailHTML(opc);
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      _mrel.enviando = false;
+      if (res && res.sucesso) {
+        // Mostra confirmação visual no botão antes de fechar
+        if (btn) {
+          btn.innerHTML = '<i class="fas fa-check-circle"></i> Enviado com sucesso!';
+          btn.style.background = '#4a7240';
+          btn.style.borderColor = '#4a7240';
+          btn.disabled = true;
+        }
+        mostrarToast('✅ Relatório enviado com sucesso!', 'sucesso');
+        setTimeout(function() { mrelFechar(); }, 2500);
+      } else {
+        _mrelFinalizarEnvio(btn, true, 'Erro: ' + ((res && res.mensagem) || 'Erro desconhecido'));
+      }
+    })
+    .withFailureHandler(function(e) {
+      _mrelFinalizarEnvio(btn, true, 'Falha ao enviar: ' + (e.message || e));
+    })
+    .enviarRelatorioProjetosEmail(SESSAO_TOKEN, opc);
+}
+
+function _mrelFinalizarEnvio(btn, mostrarErro, msg) {
+  _mrel.enviando = false;
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Relatório';
+  }
+  _mrelAtualizarStatusBar();
+  if (mostrarErro) mostrarToast(msg, 'erro');
+  else mostrarToast(msg, 'aviso');
+}
+
+</script>

@@ -1,0 +1,347 @@
+<!-- ==================== MODAL RELATÓRIO DE PROJETOS ==================== -->
+<div id="modalRelatorio" class="modal-overlay">
+  <div class="mrel-content">
+
+    <!-- HEADER -->
+    <div class="mrel-header">
+      <div class="mrel-header-icon">
+        <i class="fas fa-chart-bar"></i>
+      </div>
+      <div>
+        <div class="mrel-header-titulo">Relatório de Projetos</div>
+        <div class="mrel-header-subtitulo">Configure, pré-visualize e dispare por email</div>
+      </div>
+      <button class="mrel-btn-fechar" onclick="mrelFechar()" title="Fechar">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="mrel-statusbar">
+      <div class="mrel-statusbar-item">
+        <i class="fas fa-folder-open"></i>
+        <span>Projetos:</span>
+        <span class="mrel-statusbar-badge" id="mrelBadgeProjetos">0</span>
+      </div>
+      <div class="mrel-statusbar-sep"></div>
+      <div class="mrel-statusbar-item">
+        <i class="fas fa-tasks"></i>
+        <span id="mrelResumoAtividades">0 atividade(s) pendente(s)</span>
+      </div>
+      <div class="mrel-statusbar-sep"></div>
+      <div class="mrel-statusbar-item">
+        <i class="fas fa-paper-plane"></i>
+        <span id="mrelResumoDestinatarios">Nenhum destinatário</span>
+      </div>
+      <div class="mrel-statusbar-acoes">
+        <button class="mrel-link-btn" onclick="mrelToggleTodosProjetos(true)">
+          <i class="fas fa-check-square"></i> Todos
+        </button>
+        <button class="mrel-link-btn" onclick="mrelToggleTodosProjetos(false)">
+          <i class="fas fa-square"></i> Nenhum
+        </button>
+      </div>
+    </div>
+
+    <!-- BODY: config | preview -->
+    <div class="mrel-body">
+
+      <!-- ══ PAINEL ESQUERDO: configurações ══ -->
+      <div class="mrel-painel-config">
+
+        <!-- BARRA DE ABAS -->
+        <div class="mrel-tabs-bar">
+          <button class="mrel-tab mrel-tab--azul ativo" id="mrelTabFiltros" onclick="mrelTrocarAba('filtros')">
+            <i class="fas fa-filter mrel-tab-ico"></i>
+            <span class="mrel-tab-label">Filtros</span>
+          </button>
+          <button class="mrel-tab mrel-tab--verde" id="mrelTabProjetos" onclick="mrelTrocarAba('projetos')">
+            <i class="fas fa-folder-open mrel-tab-ico"></i>
+            <span class="mrel-tab-label">Projetos</span>
+            <span class="mrel-tab-badge" id="mrelBadgeProjetosTab">0</span>
+          </button>
+          <button class="mrel-tab mrel-tab--amber" id="mrelTabConteudo" onclick="mrelTrocarAba('conteudo')">
+            <i class="fas fa-sliders-h mrel-tab-ico"></i>
+            <span class="mrel-tab-label">Conteúdo</span>
+          </button>
+          <button class="mrel-tab mrel-tab--roxo" id="mrelTabEmail" onclick="mrelTrocarAba('email')">
+            <i class="fas fa-envelope mrel-tab-ico"></i>
+            <span class="mrel-tab-label">Email</span>
+          </button>
+          <button class="mrel-tab mrel-tab--coral" id="mrelTabPersonalizar" onclick="mrelTrocarAba('personalizar')">
+            <i class="fas fa-palette mrel-tab-ico"></i>
+            <span class="mrel-tab-label">Estilo</span>
+          </button>
+        </div>
+
+        <!-- PAINEL: FILTROS -->
+        <div class="mrel-tab-panel ativo" id="mrelPanelFiltros">
+          <div class="mrel-panel-scroll">
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-azul">
+                <i class="fas fa-circle-half-stroke"></i> Status dos Projetos
+              </div>
+              <div id="mrelFiltroStatus" class="mrel-chips">
+                <span class="mrel-chip ativo" onclick="mrelToggleStatus('__todos__', this)">Todos</span>
+                <span class="mrel-chip" data-status-id="A Fazer" onclick="mrelToggleStatus('A Fazer', this)">A Fazer</span>
+                <span class="mrel-chip" data-status-id="Em Andamento" onclick="mrelToggleStatus('Em Andamento', this)">Em Andamento</span>
+                <span class="mrel-chip" data-status-id="Aguardando Setor" onclick="mrelToggleStatus('Aguardando Setor', this)">Aguardando Setor</span>
+                <span class="mrel-chip" data-status-id="Concluída" onclick="mrelToggleStatus('Concluída', this)">Concluída</span>
+                <span class="mrel-chip" data-status-id="Suspenso" onclick="mrelToggleStatus('Suspenso', this)">Suspenso</span>
+              </div>
+            </div>
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-azul">
+                <i class="fas fa-building"></i> Setores
+              </div>
+              <div id="mrelFiltroSetores" class="mrel-chips">
+                <span class="mrel-chip ativo" onclick="mrelToggleSetor('__todos__', this)">Todos</span>
+              </div>
+            </div>
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-azul" style="justify-content:space-between;">
+                <span><i class="fas fa-users"></i> Responsáveis</span>
+                <button class="mrel-link-btn" onclick="mrelToggleTodosResps()">Todos/Nenhum</button>
+              </div>
+              <div id="mrelFiltroResps" class="mrel-check-lista"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAINEL: PROJETOS -->
+        <div class="mrel-tab-panel" id="mrelPanelProjetos">
+          <div class="mrel-panel-scroll">
+            <div id="mrelListaProjetos" class="mrel-proj-lista">
+              <span style="color:var(--cor-texto-secundario);font-size:0.75rem;">Carregando...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAINEL: CONTEÚDO -->
+        <div class="mrel-tab-panel" id="mrelPanelConteudo">
+          <div class="mrel-panel-scroll">
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-amber">
+                <i class="fas fa-sliders-h"></i> O que incluir no email
+              </div>
+              <div class="mrel-toggle-grid">
+                <label class="mrel-toggle-item">
+                  <input type="checkbox" id="mrelOpcApenasAtivos" checked onchange="mrelAtualizarPreview()">
+                  <i class="mrel-toggle-item-icon fas fa-hourglass-half"></i>
+                  <span class="mrel-toggle-item-texto">Só atividades pendentes</span>
+                </label>
+                <label class="mrel-toggle-item">
+                  <input type="checkbox" id="mrelOpcDescricao" checked onchange="mrelAtualizarPreview()">
+                  <i class="mrel-toggle-item-icon fas fa-align-left"></i>
+                  <span class="mrel-toggle-item-texto">Descrição dos projetos</span>
+                </label>
+                <label class="mrel-toggle-item">
+                  <input type="checkbox" id="mrelOpcAtividades" checked onchange="mrelAtualizarPreview()">
+                  <i class="mrel-toggle-item-icon fas fa-list-check"></i>
+                  <span class="mrel-toggle-item-texto">Tabela de atividades</span>
+                </label>
+                <label class="mrel-toggle-item">
+                  <input type="checkbox" id="mrelOpcPrioridade" checked onchange="mrelAtualizarPreview()">
+                  <i class="mrel-toggle-item-icon fas fa-fire"></i>
+                  <span class="mrel-toggle-item-texto">Score de prioridade GUT</span>
+                </label>
+                <label class="mrel-toggle-item">
+                  <input type="checkbox" id="mrelOpcProgresso" checked onchange="mrelAtualizarPreview()">
+                  <i class="mrel-toggle-item-icon fas fa-chart-line"></i>
+                  <span class="mrel-toggle-item-texto">Barra de progresso</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAINEL: EMAIL -->
+        <div class="mrel-tab-panel" id="mrelPanelEmail">
+          <div class="mrel-panel-scroll">
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-roxo">
+                <i class="fas fa-envelope"></i> Configurar envio
+              </div>
+              <div class="mrel-email-campo">
+                <label>Assunto</label>
+                <input type="text" id="mrelAssunto" placeholder="Assunto do email" oninput="mrelOnInputDebounce()">
+              </div>
+              <div class="mrel-email-campo">
+                <label>Mensagem de abertura</label>
+                <textarea id="mrelMensagem" rows="3"
+                  placeholder="Texto opcional que aparece antes dos projetos..."
+                  oninput="mrelOnInputDebounce()"></textarea>
+              </div>
+              <div class="mrel-email-campo">
+                <label>Destinatários</label>
+                <div id="mrelDestinatarios" class="mrel-dest-grid"></div>
+              </div>
+              <div class="mrel-email-campo">
+                <label>Em cópia (CC)</label>
+                <input type="text" id="mrelEmailsCC"
+                  placeholder="email1@ex.com, email2@ex.com"
+                  oninput="mrelOnInputDebounce()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAINEL: PERSONALIZAR -->
+        <div class="mrel-tab-panel" id="mrelPanelPersonalizar">
+          <div class="mrel-panel-scroll">
+
+            <!-- Tema de Cores -->
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-coral">
+                <i class="fas fa-palette"></i> Tema de Cores
+              </div>
+              <div class="mrel-tema-grid">
+                <button class="mrel-tema-swatch mrel-tema-cafe ativo" data-tema="cafe" onclick="mrelAplicarTema('cafe')">
+                  <div class="mrel-tema-preview"></div>
+                  <span>☕ Café</span>
+                </button>
+                <button class="mrel-tema-swatch mrel-tema-oceano" data-tema="oceano" onclick="mrelAplicarTema('oceano')">
+                  <div class="mrel-tema-preview"></div>
+                  <span>🌊 Oceano</span>
+                </button>
+                <button class="mrel-tema-swatch mrel-tema-verde" data-tema="verde" onclick="mrelAplicarTema('verde')">
+                  <div class="mrel-tema-preview"></div>
+                  <span>🌿 Verde</span>
+                </button>
+                <button class="mrel-tema-swatch mrel-tema-noite" data-tema="noite" onclick="mrelAplicarTema('noite')">
+                  <div class="mrel-tema-preview"></div>
+                  <span>🌙 Noite</span>
+                </button>
+                <button class="mrel-tema-swatch mrel-tema-roxo" data-tema="roxo" onclick="mrelAplicarTema('roxo')">
+                  <div class="mrel-tema-preview"></div>
+                  <span>🍇 Roxo</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Layout dos Cards -->
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-coral">
+                <i class="fas fa-th-large"></i> Layout dos Cards
+              </div>
+              <div class="mrel-layout-grid">
+                <button class="mrel-layout-card ativo" id="mrelLayoutClassico" data-layout="classico" onclick="mrelAplicarLayout('classico')">
+                  <div class="mrel-layout-mini">
+                    <div class="mrel-layout-mini-header"></div>
+                    <div class="mrel-layout-mini-rows"><div></div><div></div><div></div></div>
+                  </div>
+                  <span>Clássico</span>
+                </button>
+                <button class="mrel-layout-card" id="mrelLayoutModerno" data-layout="moderno" onclick="mrelAplicarLayout('moderno')">
+                  <div class="mrel-layout-mini mrel-layout-mini--moderno">
+                    <div class="mrel-layout-mini-borda"></div>
+                    <div class="mrel-layout-mini-rows"><div></div><div></div></div>
+                  </div>
+                  <span>Moderno</span>
+                </button>
+                <button class="mrel-layout-card" id="mrelLayoutCompacto" data-layout="compacto" onclick="mrelAplicarLayout('compacto')">
+                  <div class="mrel-layout-mini mrel-layout-mini--compacto">
+                    <div></div><div></div><div></div><div></div>
+                  </div>
+                  <span>Compacto</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Gráfico Resumo -->
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-coral">
+                <i class="fas fa-chart-pie"></i> Gráfico Resumo
+              </div>
+              <label class="mrel-toggle-item" style="margin-bottom:8px;">
+                <input type="checkbox" id="mrelOpcGrafico" checked onchange="_mrelOnGraficoChange()">
+                <i class="mrel-toggle-item-icon fas fa-chart-pie"></i>
+                <span class="mrel-toggle-item-texto">Incluir gráfico de status</span>
+              </label>
+              <div class="mrel-grafico-estilo-grid">
+                <button class="mrel-grafico-btn ativo" data-estilo="donut" onclick="mrelAplicarGrafico('donut')">
+                  <i class="fas fa-circle-notch"></i> Donut
+                </button>
+                <button class="mrel-grafico-btn" data-estilo="barras" onclick="mrelAplicarGrafico('barras')">
+                  <i class="fas fa-chart-bar"></i> Barras
+                </button>
+              </div>
+            </div>
+
+            <!-- Rodapé Personalizado -->
+            <div class="mrel-panel-bloco">
+              <div class="mrel-panel-bloco-label mrel-cor-coral">
+                <i class="fas fa-signature"></i> Rodapé do Email
+              </div>
+              <div class="mrel-email-campo">
+                <input type="text" id="mrelRodapeTexto"
+                  placeholder="Ex: Equipe de Projetos · projetos@empresa.com"
+                  oninput="mrelOnInputDebounce()">
+              </div>
+            </div>
+
+            <!-- Salvar -->
+            <div class="mrel-panel-bloco">
+              <button class="mrel-btn-salvar-prefs" id="mrelBtnSalvarPrefs" onclick="mrelSalvarPrefs()">
+                <i class="fas fa-cloud-arrow-up"></i> Salvar Preferências
+              </button>
+              <div class="mrel-prefs-status" id="mrelPrefsStatus"></div>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /mrel-painel-config -->
+
+      <!-- ══ PAINEL DIREITO: preview do email ══ -->
+      <div class="mrel-painel-preview">
+
+        <div class="mrel-preview-topbar">
+          <div class="mrel-preview-topbar-titulo">
+            <i class="fas fa-eye"></i> Pré-visualização
+          </div>
+          <div class="mrel-preview-topbar-live">
+            <div class="mrel-preview-live-dot"></div>
+            Tempo real
+          </div>
+          <div class="mrel-preview-topbar-sep"></div>
+          <div class="mrel-preview-topbar-modo">
+            <button class="mrel-modo-btn ativo" id="mrelModoBtnEmail">
+              <i class="fas fa-envelope"></i> Email
+            </button>
+          </div>
+        </div>
+
+        <div class="mrel-preview-scroll" id="mrelPreviewScroll">
+          <!-- conteúdo injetado por JS -->
+          <div class="mrel-preview-vazio">
+            <div class="mrel-preview-vazio-icon"><i class="fas fa-envelope-open-text"></i></div>
+            <div class="mrel-preview-vazio-titulo">Pré-visualização do email</div>
+            <div class="mrel-preview-vazio-sub">
+              Selecione ao menos um projeto no painel ao lado para ver como o email ficará.
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /mrel-painel-preview -->
+
+    </div><!-- /mrel-body -->
+
+    <!-- FOOTER -->
+    <div class="mrel-footer">
+      <div class="mrel-footer-info" id="mrelFooterInfo">
+        <i class="fas fa-info-circle"></i>
+        <span>Selecione projetos para começar</span>
+      </div>
+      <div class="mrel-footer-acoes">
+        <button class="btn-acao btn-secundario" onclick="mrelFechar()">
+          <i class="fas fa-times"></i> Fechar
+        </button>
+        <button class="btn-acao mrel-btn-enviar" id="mrelBtnEnviar" onclick="mrelEnviarEmail()" disabled>
+          <i class="fas fa-paper-plane"></i> Enviar Relatório
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /mrel-content -->
+</div><!-- /modalRelatorio -->

@@ -8,7 +8,7 @@
   <base target="_top">
 
   <link
-    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <?!= include('TemaPadrao-CSS'); ?>
@@ -25,24 +25,32 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <?!= include('PaginaProjetoDetalhe-CSS🟡'); ?>
+  <?!= include('ModalRelatorio-CSS🟡'); ?>
   <?!= include('TemaAzul-CSS'); ?>
+  <?!= include('TemaPreto-CSS'); ?>
   <?!= include('Complemento-CSS'); ?>
+  <script>
+    /* Aplica tema salvo do servidor imediatamente — skeleton já renderiza com o tema correto */
+    var TEMA_INICIAL = '<?= temaUsuario ?>';
+    document.getElementById('tema-azul-styles').disabled  = (TEMA_INICIAL !== 'azul');
+    document.getElementById('tema-preto-styles').disabled = (TEMA_INICIAL !== 'preto');
+  </script>
 </head>
 
 <body>
 
   <!-- ==================== TELA DE CARREGAMENTO ==================== -->
   <div class="loading-screen" id="loadingScreen">
+    <div class="loading-vignette"></div>
     <div class="loading-content">
-      <div class="loading-logo"><i class="fas fa-project-diagram"></i></div>
+      <p class="loading-saudacao" id="loadingGreeting">Olá ☕</p>
+      <div class="loading-cup-wrap">
+        <div class="loading-cup-icon">
+          <i class="fas fa-mug-hot"></i>
+        </div>
+      </div>
       <h1 class="loading-title">Smart Meeting</h1>
       <p class="loading-subtitle">Gestão Inteligente de Projetos</p>
-      <div class="loading-icons">
-        <div class="loading-icon-item"><i class="fas fa-layer-group"></i></div>
-        <div class="loading-icon-item"><i class="fas fa-folder-open"></i></div>
-        <div class="loading-icon-item"><i class="fas fa-tasks"></i></div>
-        <div class="loading-icon-item"><i class="fas fa-robot"></i></div>
-      </div>
       <div class="loading-progress">
         <div class="loading-progress-bar"></div>
       </div>
@@ -73,25 +81,72 @@
       </div>
 
       <div class="header-direita">
-        <button class="btn-header btn-tema-toggle" id="btnTemaToggle" onclick="abrirModalTema()" title="Mudar tema">
-          <i class="fas fa-palette"></i>
-        </button>
-        <button class="btn-header btn-lixeira" onclick="abrirModalLixeira()" title="Lixeira de Projetos">
-          <i class="fas fa-trash-alt"></i>
-        </button>
-        <span class="header-usuario-nome" id="headerUsuarioNome" title="Usuário logado"></span>
-        <button class="btn-header btn-logout" onclick="fazerLogoutCliente()" title="Sair">
-          <i class="fas fa-sign-out-alt"></i>
-          <span>Sair</span>
-        </button>
-        <button class="btn-header btn-novo-projeto" onclick="abrirModalNovoProjeto()">
-          <i class="fas fa-folder-plus"></i>
-          <span>Novo Projeto</span>
-        </button>
-        <button class="btn-header btn-painel-toggle" id="btnToggleChat" onclick="toggleChat()">
-          <i class="fas fa-columns"></i>
-          <span>Painel</span>
-        </button>
+
+        <!-- Grupo: Criar (projeto / setor / responsável) -->
+        <div class="btn-header-grupo">
+          <button class="btn-header btn-novo-projeto" onclick="abrirModalNovoProjeto()">
+            <i class="fas fa-folder-plus"></i>
+            <span>Novo Projeto</span>
+          </button>
+          <div class="btn-criar-dropdown-wrapper" id="wrapperDropdownCriar">
+            <button class="btn-header btn-criar-mais" onclick="toggleDropdownCriar(event)" title="Criar Setor ou Responsável">
+              <i class="fas fa-plus-circle"></i>
+              <span>Criar</span>
+              <i class="fas fa-chevron-down" style="font-size:0.58rem;opacity:0.65;margin-left:1px;"></i>
+            </button>
+            <div class="dropdown-criar" id="dropdownCriar">
+              <button class="dropdown-criar-item" onclick="fecharDropdownCriar(); abrirModalNovoSetor()">
+                <i class="fas fa-building"></i>
+                <span>Novo Setor</span>
+              </button>
+              <button class="dropdown-criar-item" onclick="fecharDropdownCriar(); abrirModalGerenciarSetores()">
+                <i class="fas fa-pen-to-square"></i>
+                <span>Editar Setores</span>
+              </button>
+              <div style="height:1px;background:var(--cor-borda-clara);margin:3px 0;"></div>
+              <button class="dropdown-criar-item" onclick="fecharDropdownCriar(); abrirModalNovoResponsavel()">
+                <i class="fas fa-user-plus"></i>
+                <span>Novo Responsável</span>
+              </button>
+              <button class="dropdown-criar-item" onclick="fecharDropdownCriar(); abrirModalGerenciarResponsaveis()">
+                <i class="fas fa-users-gear"></i>
+                <span>Editar Responsáveis</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="header-divisor-vertical"></div>
+
+        <!-- Grupo: Visualização (relatório + painel IA) -->
+        <div class="btn-header-grupo">
+          <button class="btn-header" id="btnRelatorio" onclick="abrirModalRelatorio()" title="Gerar relatório de projetos">
+            <i class="fas fa-chart-bar"></i>
+            <span>Relatório</span>
+          </button>
+          <button class="btn-header btn-painel-toggle" id="btnToggleChat" onclick="toggleChat()">
+            <i class="fas fa-columns"></i>
+            <span>Painel</span>
+          </button>
+        </div>
+
+        <div class="header-divisor-vertical"></div>
+
+        <!-- Grupo: Conta / Config -->
+        <div class="btn-header-grupo">
+          <button class="btn-header btn-lixeira" onclick="abrirModalLixeira()" title="Lixeira de Projetos">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+          <button class="btn-header btn-tema-toggle" id="btnTemaToggle" onclick="abrirModalTema()" title="Mudar tema">
+            <i class="fas fa-palette"></i>
+          </button>
+          <span class="header-usuario-nome" id="headerUsuarioNome" title="Usuário logado"></span>
+          <button class="btn-header btn-logout" onclick="fazerLogoutCliente()" title="Sair">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Sair</span>
+          </button>
+        </div>
+
       </div>
 
     </div>
@@ -103,12 +158,18 @@
           <i class="fas fa-filter"></i> Responsável:
         </span>
         <div class="header-filtro-chips" id="headerFiltroChips">
-          <!-- Gerado via JS -->
+          <span class="sk sk-chip" style="width:90px"></span>
+          <span class="sk sk-chip" style="width:120px"></span>
+          <span class="sk sk-chip" style="width:100px"></span>
+          <span class="sk sk-chip" style="width:80px"></span>
         </div>
       </div>
     </div>
 
   </header>
+
+  <!-- Backdrop para fechar o painel lateral no mobile -->
+  <div class="chat-backdrop" id="chatBackdrop" onclick="fecharChatBackdrop()"></div>
 
   <!-- ==================== LAYOUT PRINCIPAL ==================== -->
   <main class="main-layout" id="mainLayout">
@@ -116,110 +177,143 @@
     <!-- PAINEL PRINCIPAL (EDITOR) -->
     <section class="painel-editor">
 
+      <!-- ── CARROSSEL PROJETOS CRÍTICOS (oculto até existir críticos) ── -->
+      <div class="criticos-banner" id="criticosBanner" style="display:none">
+        <div class="criticos-banner-label">
+          <i class="fas fa-exclamation-triangle"></i> Críticos
+        </div>
+        <div class="criticos-banner-track-wrapper">
+          <div class="criticos-banner-track" id="criticosBannerTrack">
+            <!-- Gerado via JS -->
+          </div>
+        </div>
+        <div class="criticos-banner-nav">
+          <button onclick="navegarCriticosBanner(-1)" aria-label="Anterior"><i class="fas fa-chevron-left"></i></button>
+          <span id="criticosBannerIndicador"></span>
+          <button onclick="navegarCriticosBanner(1)" aria-label="Próximo"><i class="fas fa-chevron-right"></i></button>
+        </div>
+      </div>
+
       <!-- ==================== DASHBOARD GERENCIAL ==================== -->
       <div class="dashboard-secao" id="secaoDashboard">
         <div class="dashboard-titulo">
           <h2><i class="fas fa-chart-line"></i> Dashboard Gerencial</h2>
         </div>
 
-        <!-- Grid do Dashboard -->
-        <div class="dashboard-grid">
+        <!-- ── BENTO GRID ── -->
+        <div class="bento-grid">
 
-          <!-- Coluna Esquerda: Cards de Métricas -->
-          <div class="dashboard-col-metricas">
-            <div class="dashboard-metricas" id="dashboardMetricas">
-              <!-- Gerado via JS -->
-            </div>
-          </div>
-
-          <!-- Coluna Central: Gráfico Donut -->
-          <div class="dashboard-col-grafico">
+          <!-- ① Donut – Distribuição por Status -->
+          <div class="bento-cel bento-donut">
             <div class="grafico-container">
               <div class="grafico-header">
                 <h4><i class="fas fa-chart-pie"></i> Distribuição por Status</h4>
+                <button class="btn-ocultar-concluidas" id="btnOcultarConcluidas"
+                  onclick="toggleOcultarConcluidas()"
+                  title="Ocultar projetos concluídos">
+                  <i class="fas fa-eye-slash"></i>
+                  <span>Ocultar Concluídas</span>
+                </button>
               </div>
-
-              <!-- Filtros de Status para o Gráfico -->
               <div class="grafico-filtros" id="graficoFiltrosStatus">
-                <!-- Gerado via JS -->
+                <span class="sk sk-chip" style="width:115px"></span>
+                <span class="sk sk-chip" style="width:130px"></span>
+                <span class="sk sk-chip" style="width:105px"></span>
               </div>
-
-              <!-- Canvas do Gráfico -->
-              <div class="grafico-wrapper">
+              <div class="grafico-wrapper" style="position:relative">
                 <canvas id="graficoStatusProjetos"></canvas>
                 <div class="grafico-centro-info" id="graficoCentroInfo">
                   <span class="grafico-centro-valor" id="graficoCentroValor">0</span>
                   <span class="grafico-centro-label" id="graficoCentroLabel">Projetos</span>
                 </div>
+                <div class="sk-chart-overlay" id="skDonut">
+                  <div class="sk sk-circle" style="width:130px;height:130px"></div>
+                  <div class="sk sk-line" style="width:60%"></div>
+                  <div class="sk sk-line sm"></div>
+                </div>
               </div>
-
-              <!-- Legenda Customizada -->
               <div class="grafico-legenda" id="graficoLegenda">
-                <!-- Gerado via JS -->
+                <div class="sk sk-line" style="width:85%"></div>
+                <div class="sk sk-line" style="width:70%"></div>
+                <div class="sk sk-line" style="width:78%"></div>
+                <div class="sk sk-line sm"></div>
               </div>
             </div>
           </div>
 
-          <!-- Coluna Direita: Gráfico por Setor -->
-          <div class="dashboard-col-setor">
+          <!-- ③ Gráfico por Setor -->
+          <div class="bento-cel bento-setor">
             <div class="grafico-setor-container">
               <div class="grafico-header">
                 <h4><i class="fas fa-building"></i> Projetos por Setor</h4>
               </div>
-              <div class="grafico-wrapper-setor">
+              <div class="grafico-wrapper-setor" style="position:relative">
                 <canvas id="graficoSetorCanvas"></canvas>
+                <div class="sk-chart-overlay" id="skSetor">
+                  <div class="sk sk-bar" style="width:88%"></div>
+                  <div class="sk sk-bar" style="width:62%"></div>
+                  <div class="sk sk-bar" style="width:75%"></div>
+                  <div class="sk sk-bar" style="width:45%"></div>
+                  <div class="sk sk-bar" style="width:58%"></div>
+                </div>
               </div>
             </div>
           </div>
 
-        </div>
-
-        <!-- Linha Inferior: Barras de Prioridade + Projetos Críticos -->
-        <div class="dashboard-row-inferior">
-
-          <!-- Distribuição por Prioridade -->
-          <div class="dashboard-bloco">
-            <h4><i class="fas fa-signal"></i> Distribuição por Prioridade</h4>
-            <div class="dashboard-prioridade-bars" id="dashboardPrioridadeBars">
-              <!-- Gerado via JS -->
+          <!-- ④ Distribuição por Prioridade -->
+          <div class="bento-cel bento-prioridade">
+            <div class="dashboard-bloco bento-bloco-inner">
+              <div class="grafico-header">
+                <h4><i class="fas fa-signal"></i> Distribuição por Prioridade</h4>
+              </div>
+              <div class="grafico-filtros" id="graficoFiltrosPrioridade">
+                <span class="sk sk-chip" style="width:80px"></span>
+                <span class="sk sk-chip" style="width:95px"></span>
+                <span class="sk sk-chip" style="width:75px"></span>
+                <span class="sk sk-chip" style="width:110px"></span>
+              </div>
+              <div class="dashboard-prioridade-bars" id="dashboardPrioridadeBars">
+                <div class="sk sk-bar"></div>
+                <div class="sk sk-bar" style="width:72%"></div>
+                <div class="sk sk-bar" style="width:85%"></div>
+                <div class="sk sk-bar" style="width:50%"></div>
+              </div>
             </div>
           </div>
 
-          <!-- Projetos Críticos -->
-          <div class="dashboard-bloco">
-            <h4><i class="fas fa-exclamation-triangle"></i> Projetos Críticos</h4>
-            <div class="dashboard-criticos" id="dashboardCriticos">
-              <!-- Gerado via JS -->
-            </div>
-          </div>
-
-          <!-- Gráfico por Setor (será inserido via JS após dashboard-row-inferior) -->
-
-        </div>
-
-        <!-- Linha de Gráficos Secundários: Tipo de Projeto + Responsáveis -->
-        <div class="dashboard-row-graficos">
-
-          <!-- Gráfico: Tipo de Projeto -->
-          <div class="dashboard-col-grafico-sec">
+          <!-- ⑥ Projetos por Tipo -->
+          <div class="bento-cel bento-tipo">
             <div class="grafico-setor-container">
               <div class="grafico-header">
                 <h4><i class="fas fa-tag"></i> Projetos por Tipo</h4>
               </div>
-              <div class="grafico-wrapper-setor">
+              <div class="grafico-wrapper-setor" style="position:relative">
                 <canvas id="graficoTipoCanvas"></canvas>
+                <div class="sk-chart-overlay" id="skTipo">
+                  <div class="sk sk-bar" style="width:80%"></div>
+                  <div class="sk sk-bar" style="width:55%"></div>
+                  <div class="sk sk-bar" style="width:68%"></div>
+                  <div class="sk sk-bar" style="width:40%"></div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Gráfico: Responsáveis -->
-          <div class="dashboard-col-grafico-sec">
+          <!-- ⑦ Projetos por Responsável -->
+          <div class="bento-cel bento-responsaveis">
             <div class="grafico-setor-container">
               <div class="grafico-header">
                 <h4><i class="fas fa-users"></i> Projetos por Responsável</h4>
               </div>
-              <div class="grafico-wrapper-setor">
+              <div class="grafico-wrapper-setor" style="position:relative">
                 <canvas id="graficoResponsaveisCanvas"></canvas>
+                <div class="sk-chart-overlay" id="skResponsaveis">
+                  <div class="sk sk-bar" style="width:90%"></div>
+                  <div class="sk sk-bar" style="width:70%"></div>
+                  <div class="sk sk-bar" style="width:82%"></div>
+                  <div class="sk sk-bar" style="width:55%"></div>
+                  <div class="sk sk-bar" style="width:65%"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -249,9 +343,30 @@
 
           <!-- Lista de Projetos (cards com drag&drop) -->
           <div class="projetos-cards-lista" id="projetosCardsLista">
-            <div class="empty-state">
-              <i class="fas fa-folder-open"></i>
-              <p>Carregando projetos...</p>
+            <div class="sk-project-card">
+              <div class="sk sk-line lg" style="width:75%;margin-bottom:10px"></div>
+              <div class="sk sk-line sm"></div>
+              <div class="sk sk-line sm" style="width:42%;margin-top:4px"></div>
+            </div>
+            <div class="sk-project-card">
+              <div class="sk sk-line lg" style="width:60%;margin-bottom:10px"></div>
+              <div class="sk sk-line sm"></div>
+              <div class="sk sk-line sm" style="width:50%;margin-top:4px"></div>
+            </div>
+            <div class="sk-project-card">
+              <div class="sk sk-line lg" style="width:80%;margin-bottom:10px"></div>
+              <div class="sk sk-line sm"></div>
+              <div class="sk sk-line sm" style="width:38%;margin-top:4px"></div>
+            </div>
+            <div class="sk-project-card">
+              <div class="sk sk-line lg" style="width:55%;margin-bottom:10px"></div>
+              <div class="sk sk-line sm"></div>
+              <div class="sk sk-line sm" style="width:45%;margin-top:4px"></div>
+            </div>
+            <div class="sk-project-card">
+              <div class="sk sk-line lg" style="width:70%;margin-bottom:10px"></div>
+              <div class="sk sk-line sm"></div>
+              <div class="sk sk-line sm" style="width:55%;margin-top:4px"></div>
             </div>
           </div>
         </div>
@@ -523,7 +638,7 @@
 
 <!-- ==================== MODAL NOVO PROJETO ==================== -->
 <div id="modalNovoProjeto" class="modal-overlay">
-  <div class="modal-content" style="max-width:680px;">
+  <div class="modal-content" style="max-width:900px;width:96vw;">
     <div class="modal-header">
       <h3><i class="fas fa-folder-plus"></i> Novo Projeto</h3>
       <button class="btn-fechar-modal" onclick="fecharModalNovoProjeto()">
@@ -816,6 +931,9 @@
     </div>
   </div>
 
+  <?!= include('ModalRelatorio🟡'); ?>
+
+
   <!-- ==================== MODAL LIXEIRA ==================== -->
   <div id="modalLixeira" class="modal-overlay">
     <div class="modal-content" style="max-width:680px;">
@@ -946,95 +1064,99 @@
       </div>
     </div>
   </div>
-  <!-- ==================== MODAL TEMA: CLÁSSICO → AZUL ==================== -->
-<div id="modalTemaParaAzul" class="modal-overlay">
-  <div class="modal-content" style="max-width:460px;">
+  <!-- ==================== MODAL SELETOR DE TEMA ==================== -->
+<div id="modalSeletorTema" class="modal-overlay">
+  <div class="modal-content" style="max-width:545px;">
     <div class="modal-header">
-      <h3><i class="fas fa-exclamation-triangle" style="color:var(--cor-aviso);"></i> Aviso Importante!</h3>
-      <button class="btn-fechar-modal" onclick="fecharModal('modalTemaParaAzul')">
+      <h3>
+        <i class="fas fa-palette" style="color:var(--cor-destaque);"></i>
+        Seleção de Tema
+        <span style="font-size:0.70rem;font-weight:400;color:var(--cor-texto-secundario);margin-left:8px;font-family:var(--font-corpo);">(escolha com sabedoria)</span>
+      </h3>
+      <button class="btn-fechar-modal" onclick="fecharModal('modalSeletorTema')">
         <i class="fas fa-times"></i>
       </button>
     </div>
-    <div class="modal-body" style="text-align:center;padding:28px 24px;">
+    <div class="modal-body" style="padding:22px 24px;">
 
-      <div style="font-size:3rem;margin-bottom:16px;line-height:1;">
-        🎨😤👩‍💻
+      <!-- Aviso dramático do criador -->
+      <div style="background:linear-gradient(135deg,rgba(139,99,71,0.09),rgba(196,130,42,0.06));border:1px solid rgba(139,99,71,0.22);border-radius:var(--raio);padding:11px 15px;margin-bottom:18px;display:flex;align-items:flex-start;gap:10px;">
+        <span style="font-size:1.3rem;line-height:1.2;flex-shrink:0;">☕</span>
+        <div>
+          <div style="font-size:0.80rem;font-weight:700;color:var(--cor-primaria-escura);margin-bottom:2px;font-family:var(--font-titulo);">Comunicado oficial do criador deste sistema</div>
+          <div style="font-size:0.77rem;color:var(--cor-texto-secundario);line-height:1.65;">
+            Dediquei <strong>horas</strong> ao tema Vintage Creme. Horas que nunca vou recuperar.
+            Com estudo de paletas, teoria das cores e xícaras de café que eu nem contei.
+            <em>Você pode escolher outro tema. Mas eu vou saber. E eu nunca esqueço.</em> 👁️
+          </div>
+        </div>
       </div>
 
-      <h4 style="font-size:1.1rem;color:var(--cor-primaria-escura);margin-bottom:12px;font-family:var(--font-titulo);">
-        Você realmente vai fazer isso?
-      </h4>
+      <!-- Grade de temas -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
 
-      <p style="font-size:0.85rem;color:var(--cor-texto);line-height:1.7;margin-bottom:10px;">
-        Eu <strong>passei horas</strong> escolhendo esse tema <em>Vintage Creme</em> 
-        com muito amor, carinho e várias xícaras de café ☕
-      </p>
+        <!-- ☕ Tema Café — A ESCOLHA CERTA -->
+        <button onclick="aplicarTema('cafe')" id="temaBtnCafe"
+          onmouseover="_reacaoCriador('cafe')" onmouseleave="_reacaoCriador(null)"
+          style="cursor:pointer;border:2px solid #C68642;border-radius:var(--raio-lg);padding:15px 10px 14px;background:linear-gradient(160deg,#FAF3E0,#F5ECD7);text-align:center;transition:var(--transicao);display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;">
+          <div style="position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:0.95rem;line-height:1;" title="Tema favorito do criador">👑</div>
+          <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(150deg,#5C2A0A,#2C1206);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.35);">
+            <i class="fas fa-mug-hot" style="font-size:20px;color:#D4A96A;"></i>
+          </div>
+          <div>
+            <div style="font-weight:800;font-size:0.84rem;color:#2C1A0E;font-family:'Playfair Display',serif;">Vintage Creme</div>
+            <div style="font-size:0.68rem;color:#8B6347;margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ A escolha certa</div>
+          </div>
+          <div style="font-size:0.67rem;color:#6B4C2A;line-height:1.45;padding:0 2px;font-style:italic;">Para quem tem bom gosto, cultura e provavelmente passou bem na vida.</div>
+          <div id="temaBadgeCafe" style="display:none;font-size:0.67rem;background:#8B6347;color:#FAF3E0;padding:2px 9px;border-radius:20px;font-weight:700;">✓ Ativo</div>
+        </button>
 
-      <div style="background:rgba(184,134,11,0.08);border:1px solid rgba(184,134,11,0.25);border-radius:var(--raio);padding:12px 16px;margin:14px 0;font-size:0.82rem;color:var(--cor-texto);">
-        <i class="fas fa-quote-left" style="color:var(--cor-destaque);margin-right:4px;"></i>
-        <em>"A beleza está nos olhos de quem vê... mas aparentemente vocês precisam de oftalmologista."</em>
-        <i class="fas fa-quote-right" style="color:var(--cor-destaque);margin-left:4px;"></i>
+        <!-- 💙 Tema Oceano Azul — O POLÊMICO -->
+        <button onclick="aplicarTema('azul')" id="temaBtnAzul"
+          onmouseover="_reacaoCriador('azul')" onmouseleave="_reacaoCriador(null)"
+          style="cursor:pointer;border:2px solid var(--cor-borda);border-radius:var(--raio-lg);padding:15px 10px 14px;background:linear-gradient(160deg,#f4f7ff,#eef3ff);text-align:center;transition:var(--transicao);display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;">
+          <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(150deg,#1a3476,#2558d4);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(30,60,140,0.4);">
+            <i class="fas fa-water" style="font-size:20px;color:#93c5fd;"></i>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:0.84rem;color:#1e2c4a;font-family:'Nunito',sans-serif;">Oceano Azul</div>
+            <div style="font-size:0.68rem;color:#607090;margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">😬 O polêmico</div>
+          </div>
+          <div style="font-size:0.67rem;color:#607090;line-height:1.45;padding:0 2px;font-style:italic;">Para quem viu uma paleta azul no Pinterest e achou que entende de design.</div>
+          <div id="temaBadgeAzul" style="display:none;font-size:0.67rem;background:#4878d6;color:#fff;padding:2px 9px;border-radius:20px;font-weight:700;">✓ Ativo</div>
+        </button>
+
+        <!-- 🖤 Tema Black Night — O DRAMÁTICO -->
+        <button onclick="aplicarTema('preto')" id="temaBtnPreto"
+          onmouseover="_reacaoCriador('preto')" onmouseleave="_reacaoCriador(null)"
+          style="cursor:pointer;border:2px solid #333;border-radius:var(--raio-lg);padding:15px 10px 14px;background:linear-gradient(160deg,#1e1e1e,#141414);text-align:center;transition:var(--transicao);display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;">
+          <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(150deg,#2a2a2a,#111);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.7);border:1px solid rgba(224,184,74,0.2);">
+            <i class="fas fa-moon" style="font-size:20px;color:#e0b84a;"></i>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:0.84rem;color:#d0d0d0;font-family:'Nunito',sans-serif;">Black Night</div>
+            <div style="font-size:0.68rem;color:#7a7a7a;margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">💀 O dramático</div>
+          </div>
+          <div style="font-size:0.67rem;color:#7a7a7a;line-height:1.45;padding:0 2px;font-style:italic;">Para quem acha que dark mode é personalidade. Coitado.</div>
+          <div id="temaBadgePreto" style="display:none;font-size:0.67rem;background:#e0b84a;color:#111;padding:2px 9px;border-radius:20px;font-weight:700;">✓ Ativo</div>
+        </button>
+
       </div>
 
-      <p style="font-size:0.82rem;color:var(--cor-texto-secundario);margin-bottom:4px;">
-        Se clicar em <strong>"Mudar"</strong>, saiba que eu nunca vou esquecer isso. 
-        <br>Mas tudo bem... eu aguento. 😢
-      </p>
-
-      <div style="font-size:1.5rem;margin-top:10px;">🙄💙🫡</div>
-
-    </div>
-    <div class="modal-footer" style="justify-content:center;gap:12px;">
-      <button class="btn-secundario" onclick="fecharModal('modalTemaParaAzul')" style="min-width:130px;">
-        <i class="fas fa-heart"></i> Manter o Original
-      </button>
-      <button class="btn-acao" onclick="aplicarTemaAzul()" style="min-width:130px;">
-        <i class="fas fa-palette"></i> Mudar (coitado)
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- ==================== MODAL TEMA: AZUL → CLÁSSICO ==================== -->
-<div id="modalTemaParaClassico" class="modal-overlay">
-  <div class="modal-content" style="max-width:460px;">
-    <div class="modal-header">
-      <h3><i class="fas fa-star" style="color:var(--cor-destaque);"></i> Voltando ao Bom Gosto!</h3>
-      <button class="btn-fechar-modal" onclick="fecharModal('modalTemaParaClassico')">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-    <div class="modal-body" style="text-align:center;padding:28px 24px;">
-
-      <div style="font-size:3rem;margin-bottom:16px;line-height:1;">
-        🎉☕✨
+      <!-- Caixa de reação ao vivo do criador -->
+      <div id="reacaoCriadorBox" style="min-height:44px;padding:9px 14px;background:rgba(107,76,59,0.05);border:1px dashed var(--cor-borda);border-radius:var(--raio);font-size:0.78rem;color:var(--cor-texto-secundario);text-align:center;transition:all 0.2s ease;display:flex;align-items:center;justify-content:center;gap:6px;">
+        <span id="reacaoCriadorEmoji" style="font-size:1rem;">🎭</span>
+        <span id="reacaoCriadorTexto" style="font-style:italic;">Passe o mouse sobre um tema para ver minha reação ao vivo...</span>
       </div>
 
-      <h4 style="font-size:1.1rem;color:var(--cor-primaria-escura);margin-bottom:12px;font-family:var(--font-titulo);">
-        Percebeu que o original era melhor?
-      </h4>
-
-      <p style="font-size:0.85rem;color:var(--cor-texto);line-height:1.7;margin-bottom:10px;">
-        Que surpresa... <strong>NENHUMA.</strong> 🤷‍♂️
-        <br>O tema Vintage Creme estava esperando por você.
-        <br>Sempre soube que você voltaria. 😌
-      </p>
-
-      <div style="background:rgba(107,76,59,0.08);border:1px solid rgba(107,76,59,0.25);border-radius:var(--raio);padding:12px 16px;margin:14px 0;font-size:0.82rem;color:var(--cor-texto);">
-        <i class="fas fa-quote-left" style="color:var(--cor-primaria);margin-right:4px;"></i>
-        <em>"Alguns precisam se perder no azul para encontrar o bege que carregam no coração."</em>
-        <i class="fas fa-quote-right" style="color:var(--cor-primaria);margin-left:4px;"></i>
-      </div>
-
-      <div style="font-size:1.5rem;margin-top:10px;">🫶😤☕</div>
-
     </div>
-    <div class="modal-footer" style="justify-content:center;gap:12px;">
-      <button class="btn-secundario" onclick="fecharModal('modalTemaParaClassico')" style="min-width:130px;">
-        <i class="fas fa-times"></i> Ficar no Azul
-      </button>
-      <button class="btn-acao" onclick="aplicarTemaClassico()" style="min-width:130px;">
-        <i class="fas fa-coffee"></i> Voltar ao Bom Gosto
+    <div class="modal-footer" style="justify-content:space-between;align-items:center;">
+      <span style="font-size:0.73rem;color:var(--cor-texto-secundario);font-style:italic;">
+        <i class="fas fa-info-circle" style="margin-right:3px;opacity:0.7;"></i>
+        Afeta tela de carregamento e skeleton loading.
+      </span>
+      <button class="btn-secundario" onclick="fecharModal('modalSeletorTema')">
+        <i class="fas fa-times"></i> Fechar (sem escolher o errado)
       </button>
     </div>
   </div>
@@ -1095,9 +1217,116 @@
       </div>
     </div>
   </div>
+  <!-- ==================== MODAL NOVO SETOR ==================== -->
+  <div id="modalNovoSetor" class="modal-overlay">
+    <div class="modal-content" style="max-width:460px;">
+      <div class="modal-header">
+        <h3 id="modalNovoSetorTitulo"><i class="fas fa-building"></i> Novo Setor</h3>
+        <button class="btn-fechar-modal" onclick="fecharModalNovoSetor()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="campo-grupo">
+          <label>Nome do Setor *</label>
+          <input type="text" id="novoSetorNome" placeholder="Ex: Financeiro, Marketing, TI...">
+        </div>
+        <div class="campo-grupo">
+          <label>Descrição</label>
+          <textarea id="novoSetorDescricao" rows="2" placeholder="Descrição opcional do setor..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secundario" onclick="fecharModalNovoSetor()">Cancelar</button>
+        <button class="btn-acao" id="modalNovoSetorBtnSalvar" onclick="salvarNovoSetor()">
+          <i class="fas fa-save"></i> Criar Setor
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL NOVO / EDITAR RESPONSÁVEL ==================== -->
+  <div id="modalNovoResponsavel" class="modal-overlay">
+    <div class="modal-content" style="max-width:460px;">
+      <div class="modal-header">
+        <h3 id="modalNovoResponsavelTitulo"><i class="fas fa-user-plus"></i> Novo Responsável</h3>
+        <button class="btn-fechar-modal" onclick="fecharModalNovoResponsavel()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="campo-grupo">
+          <label>Nome *</label>
+          <input type="text" id="novoResponsavelNome" placeholder="Nome completo">
+        </div>
+        <div class="campo-grupo">
+          <label>Email *</label>
+          <input type="email" id="novoResponsavelEmail" placeholder="email@empresa.com">
+        </div>
+        <div class="campo-grupo">
+          <label>Cargo</label>
+          <input type="text" id="novoResponsavelCargo" placeholder="Ex: Analista, Gerente, Dev...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secundario" onclick="fecharModalNovoResponsavel()">Cancelar</button>
+        <button class="btn-acao" id="modalNovoResponsavelBtnSalvar" onclick="salvarNovoResponsavel()">
+          <i class="fas fa-save"></i> Criar Responsável
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL GERENCIAR SETORES ==================== -->
+  <div id="modalGerenciarSetores" class="modal-overlay">
+    <div class="modal-content" style="max-width:560px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-building"></i> Gerenciar Setores</h3>
+        <button class="btn-fechar-modal" onclick="fecharModal('modalGerenciarSetores')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding:12px 18px;">
+        <div style="margin-bottom:12px;display:flex;justify-content:flex-end;">
+          <button class="btn-acao" style="font-size:0.8rem;padding:6px 14px;" onclick="fecharModal('modalGerenciarSetores'); abrirModalNovoSetor()">
+            <i class="fas fa-plus"></i> Novo Setor
+          </button>
+        </div>
+        <div id="listaGerenciarSetores"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secundario" onclick="fecharModal('modalGerenciarSetores')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL GERENCIAR RESPONSÁVEIS ==================== -->
+  <div id="modalGerenciarResponsaveis" class="modal-overlay">
+    <div class="modal-content" style="max-width:620px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-users"></i> Gerenciar Responsáveis</h3>
+        <button class="btn-fechar-modal" onclick="fecharModal('modalGerenciarResponsaveis')">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding:12px 18px;">
+        <div style="margin-bottom:12px;display:flex;justify-content:flex-end;">
+          <button class="btn-acao" style="font-size:0.8rem;padding:6px 14px;" onclick="fecharModal('modalGerenciarResponsaveis'); abrirModalNovoResponsavel()">
+            <i class="fas fa-plus"></i> Novo Responsável
+          </button>
+        </div>
+        <div id="listaGerenciarResponsaveis"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secundario" onclick="fecharModal('modalGerenciarResponsaveis')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== SCRIPTS ==================== -->
   <?!= include('Compartilhado-Utilidades🔧'); ?>
   <?!= include('PaginaProjetoDetalhe-JS🟡'); ?>
+  <?!= include('ModalRelatorio-JS🟡'); ?>
 
 </body>
 
