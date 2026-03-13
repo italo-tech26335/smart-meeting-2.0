@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -22,6 +22,7 @@
   <div class="loading-barra"></div>
 </div>
 
+<!-- ══ FUNDO ══ -->
 <div class="bg-orbs">
   <div class="orb orb-1"></div>
   <div class="orb orb-2"></div>
@@ -30,226 +31,287 @@
 </div>
 <div class="login-bg"></div>
 
-<div class="login-card" id="painelLogin">
-  <div class="login-logo">
-    <div class="icon">&#9749;</div>
-    <h1>Smart Meeting</h1>
-    <p>Fa&#231;a login para continuar</p>
-  </div>
+<!-- ══ LAYOUT DIVIDIDO ══ -->
+<div class="login-split">
 
-  <? if (mensagemErroUrl) { ?>
-  <div class="msg-erro" style="display:block;"><?= mensagemErroUrl ?></div>
-  <? } ?>
-
-  <div class="msg-erro" id="erroLogin"></div>
-  <div class="msg-sucesso" id="sucessoLogin"></div>
-
-  <form onsubmit="fazerLogin(); return false;" autocomplete="on">
-  <div class="form-group">
-    <label>Email</label>
-    <div class="input-wrap">
-      <input type="email" id="inputEmail" placeholder="seu@email.com" autocomplete="username">
+  <!-- ── LADO ESQUERDO — vídeo/gif ──────────────────────────────── -->
+  <div class="login-split-left">
+    <!--
+      Para usar seu vídeo:
+      1. Suba o arquivo para o Google Drive e compartilhe publicamente
+      2. Copie o ID (parte entre /d/ e /view no link)
+      3. Substitua SRC abaixo por: https://drive.google.com/uc?export=view&id=SEU_ID_AQUI
+    -->
+    <!-- Orbs de fundo (sempre visíveis, ficam atrás do GIF) -->
+    <div class="split-placeholder">
+      <div class="placeholder-orb placeholder-orb-1"></div>
+      <div class="placeholder-orb placeholder-orb-2"></div>
+      <div class="placeholder-orb placeholder-orb-3"></div>
     </div>
-  </div>
 
-  <div class="form-group">
-    <label>Senha</label>
-    <div class="input-wrap">
-      <input type="password" id="inputSenha" placeholder="********" autocomplete="current-password">
-      <button type="button" class="toggle-senha" onclick="toggleSenha('inputSenha', this)">
-        <i class="fas fa-eye"></i>
-      </button>
-    </div>
-  </div>
+    <!-- GIF embutido como base64 via backend GAS — sem CDN, sem CORS -->
+    <? if (gifData) { ?>
+    <img
+      class="split-gif"
+      id="splitGif"
+      src="data:image/gif;base64,<?= gifData ?>"
+      alt=""
+    >
+    <? } ?>
 
-  <button class="btn-entrar" id="btnEntrar" type="submit">Entrar</button>
-  </form>
-
-  <div class="link-reset">
-    <a onclick="mostrarReset()">Esqueci minha senha</a>
-    &nbsp;·&nbsp;
-    <a onclick="irParaPrimeiroAcesso()">Primeiro acesso</a>
-  </div>
-</div>
-
-<div class="login-card painel-escolha" id="painelEscolha">
-  <div class="escolha-saudacao">
-    <div class="icon">&#9749;</div>
-    <h2>Bem-vindo, <span id="escolhaNome">usu&#225;rio</span>!</h2>
-    <p>Onde você quer ir hoje?</p>
-  </div>
-
-  <div class="escolha-grid">
-    <a class="escolha-item" id="linkReunioes" href="#">
-      <div class="escolha-item-icone"><i class="fas fa-video"></i></div>
-      <div class="escolha-item-texto">
-        <strong>Reuniões</strong>
-        <span>Gerencie e transcreva reuniões</span>
+    <!-- Overlay com branding na parte inferior -->
+    <div class="split-overlay">
+      <div class="split-branding">
+        <h2 class="split-branding-title">Transforme reuni&#245;es<br>em resultados reais.</h2>
+        <p class="split-branding-sub">Da pauta &#224; a&#231;&#227;o — projetos, atas e insights em um s&#243; lugar.</p>
+        <div class="split-branding-dots">
+          <span></span><span></span><span></span>
+        </div>
       </div>
-      <i class="fas fa-chevron-right escolha-item-seta"></i>
-    </a>
-    <a class="escolha-item" id="linkProjetos" href="#">
-      <div class="escolha-item-icone"><i class="fas fa-project-diagram"></i></div>
-      <div class="escolha-item-texto">
-        <strong>Projetos</strong>
-        <span>Acompanhe projetos e atividades</span>
+    </div>
+  </div>
+
+  <!-- ── LADO DIREITO — painéis de login ────────────────────────── -->
+  <div class="login-split-right">
+
+    <div class="login-card" id="painelLogin">
+      <div class="login-logo">
+        <div class="icon">&#9749;</div>
+        <h1>Smart Meeting</h1>
+        <p>Fa&#231;a login para continuar</p>
       </div>
-      <i class="fas fa-chevron-right escolha-item-seta"></i>
-    </a>
-    <a class="escolha-item" id="linkRelatorios" href="#">
-      <div class="escolha-item-icone"><i class="fas fa-clipboard-check"></i></div>
-      <div class="escolha-item-texto">
-        <strong>Relatórios IA</strong>
-        <span>Analise atas e insights das reuniões</span>
+
+      <? if (mensagemErroUrl) { ?>
+      <div class="msg-erro" style="display:block;"><?= mensagemErroUrl ?></div>
+      <? } ?>
+
+      <div class="msg-erro" id="erroLogin"></div>
+      <div class="msg-sucesso" id="sucessoLogin"></div>
+
+      <form onsubmit="fazerLogin(); return false;" autocomplete="on">
+      <div class="form-group">
+        <label>Email</label>
+        <div class="input-wrap">
+          <input type="email" id="inputEmail" placeholder="seu@email.com" autocomplete="username">
+        </div>
       </div>
-      <i class="fas fa-chevron-right escolha-item-seta"></i>
-    </a>
-    <a class="escolha-item" id="linkAdmin" href="#" style="display:none;">
-      <div class="escolha-item-icone"><i class="fas fa-shield-alt"></i></div>
-      <div class="escolha-item-texto">
-        <strong>Painel Admin</strong>
-        <span>Gerencie usuários e logs do sistema</span>
+
+      <div class="form-group">
+        <label>Senha</label>
+        <div class="input-wrap">
+          <input type="password" id="inputSenha" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" autocomplete="current-password">
+          <button type="button" class="toggle-senha" onclick="toggleSenha('inputSenha', this)">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
       </div>
-      <i class="fas fa-chevron-right escolha-item-seta"></i>
-    </a>
-  </div>
 
-  <div class="link-sair">
-    <a onclick="fazerLogoutEscolha()">
-      <i class="fas fa-sign-out-alt"></i> Sair
-    </a>
-  </div>
-</div>
+      <button class="btn-entrar" id="btnEntrar" type="submit">Entrar</button>
+      </form>
 
-<div class="login-card painel-reset" id="painelReset">
-  <button class="btn-voltar" onclick="voltarLogin()">
-    <i class="fas fa-arrow-left"></i> Voltar ao login
-  </button>
-
-  <div class="login-logo">
-    <div class="icon"><i class="fas fa-envelope" style="font-size:1.4rem;"></i></div>
-    <h1>Redefinir Senha</h1>
-    <p>Enviaremos um link para seu email</p>
-  </div>
-
-  <div class="msg-erro" id="erroReset"></div>
-  <div class="msg-sucesso" id="sucessoReset"></div>
-
-  <form onsubmit="enviarReset(); return false;" autocomplete="on">
-  <div class="form-group">
-    <label>Email cadastrado</label>
-    <div class="input-wrap">
-      <input type="email" id="inputEmailReset" placeholder="seu@email.com" autocomplete="email">
+      <div class="link-reset">
+        <a onclick="mostrarReset()">Esqueci minha senha</a>
+        &nbsp;&#183;&nbsp;
+        <a onclick="irParaPrimeiroAcesso()">Primeiro acesso</a>
+      </div>
     </div>
-  </div>
 
-  <button class="btn-entrar" id="btnReset" type="submit">Enviar link</button>
-  </form>
-</div>
+    <div class="login-card painel-escolha" id="painelEscolha">
+      <div class="escolha-saudacao">
+        <div class="icon">&#9749;</div>
+        <h2>Bem-vindo, <span id="escolhaNome">usu&#225;rio</span>!</h2>
+        <p>Onde voc&#234; quer ir hoje?</p>
+      </div>
 
-<div class="login-card painel-nova-senha" id="painelPrimeiroAcesso">
-  <button class="btn-voltar" onclick="voltarLogin()">
-    <i class="fas fa-arrow-left"></i> Voltar ao login
-  </button>
+      <div class="escolha-grid">
+        <a class="escolha-item" id="linkReunioes" href="#">
+          <div class="escolha-item-icone"><i class="fas fa-video"></i></div>
+          <div class="escolha-item-texto">
+            <strong>Reuni&#245;es</strong>
+            <span>Gerencie e transcreva reuni&#245;es</span>
+          </div>
+          <i class="fas fa-chevron-right escolha-item-seta"></i>
+        </a>
+        <a class="escolha-item" id="linkProjetos" href="#">
+          <div class="escolha-item-icone"><i class="fas fa-project-diagram"></i></div>
+          <div class="escolha-item-texto">
+            <strong>Projetos</strong>
+            <span>Acompanhe projetos e atividades</span>
+          </div>
+          <i class="fas fa-chevron-right escolha-item-seta"></i>
+        </a>
+        <a class="escolha-item" id="linkRelatorios" href="#" style="display:none;">
+          <div class="escolha-item-icone"><i class="fas fa-clipboard-check"></i></div>
+          <div class="escolha-item-texto">
+            <strong>Relat&#243;rios IA</strong>
+            <span>Analise atas e insights das reuni&#245;es</span>
+          </div>
+          <i class="fas fa-chevron-right escolha-item-seta"></i>
+        </a>
+        <a class="escolha-item" id="linkAdmin" href="#" style="display:none;">
+          <div class="escolha-item-icone"><i class="fas fa-shield-alt"></i></div>
+          <div class="escolha-item-texto">
+            <strong>Painel Admin</strong>
+            <span>Gerencie usu&#225;rios e logs do sistema</span>
+          </div>
+          <i class="fas fa-chevron-right escolha-item-seta"></i>
+        </a>
+      </div>
 
-  <div class="login-logo">
-    <div class="icon"><i class="fas fa-key" style="font-size:1.4rem;"></i></div>
-    <h1>Primeiro Acesso</h1>
-    <p>Crie seu PIN de <strong>4 dígitos</strong></p>
-  </div>
-
-  <div class="msg-erro"    id="erroPrimeiroAcesso"></div>
-  <div class="msg-sucesso" id="sucessoPrimeiroAcesso"></div>
-
-  <form onsubmit="salvarPinPrimeiroAcesso(); return false;" autocomplete="off">
-  <div class="form-group">
-    <label>Email cadastrado</label>
-    <div class="input-wrap">
-      <input type="email" id="primeiroAcessoEmail" placeholder="seu@email.com" autocomplete="email">
+      <div class="link-sair">
+        <a onclick="fazerLogoutEscolha()">
+          <i class="fas fa-sign-out-alt"></i> Sair
+        </a>
+      </div>
     </div>
-  </div>
-  <div class="form-group" style="margin-bottom:8px;">
-    <label id="primeiroAcessoNomeLabel" style="font-size:.85rem;color:#64748b;"></label>
-  </div>
-  <div class="form-group">
-    <label>PIN de acesso</label>
-    <div class="input-wrap">
-      <input type="password" id="inputPin1" placeholder="4 dígitos" maxlength="4" pattern="\d{4}" inputmode="numeric"
-             autocomplete="new-password" oninput="this.value=this.value.replace(/\D/g,'').slice(0,4)">
-      <button type="button" class="toggle-senha" onclick="toggleSenha('inputPin1', this)">
-        <i class="fas fa-eye"></i>
+
+    <div class="login-card painel-reset" id="painelReset">
+      <button class="btn-voltar" onclick="voltarLogin()">
+        <i class="fas fa-arrow-left"></i> Voltar ao login
       </button>
+
+      <div class="login-logo">
+        <div class="icon"><i class="fas fa-envelope" style="font-size:1.4rem;"></i></div>
+        <h1>Redefinir Senha</h1>
+        <p>Enviaremos um link para seu email</p>
+      </div>
+
+      <div class="msg-erro" id="erroReset"></div>
+      <div class="msg-sucesso" id="sucessoReset"></div>
+
+      <form onsubmit="enviarReset(); return false;" autocomplete="on">
+      <div class="form-group">
+        <label>Email cadastrado</label>
+        <div class="input-wrap">
+          <input type="email" id="inputEmailReset" placeholder="seu@email.com" autocomplete="email">
+        </div>
+      </div>
+
+      <button class="btn-entrar" id="btnReset" type="submit">Enviar link</button>
+      </form>
     </div>
-  </div>
-  <div class="form-group">
-    <label>Confirmar PIN</label>
-    <div class="input-wrap">
-      <input type="password" id="inputPin2" placeholder="4 dígitos" maxlength="4" pattern="\d{4}" inputmode="numeric"
-             autocomplete="new-password" oninput="this.value=this.value.replace(/\D/g,'').slice(0,4)">
-      <button type="button" class="toggle-senha" onclick="toggleSenha('inputPin2', this)">
-        <i class="fas fa-eye"></i>
+
+    <div class="login-card painel-nova-senha" id="painelPrimeiroAcesso">
+      <button class="btn-voltar" onclick="voltarLogin()">
+        <i class="fas fa-arrow-left"></i> Voltar ao login
       </button>
+
+      <div class="login-logo">
+        <div class="icon"><i class="fas fa-key" style="font-size:1.4rem;"></i></div>
+        <h1>Primeiro Acesso</h1>
+        <p>Crie seu PIN de <strong>4 d&#237;gitos</strong></p>
+      </div>
+
+      <div class="msg-erro"    id="erroPrimeiroAcesso"></div>
+      <div class="msg-sucesso" id="sucessoPrimeiroAcesso"></div>
+
+      <form onsubmit="salvarPinPrimeiroAcesso(); return false;" autocomplete="off">
+      <div class="form-group">
+        <label>Email cadastrado</label>
+        <div class="input-wrap">
+          <input type="email" id="primeiroAcessoEmail" placeholder="seu@email.com" autocomplete="email">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label id="primeiroAcessoNomeLabel" style="font-size:.85rem;color:#64748b;"></label>
+      </div>
+      <div class="form-group">
+        <label>PIN de acesso</label>
+        <div class="input-wrap">
+          <input type="password" id="inputPin1" placeholder="4 d&#237;gitos" maxlength="4" pattern="\d{4}" inputmode="numeric"
+                 autocomplete="new-password" oninput="this.value=this.value.replace(/\D/g,'').slice(0,4)">
+          <button type="button" class="toggle-senha" onclick="toggleSenha('inputPin1', this)">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Confirmar PIN</label>
+        <div class="input-wrap">
+          <input type="password" id="inputPin2" placeholder="4 d&#237;gitos" maxlength="4" pattern="\d{4}" inputmode="numeric"
+                 autocomplete="new-password" oninput="this.value=this.value.replace(/\D/g,'').slice(0,4)">
+          <button type="button" class="toggle-senha" onclick="toggleSenha('inputPin2', this)">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+      <small style="display:block;margin-bottom:16px;">
+        Use apenas n&#250;meros. Este PIN ser&#225; solicitado em todo login.
+      </small>
+      <button class="btn-entrar" id="btnPinSalvar" type="submit">Criar PIN e entrar</button>
+      </form>
     </div>
-  </div>
-  <small style="color:#64748b;font-size:.8rem;display:block;margin-bottom:16px;">
-    Use apenas números. Este PIN será solicitado em todo login.
-  </small>
-  <button class="btn-entrar" id="btnPinSalvar" type="submit">Criar PIN e entrar</button>
-  </form>
-</div>
 
-<div class="login-card painel-nova-senha" id="painelNovaSenha">
-  <div class="login-logo">
-    <div class="icon"><i class="fas fa-key" style="font-size:1.4rem;"></i></div>
-    <h1>Nova Senha</h1>
-    <p>Crie sua nova senha de acesso</p>
-  </div>
+    <div class="login-card painel-nova-senha" id="painelNovaSenha">
+      <div class="login-logo">
+        <div class="icon"><i class="fas fa-key" style="font-size:1.4rem;"></i></div>
+        <h1>Nova Senha</h1>
+        <p>Crie sua nova senha de acesso</p>
+      </div>
 
-  <div class="msg-erro" id="erroNovaSenha"></div>
-  <div class="msg-sucesso" id="sucessoNovaSenha"></div>
+      <div class="msg-erro" id="erroNovaSenha"></div>
+      <div class="msg-sucesso" id="sucessoNovaSenha"></div>
 
-  <form onsubmit="salvarNovaSenha(); return false;" autocomplete="on">
-  <div class="form-group">
-    <label>Nova Senha</label>
-    <div class="input-wrap">
-      <input type="password" id="inputNovaSenha" placeholder="4 dígitos numéricos" autocomplete="new-password">
-      <button type="button" class="toggle-senha" onclick="toggleSenha('inputNovaSenha', this)">
-        <i class="fas fa-eye"></i>
-      </button>
+      <form onsubmit="salvarNovaSenha(); return false;" autocomplete="on">
+      <div class="form-group">
+        <label>Nova Senha</label>
+        <div class="input-wrap">
+          <input type="password" id="inputNovaSenha" placeholder="4 d&#237;gitos num&#233;ricos" autocomplete="new-password">
+          <button type="button" class="toggle-senha" onclick="toggleSenha('inputNovaSenha', this)">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Confirmar Senha</label>
+        <div class="input-wrap">
+          <input type="password" id="inputConfirmaSenha" placeholder="Repita a senha" autocomplete="new-password">
+          <button type="button" class="toggle-senha" onclick="toggleSenha('inputConfirmaSenha', this)">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <small style="display:block;margin-bottom:16px;">
+        Somente 4 d&#237;gitos num&#233;ricos.
+      </small>
+
+      <button class="btn-entrar" id="btnNovaSenha" type="submit">Salvar nova senha</button>
+      </form>
     </div>
-  </div>
 
-  <div class="form-group">
-    <label>Confirmar Senha</label>
-    <div class="input-wrap">
-      <input type="password" id="inputConfirmaSenha" placeholder="Repita a senha" autocomplete="new-password">
-      <button type="button" class="toggle-senha" onclick="toggleSenha('inputConfirmaSenha', this)">
-        <i class="fas fa-eye"></i>
-      </button>
-    </div>
-  </div>
-
-  <small style="color:#64748b;font-size:.8rem;display:block;margin-bottom:16px;">
-    Somente 4 dígitos numéricos.
-  </small>
-
-  <button class="btn-entrar" id="btnNovaSenha" type="submit">Salvar nova senha</button>
-  </form>
-</div>
+  </div><!-- /login-split-right -->
+</div><!-- /login-split -->
 
 <script>
   var TOKEN_RESET = '<?= tokenReset ?>';
   var BASE_URL    = '<?= baseUrl ?>';
 
+  // GIF embutido como base64 — fade-in suave após decode do browser
+  (function() {
+    var img = document.getElementById('splitGif');
+    if (!img) return;
+    img.style.opacity = '0';
+    function revelar() {
+      img.style.transition = 'opacity 0.9s ease';
+      img.style.opacity = '1';
+    }
+    if (img.complete && img.naturalWidth > 0) {
+      setTimeout(revelar, 80); // pequeno delay para o browser finalizar layout
+    } else {
+      img.addEventListener('load',  revelar);
+      img.addEventListener('error', function() { img.style.display = 'none'; });
+    }
+  })();
+
   document.addEventListener('DOMContentLoaded', function() {
-    // Verificar sessão salva no localStorage (persiste entre refreshes)
-    // Ao chegar na página de login, limpa o contador de redirecionamentos
     sessionStorage.removeItem('_sm_redir');
 
     if (!TOKEN_RESET) {
       var tokenSalvo = localStorage.getItem('sm_token');
       if (tokenSalvo) {
-        mostrarLoading('Verificando sessão...');
+        mostrarLoading('Verificando sess\u00e3o...');
         google.script.run
           .withSuccessHandler(function(r) {
             if (r && r.valida) {
@@ -393,7 +455,7 @@
         esconderLoading();
         setCarregando('btnEntrar', false);
         document.getElementById('btnEntrar').textContent = 'Entrar';
-        mostrarErro('erroLogin', 'Erro de conexao. Tente novamente.');
+        mostrarErro('erroLogin', 'Erro de conex\u00e3o. Tente novamente.');
       })
       .fazerLogin(email, senha);
   }
@@ -407,11 +469,11 @@
     document.getElementById('sucessoPrimeiroAcesso').textContent = '';
 
     if (!pin1 || pin1.length !== 4) {
-      document.getElementById('erroPrimeiroAcesso').textContent = 'O PIN deve ter exatamente 4 dígitos.';
+      document.getElementById('erroPrimeiroAcesso').textContent = 'O PIN deve ter exatamente 4 d\u00edgitos.';
       return;
     }
     if (pin1 !== pin2) {
-      document.getElementById('erroPrimeiroAcesso').textContent = 'Os PINs não coincidem.';
+      document.getElementById('erroPrimeiroAcesso').textContent = 'Os PINs n\u00e3o coincidem.';
       return;
     }
 
@@ -425,7 +487,6 @@
         document.getElementById('btnPinSalvar').textContent = 'Criar PIN e entrar';
         if (r.sucesso) {
           document.getElementById('sucessoPrimeiroAcesso').textContent = r.mensagem || 'PIN criado! Entrando...';
-          // Auto-login
           setTimeout(function() {
             mostrarLoading('Autenticando...');
             google.script.run
@@ -439,13 +500,13 @@
                   _mostrarEscolhaPagina(lr.token, lr.usuario);
                 } else {
                   mostrarPainel('painelLogin');
-                  mostrarSucesso('sucessoLogin', 'PIN criado! Faça login agora.');
+                  mostrarSucesso('sucessoLogin', 'PIN criado! Fa\u00e7a login agora.');
                 }
               })
               .withFailureHandler(function() {
                 esconderLoading();
                 mostrarPainel('painelLogin');
-                mostrarSucesso('sucessoLogin', 'PIN criado! Faça login agora.');
+                mostrarSucesso('sucessoLogin', 'PIN criado! Fa\u00e7a login agora.');
               })
               .fazerLogin(email, pin1);
           }, 800);
@@ -457,7 +518,7 @@
         esconderLoading();
         setCarregando('btnPinSalvar', false);
         document.getElementById('btnPinSalvar').textContent = 'Criar PIN e entrar';
-        document.getElementById('erroPrimeiroAcesso').textContent = 'Erro de conexão. Tente novamente.';
+        document.getElementById('erroPrimeiroAcesso').textContent = 'Erro de conex\u00e3o. Tente novamente.';
       })
       .definirSenhaPrimeiroAcesso(email, pin1);
   }
@@ -493,7 +554,7 @@
     var confirma = document.getElementById('inputConfirmaSenha').value;
 
     if (!nova || !confirma) { mostrarErro('erroNovaSenha', 'Preencha os dois campos.'); return; }
-    if (nova !== confirma) { mostrarErro('erroNovaSenha', 'As senhas nao coincidem.'); return; }
+    if (nova !== confirma) { mostrarErro('erroNovaSenha', 'As senhas n\u00e3o coincidem.'); return; }
 
     setCarregando('btnNovaSenha', true, 'Salvando...');
     mostrarLoading('Salvando nova senha...');
@@ -514,13 +575,13 @@
         esconderLoading();
         setCarregando('btnNovaSenha', false);
         document.getElementById('btnNovaSenha').textContent = 'Salvar nova senha';
-        mostrarErro('erroNovaSenha', 'Erro de conexao.');
+        mostrarErro('erroNovaSenha', 'Erro de conex\u00e3o.');
       })
       .redefinirSenha(TOKEN_RESET, nova);
   }
 
   function _mostrarEscolhaPagina(token, usuario) {
-    var nome = (usuario && usuario.nome) ? usuario.nome.split(' ')[0] : 'usuário';
+    var nome = (usuario && usuario.nome) ? usuario.nome.split(' ')[0] : 'usu\u00e1rio';
     document.getElementById('escolhaNome').textContent = nome;
 
     var BASE = (typeof BASE_URL !== 'undefined' && BASE_URL)
@@ -529,7 +590,6 @@
     var tk = '&token=' + encodeURIComponent(token);
 
     var ehAdmin = usuario && usuario.perfil === 'admin';
-    // null = sem restrição (admin ou usuário sem páginas restritas)
     var permitidas = (!ehAdmin && usuario && Array.isArray(usuario.paginasPermitidas) && usuario.paginasPermitidas.length > 0)
       ? usuario.paginasPermitidas
       : null;
@@ -557,11 +617,22 @@
       elAdmin.style.display = 'none';
     }
 
-    // Se apenas 1 página permitida, redirecionar direto sem mostrar painel
     if (paginasVisiveis.length === 1) {
+      mostrarLoading('Carregando página...');
       window.location.replace(paginasVisiveis[0]);
       return;
     }
+
+    // Mostrar loading ao clicar em qualquer item de escolha
+    document.querySelectorAll('.escolha-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        var textos = { reunioes: 'Carregando Reuniões...', projeto: 'Carregando Projetos...', relatorios: 'Carregando Relatórios IA...', admin: 'Carregando Painel Admin...' };
+        var href = item.href || '';
+        var match = href.match(/pagina=([^&]+)/);
+        var pag = match ? match[1] : '';
+        mostrarLoading(textos[pag] || 'Carregando...');
+      });
+    });
 
     mostrarPainel('painelEscolha');
   }
@@ -577,11 +648,6 @@
     document.getElementById('btnEntrar').textContent = 'Entrar';
   }
 
-  /**
-   * Navega o sistema após autenticação.
-   * Usa window.location.replace para navegar o próprio iframe — não requer
-   * ativação do usuário (ao contrário de target="_top" em callbacks assíncronos).
-   */
   function _navegarSistema(url) {
     window.location.replace(url);
   }

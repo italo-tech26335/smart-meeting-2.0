@@ -4,6 +4,11 @@
  *  Todas as funções públicas são chamáveis via google.script.run.
  * ===================================================================== */
 
+// ── Configurações de Email ───────────────────────────────────────────────────
+const EMAIL_REMETENTE_NOME = 'Smart Meeting';
+const EMAIL_REPLY_TO       = 'setorbiunichristus@gmail.com';
+const URL_SISTEMA          = 'https://script.google.com/macros/s/AKfycbwJB8g7DHPjcCX4Bl2rclQze_TpOyZ0PB9sEFgHDNLdzCihG8AjHPXWvsOsoqvu1bh7/exec';
+
 // ── Constantes ──────────────────────────────────────────────────────────────
 const NOME_ABA_USUARIOS = 'Usuarios';
 const NOME_ABA_LOGS     = 'Logs';
@@ -206,12 +211,10 @@ function solicitarResetSenha(email) {
 
     MailApp.sendEmail({
       to: email,
-      subject: 'Smart Meeting - Redefinição de Senha',
-      body: 'Olá, ' + usuario.nome + '!\n\n' +
-            'Recebemos uma solicitação para redefinir sua senha.\n\n' +
-            'Clique no link abaixo (válido por 30 minutos):\n' + linkReset + '\n\n' +
-            'Se não solicitou isso, ignore este email.\n\n' +
-            'Smart Meeting'
+      subject: 'Smart Meeting — Redefinição de Senha',
+      htmlBody: _htmlResetSenha(usuario.nome, linkReset),
+      name: EMAIL_REMETENTE_NOME,
+      replyTo: EMAIL_REPLY_TO
     });
 
     _registrarLog('reset_senha', email, '', 'token de reset enviado', 'sucesso');
@@ -411,12 +414,10 @@ function criarUsuario(token, dados) {
       try {
         MailApp.sendEmail({
           to: email,
-          subject: 'Smart Meeting - Bem-vindo!',
-          body: 'Olá, ' + dados.nome + '!\n\n' +
-                'Sua conta no Smart Meeting foi criada.\n\n' +
-                'Login: ' + email + '\n\n' +
-                'No seu primeiro acesso, você será solicitado a criar um PIN de 4 dígitos.\n\n' +
-                'Smart Meeting'
+          subject: 'Smart Meeting — Bem-vindo(a), ' + dados.nome + '!',
+          htmlBody: _htmlBoasVindas(dados.nome, email),
+          name: EMAIL_REMETENTE_NOME,
+          replyTo: EMAIL_REPLY_TO
         });
       } catch (mailErr) {
         Logger.log('Aviso: não foi possível enviar email de boas-vindas: ' + mailErr.toString());
@@ -533,11 +534,10 @@ function resetarSenhaAdmin(token, userId) {
         try {
           MailApp.sendEmail({
             to: emailUsuario,
-            subject: 'Smart Meeting - Redefinição de Acesso',
-            body: 'Olá, ' + nomeUsuario + '!\n\n' +
-                  'O administrador resetou seu acesso ao Smart Meeting.\n\n' +
-                  'No próximo login com seu email (' + emailUsuario + '), você será solicitado a criar um novo PIN de 4 dígitos.\n\n' +
-                  'Smart Meeting'
+            subject: 'Smart Meeting — Redefinição de Acesso',
+            htmlBody: _htmlResetAdmin(nomeUsuario, emailUsuario),
+            name: EMAIL_REMETENTE_NOME,
+            replyTo: EMAIL_REPLY_TO
           });
         } catch (mailErr) {
           Logger.log('Erro ao enviar email reset: ' + mailErr.toString());
@@ -974,3 +974,115 @@ function limparSessoesExpiradas() {
     });
   } catch (e) {}
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS DE EMAIL — Templates HTML
+// ═══════════════════════════════════════════════════════════════
+
+function _htmlBoasVindas(nome, email) {
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
+'<body style="margin:0;padding:0;background:#F2E8D5;font-family:Segoe UI,Arial,sans-serif;">' +
+'<table width="100%" cellpadding="0" cellspacing="0" style="background:#F2E8D5;padding:32px 16px;"><tr><td align="center">' +
+'<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(30,18,10,0.13);">' +
+'<tr><td style="background:linear-gradient(135deg,#1A0E06 0%,#3D1F0D 60%,#1A0E06 100%);padding:36px 40px;text-align:center;">' +
+'<div style="font-size:38px;margin-bottom:10px;">&#9749;</div>' +
+'<div style="font-family:Georgia,serif;font-size:30px;font-weight:700;color:#D4A96A;letter-spacing:1px;">Smart Meeting</div>' +
+'<div style="font-size:11px;color:rgba(212,169,106,0.65);margin-top:6px;letter-spacing:3px;text-transform:uppercase;">Sistema de Gest&#227;o de Reuni&#245;es com IA</div>' +
+'</td></tr>' +
+'<tr><td style="background:linear-gradient(90deg,#C07D2A,#9B621A);padding:13px 40px;text-align:center;">' +
+'<span style="font-size:14px;font-weight:700;color:#fff;letter-spacing:0.5px;">&#127881;&#160;&#160;Sua conta foi criada com sucesso!</span>' +
+'</td></tr>' +
+'<tr><td style="padding:38px 40px 28px;">' +
+'<p style="margin:0 0 6px;font-size:24px;font-weight:700;color:#1E120A;font-family:Georgia,serif;">Ol&#225;, ' + nome + '!</p>' +
+'<p style="margin:0 0 28px;font-size:14px;color:#5C3D2E;line-height:1.7;">Bem-vindo(a) ao <strong>Smart Meeting</strong>! Sua conta est&#225; pronta para uso. Siga os passos abaixo para fazer seu <strong>primeiro acesso</strong>.</p>' +
+'<div style="background:#FBF6EC;border-radius:10px;padding:26px 28px;margin-bottom:28px;border:1px solid rgba(192,125,42,0.18);">' +
+'<p style="margin:0 0 22px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#C07D2A;">&#128203;&#160;&#160;Passo a passo &#8212; Primeiro Acesso</p>' +
+'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:18px;"><tr>' +
+'<td width="36" valign="top"><div style="width:30px;height:30px;background:#C07D2A;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:800;color:#fff;">1</div></td>' +
+'<td valign="middle" style="padding-left:10px;"><div style="font-size:14px;font-weight:700;color:#1E120A;margin-bottom:2px;">Clique no bot&#227;o abaixo para acessar o sistema</div><div style="font-size:12px;color:#8B6347;line-height:1.5;">O link abrir&#225; o Smart Meeting diretamente no seu navegador</div></td>' +
+'</tr></table>' +
+'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:18px;"><tr>' +
+'<td width="36" valign="top"><div style="width:30px;height:30px;background:#C07D2A;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:800;color:#fff;">2</div></td>' +
+'<td valign="middle" style="padding-left:10px;"><div style="font-size:14px;font-weight:700;color:#1E120A;margin-bottom:4px;">Informe seu email de acesso</div>' +
+'<div style="font-size:12px;color:#5C3D2E;background:#fff;border:1px solid rgba(192,125,42,0.3);border-radius:6px;padding:5px 12px;font-family:Courier New,monospace;display:inline-block;">' + email + '</div></td>' +
+'</tr></table>' +
+'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:18px;"><tr>' +
+'<td width="36" valign="top"><div style="width:30px;height:30px;background:#C07D2A;border-radius:50%;text-align:center;line-height:30px;font-size:13px;font-weight:800;color:#fff;">3</div></td>' +
+'<td valign="middle" style="padding-left:10px;"><div style="font-size:14px;font-weight:700;color:#1E120A;margin-bottom:2px;">Crie seu PIN de 4 d&#237;gitos</div><div style="font-size:12px;color:#8B6347;line-height:1.5;">No primeiro acesso voc&#234; definir&#225; uma senha num&#233;rica pessoal. Guarde-a em local seguro!</div></td>' +
+'</tr></table>' +
+'<table cellpadding="0" cellspacing="0" width="100%"><tr>' +
+'<td width="36" valign="top"><div style="width:30px;height:30px;background:#4A6741;border-radius:50%;text-align:center;line-height:30px;font-size:14px;font-weight:800;color:#fff;">&#10003;</div></td>' +
+'<td valign="middle" style="padding-left:10px;"><div style="font-size:14px;font-weight:700;color:#1E120A;margin-bottom:2px;">Pronto! Explore o Smart Meeting</div><div style="font-size:12px;color:#8B6347;line-height:1.5;">Grave reuni&#245;es, gere atas autom&#225;ticas com IA e gerencie projetos</div></td>' +
+'</tr></table>' +
+'</div>' +
+'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;"><tr><td align="center">' +
+'<a href="' + URL_SISTEMA + '" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#C07D2A 0%,#9B621A 100%);color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:18px 52px;border-radius:8px;letter-spacing:0.5px;box-shadow:0 4px 18px rgba(192,125,42,0.45);font-family:Segoe UI,Arial,sans-serif;">' +
+'&#9749;&#160;&#160;Acessar o Smart Meeting</a>' +
+'</td></tr>' +
+'<tr><td align="center" style="padding-top:10px;">' +
+'<span style="font-size:11px;color:#B09070;">Ou copie: <a href="' + URL_SISTEMA + '" style="color:#C07D2A;word-break:break-all;font-size:10px;">' + URL_SISTEMA + '</a></span>' +
+'</td></tr></table>' +
+'<div style="background:#FBF6EC;border-left:3px solid #C07D2A;padding:12px 16px;border-radius:0 6px 6px 0;">' +
+'<p style="margin:0;font-size:12px;color:#5C3D2E;line-height:1.6;"><strong>&#128274; Seguran&#231;a:</strong> Nunca compartilhe seu PIN. D&#250;vidas? Contate o administrador em ' +
+'<a href="mailto:' + EMAIL_REPLY_TO + '" style="color:#C07D2A;">' + EMAIL_REPLY_TO + '</a>.</p>' +
+'</div>' +
+'</td></tr>' +
+'<tr><td style="background:#F2E8D5;border-top:1px solid rgba(192,125,42,0.15);padding:18px 40px;text-align:center;">' +
+'<p style="margin:0 0 4px;font-size:12px;color:#8B6347;">Este email foi enviado automaticamente pelo <strong>Smart Meeting</strong></p>' +
+'<p style="margin:0;font-size:11px;color:#B09070;">&#169; 2026 Smart Meeting &#8212; Christus &#160;|&#160; N&#227;o responda este email diretamente</p>' +
+'</td></tr>' +
+'</table></td></tr></table></body></html>';
+}
+
+function _htmlResetSenha(nome, linkReset) {
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head>' +
+'<body style="margin:0;padding:0;background:#F2E8D5;font-family:Segoe UI,Arial,sans-serif;">' +
+'<table width="100%" cellpadding="0" cellspacing="0" style="background:#F2E8D5;padding:32px 16px;"><tr><td align="center">' +
+'<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(30,18,10,0.13);">' +
+'<tr><td style="background:linear-gradient(135deg,#1A0E06,#3D1F0D);padding:30px 40px;text-align:center;">' +
+'<div style="font-size:32px;margin-bottom:8px;">&#128274;</div>' +
+'<div style="font-family:Georgia,serif;font-size:24px;font-weight:700;color:#D4A96A;">Smart Meeting</div>' +
+'<div style="font-size:11px;color:rgba(212,169,106,0.65);letter-spacing:2px;text-transform:uppercase;margin-top:5px;">Redefini&#231;&#227;o de Senha</div>' +
+'</td></tr>' +
+'<tr><td style="padding:36px 40px;">' +
+'<p style="margin:0 0 6px;font-size:20px;font-weight:700;color:#1E120A;">Ol&#225;, ' + nome + '!</p>' +
+'<p style="margin:0 0 24px;font-size:14px;color:#5C3D2E;line-height:1.7;">Recebemos uma solicita&#231;&#227;o para <strong>redefinir sua senha</strong>. Clique no bot&#227;o abaixo (v&#225;lido por <strong>30 minutos</strong>).</p>' +
+'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:24px;"><tr><td align="center">' +
+'<a href="' + linkReset + '" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#C07D2A,#9B621A);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:16px 40px;border-radius:8px;box-shadow:0 4px 14px rgba(192,125,42,0.4);">&#128273;&#160;Redefinir minha senha</a>' +
+'</td></tr></table>' +
+'<div style="background:#FBF6EC;border-left:3px solid #8B2E2E;padding:12px 16px;border-radius:0 6px 6px 0;">' +
+'<p style="margin:0;font-size:12px;color:#5C3D2E;">&#9888;&#65039; Se voc&#234; <strong>n&#227;o solicitou</strong> a redefini&#231;&#227;o, ignore este email. Sua senha permanece a mesma.</p>' +
+'</div></td></tr>' +
+'<tr><td style="background:#F2E8D5;border-top:1px solid rgba(192,125,42,0.15);padding:16px 40px;text-align:center;">' +
+'<p style="margin:0;font-size:11px;color:#B09070;">&#169; 2026 Smart Meeting &#8212; Christus &#160;|&#160; Email autom&#225;tico</p>' +
+'</td></tr></table></td></tr></table></body></html>';
+}
+
+function _htmlResetAdmin(nome, emailUsuario) {
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head>' +
+'<body style="margin:0;padding:0;background:#F2E8D5;font-family:Segoe UI,Arial,sans-serif;">' +
+'<table width="100%" cellpadding="0" cellspacing="0" style="background:#F2E8D5;padding:32px 16px;"><tr><td align="center">' +
+'<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(30,18,10,0.13);">' +
+'<tr><td style="background:linear-gradient(135deg,#1A0E06,#3D1F0D);padding:30px 40px;text-align:center;">' +
+'<div style="font-size:32px;margin-bottom:8px;">&#128260;</div>' +
+'<div style="font-family:Georgia,serif;font-size:24px;font-weight:700;color:#D4A96A;">Smart Meeting</div>' +
+'<div style="font-size:11px;color:rgba(212,169,106,0.65);letter-spacing:2px;text-transform:uppercase;margin-top:5px;">Redefini&#231;&#227;o de Acesso</div>' +
+'</td></tr>' +
+'<tr><td style="padding:36px 40px;">' +
+'<p style="margin:0 0 6px;font-size:20px;font-weight:700;color:#1E120A;">Ol&#225;, ' + nome + '!</p>' +
+'<p style="margin:0 0 24px;font-size:14px;color:#5C3D2E;line-height:1.7;">O <strong>administrador do sistema</strong> resetou seu acesso. No pr&#243;ximo login, voc&#234; dever&#225; criar um <strong>novo PIN de 4 d&#237;gitos</strong>.</p>' +
+'<div style="background:#FBF6EC;border-radius:8px;padding:20px 24px;margin-bottom:24px;border:1px solid rgba(192,125,42,0.15);">' +
+'<p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#C07D2A;text-transform:uppercase;letter-spacing:0.8px;">Seu email de acesso</p>' +
+'<div style="font-size:14px;color:#1E120A;font-family:Courier New,monospace;background:#fff;border:1px solid rgba(192,125,42,0.25);border-radius:6px;padding:8px 14px;display:inline-block;">' + emailUsuario + '</div>' +
+'</div>' +
+'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:24px;"><tr><td align="center">' +
+'<a href="' + URL_SISTEMA + '" target="_blank" style="display:inline-block;background:linear-gradient(135deg,#C07D2A,#9B621A);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:16px 40px;border-radius:8px;box-shadow:0 4px 14px rgba(192,125,42,0.4);">&#9749;&#160;Acessar o Smart Meeting</a>' +
+'</td></tr></table>' +
+'<div style="background:#FBF6EC;border-left:3px solid #C07D2A;padding:12px 16px;border-radius:0 6px 6px 0;">' +
+'<p style="margin:0;font-size:12px;color:#5C3D2E;">D&#250;vidas? <a href="mailto:' + EMAIL_REPLY_TO + '" style="color:#C07D2A;">' + EMAIL_REPLY_TO + '</a></p>' +
+'</div></td></tr>' +
+'<tr><td style="background:#F2E8D5;border-top:1px solid rgba(192,125,42,0.15);padding:16px 40px;text-align:center;">' +
+'<p style="margin:0;font-size:11px;color:#B09070;">&#169; 2026 Smart Meeting &#8212; Christus &#160;|&#160; Email autom&#225;tico</p>' +
+'</td></tr></table></td></tr></table></body></html>';
+}
+

@@ -612,9 +612,109 @@ select.campo-valor-grande{cursor:pointer}
   .sidebar-lista{flex-direction:row;display:flex;padding:.35rem;overflow-x:auto}
   .rel-item{min-width:160px;flex-shrink:0;margin-bottom:0}
 }
+
+/* ═══════════════════════════════════════════════
+   TELA DE CARREGAMENTO — Café ☕
+═══════════════════════════════════════════════ */
+.loading-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background-color: #3A1A08;
+  background-image:
+    repeating-linear-gradient(91deg,
+      transparent 0px, transparent 10px,
+      rgba(0,0,0,0.045) 10px, rgba(0,0,0,0.045) 11px,
+      transparent 11px, transparent 24px,
+      rgba(0,0,0,0.025) 24px, rgba(0,0,0,0.025) 25px,
+      transparent 25px, transparent 38px,
+      rgba(255,255,255,0.018) 38px, rgba(255,255,255,0.018) 39px),
+    repeating-linear-gradient(89deg,
+      transparent 0px, transparent 55px,
+      rgba(0,0,0,0.018) 55px, rgba(0,0,0,0.018) 56px),
+    linear-gradient(172deg,
+      #5C2A0A 0%, #3A1A08 18%, #4A200E 34%,
+      #2C1206 50%, #3E1C0C 66%, #4C2610 82%, #3A1A08 100%);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  z-index: 9999; overflow: hidden;
+  transition: opacity 0.65s ease, visibility 0.65s ease;
+}
+.loading-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.loading-vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 80% 80% at 50% 50%, transparent 35%, rgba(0,0,0,0.55) 100%);
+}
+.loading-content { position: relative; text-align: center; z-index: 1; }
+.loading-saudacao {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1rem; font-weight: 600; font-style: italic;
+  color: rgba(212,169,106,0.90);
+  margin-bottom: 20px; letter-spacing: 0.03em;
+}
+.loading-cup-wrap {
+  display: inline-flex; flex-direction: column; align-items: center;
+  margin-bottom: 28px;
+}
+.loading-cup-icon {
+  width: 88px; height: 88px;
+  background: linear-gradient(150deg, #5C2A0A 0%, #2C1206 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(212,169,106,0.25);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 0 rgba(255,255,255,0.06) inset, 0 6px 28px rgba(0,0,0,0.55), 0 0 0 4px rgba(44,18,6,0.6);
+  animation: cup-breathe 3.2s ease-in-out infinite;
+}
+.loading-cup-icon i { font-size: 38px; color: #D4A96A; }
+@keyframes cup-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.loading-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.75rem; font-weight: 700;
+  color: #F5EBD7; margin-bottom: 5px; letter-spacing: 0.01em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+.loading-subtitle {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.78rem; font-weight: 400;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(212,169,106,0.55); margin-bottom: 32px;
+}
+.loading-progress {
+  width: 160px; height: 2px;
+  background: rgba(212,169,106,0.15);
+  border-radius: 2px; overflow: hidden; margin: 0 auto;
+}
+.loading-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, transparent, #D4A96A, #F5EBD7, #D4A96A, transparent);
+  border-radius: 2px;
+  animation: ls-progress-scan 2s ease-in-out infinite;
+}
+@keyframes ls-progress-scan { 0% { width: 50%; margin-left: -50%; } 100% { width: 50%; margin-left: 100%; } }
+.loading-status {
+  font-size: 0.80rem; font-weight: 400;
+  color: rgba(212,169,106,0.60);
+  margin-top: 14px; letter-spacing: 0.04em;
+}
 </style>
 </head>
 <body>
+
+<!-- ==================== TELA DE CARREGAMENTO ==================== -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-vignette"></div>
+  <div class="loading-content">
+    <p class="loading-saudacao" id="loadingGreeting">Olá ☕</p>
+    <div class="loading-cup-wrap">
+      <div class="loading-cup-icon">
+        <i class="fas fa-mug-hot"></i>
+      </div>
+    </div>
+    <h1 class="loading-title">Smart Meeting</h1>
+    <p class="loading-subtitle">Relatórios IA</p>
+    <div class="loading-progress">
+      <div class="loading-progress-bar"></div>
+    </div>
+    <p class="loading-status" id="loadingStatus">Inicializando...</p>
+  </div>
+</div>
 
 <!-- ============================================================
      HEADER
@@ -865,7 +965,19 @@ document.addEventListener('DOMContentLoaded',function(){
   var elNome = document.getElementById('headerUsuarioNome');
   if (elNome && typeof USUARIO_NOME !== 'undefined') elNome.textContent = USUARIO_NOME;
 
+  // Saudação personalizada na tela de carregamento
+  var elGreet = document.getElementById('loadingGreeting');
+  if (elGreet) {
+    var nomeUsuario = (typeof USUARIO_NOME !== 'undefined' && USUARIO_NOME)
+      ? USUARIO_NOME.trim().split(' ')[0] : '';
+    elGreet.textContent = (nomeUsuario ? 'Olá, ' + nomeUsuario : 'Olá') + ' ☕';
+  }
+  var elStatus = document.getElementById('loadingStatus');
+  if (elStatus) elStatus.textContent = 'Carregando relatórios...';
+
   verificarSessaoCliente(function() {
+    var ls = document.getElementById('loadingScreen');
+    if (ls) ls.classList.add('hidden');
     carregarLista();
     carregarContexto();
     carregarOpcoes();

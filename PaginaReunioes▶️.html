@@ -414,6 +414,8 @@
     .arquivo-tam { font-size: 0.72rem; color: var(--marrom-claro); }
     .btn-remover { background:none; border:none; color: var(--vermelho-vintage); cursor:pointer; padding:0.3rem; border-radius:var(--raio); transition:var(--trans); }
     .btn-remover:hover { background: rgba(139,46,46,0.08); }
+    .btn-download-audio { background:none; border:none; color: var(--azul-vintage); cursor:pointer; padding:0.3rem; border-radius:var(--raio); transition:var(--trans); font-size:1rem; line-height:1; }
+    .btn-download-audio:hover { background: var(--azul-claro); color: var(--azul-vintage); }
 
     /* Progresso */
     .progresso-wrap { display:none; }
@@ -1530,9 +1532,623 @@
   background: linear-gradient(90deg, transparent, var(--creme-escuro), transparent);
 }
 
+/* ═══════════════════════════════════════════════
+   TELA DE CARREGAMENTO — Café ☕
+═══════════════════════════════════════════════ */
+.loading-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background-color: #3A1A08;
+  background-image:
+    repeating-linear-gradient(91deg,
+      transparent 0px, transparent 10px,
+      rgba(0,0,0,0.045) 10px, rgba(0,0,0,0.045) 11px,
+      transparent 11px, transparent 24px,
+      rgba(0,0,0,0.025) 24px, rgba(0,0,0,0.025) 25px,
+      transparent 25px, transparent 38px,
+      rgba(255,255,255,0.018) 38px, rgba(255,255,255,0.018) 39px),
+    repeating-linear-gradient(89deg,
+      transparent 0px, transparent 55px,
+      rgba(0,0,0,0.018) 55px, rgba(0,0,0,0.018) 56px),
+    linear-gradient(172deg,
+      #5C2A0A 0%, #3A1A08 18%, #4A200E 34%,
+      #2C1206 50%, #3E1C0C 66%, #4C2610 82%, #3A1A08 100%);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  z-index: 9999; overflow: hidden;
+  transition: opacity 0.65s ease, visibility 0.65s ease;
+}
+.loading-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.loading-vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 80% 80% at 50% 50%, transparent 35%, rgba(0,0,0,0.55) 100%);
+}
+.loading-content { position: relative; text-align: center; z-index: 1; }
+.loading-saudacao {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1rem; font-weight: 600; font-style: italic;
+  color: rgba(212,169,106,0.90);
+  margin-bottom: 20px; letter-spacing: 0.03em;
+}
+.loading-cup-wrap {
+  display: inline-flex; flex-direction: column; align-items: center;
+  margin-bottom: 28px;
+}
+.loading-cup-icon {
+  width: 88px; height: 88px;
+  background: linear-gradient(150deg, #5C2A0A 0%, #2C1206 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(212,169,106,0.25);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 0 rgba(255,255,255,0.06) inset, 0 6px 28px rgba(0,0,0,0.55), 0 0 0 4px rgba(44,18,6,0.6);
+  animation: cup-breathe 3.2s ease-in-out infinite;
+}
+.loading-cup-icon i { font-size: 38px; color: #D4A96A; }
+@keyframes cup-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.loading-title {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.75rem; font-weight: 700;
+  color: #F5EBD7; margin-bottom: 5px; letter-spacing: 0.01em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+.loading-subtitle {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.78rem; font-weight: 400;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(212,169,106,0.55); margin-bottom: 32px;
+}
+.loading-progress {
+  width: 160px; height: 2px;
+  background: rgba(212,169,106,0.15);
+  border-radius: 2px; overflow: hidden; margin: 0 auto;
+}
+.loading-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, transparent, #D4A96A, #F5EBD7, #D4A96A, transparent);
+  border-radius: 2px;
+  animation: ls-progress-scan 2s ease-in-out infinite;
+}
+@keyframes ls-progress-scan { 0% { width: 50%; margin-left: -50%; } 100% { width: 50%; margin-left: 100%; } }
+.loading-status {
+  font-size: 0.80rem; font-weight: 400;
+  color: rgba(212,169,106,0.60);
+  margin-top: 14px; letter-spacing: 0.04em;
+}
+
+
+    /* ═══════════════════════════════════════════════
+       MODAL CONFIGURAR ENVIO — 80vw 3 colunas
+    ═══════════════════════════════════════════════ */
+    #modalConfigurarEnvio .modal-caixa { max-width: 80vw; width: 80vw; }
+    .cfg-grid { display: grid; grid-template-columns: 220px 1fr 260px; gap: 0; height: 100%; overflow: hidden; }
+    .cfg-col { display: flex; flex-direction: column; overflow: hidden; }
+    .cfg-col + .cfg-col { border-left: 1px solid var(--creme-escuro); }
+    .cfg-col-inner { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .cfg-col-header {
+      padding: 0.6rem 1rem; border-bottom: 1px solid var(--creme-escuro);
+      font-size: 0.69rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--marrom-claro); background: linear-gradient(180deg, var(--creme-escuro) 0%, var(--creme-claro) 100%);
+      flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    }
+    .prompt-card {
+      border: 1px solid var(--creme-escuro); border-radius: var(--raio-md);
+      padding: 0.65rem 0.875rem; cursor: pointer; transition: var(--trans);
+      background: var(--creme-claro); position: relative;
+    }
+    .prompt-card:hover { border-color: var(--ocre); box-shadow: var(--sombra-dourada); transform: translateY(-1px); }
+    .prompt-card.ativo { border-color: var(--ocre); background: var(--ocre-claro); box-shadow: var(--sombra-dourada); }
+    .prompt-card-nome { font-size: 0.82rem; font-weight: 700; color: var(--marrom-escuro); margin-bottom: 0.25rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prompt-card-prev { font-size: 0.72rem; color: var(--marrom-claro); line-height: 1.45;
+      overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .prompt-card-acoes { position: absolute; top: 0.4rem; right: 0.4rem;
+      display: flex; gap: 2px; opacity: 0; transition: opacity 0.2s; }
+    .prompt-card:hover .prompt-card-acoes { opacity: 1; }
+    .prompt-empty { text-align: center; color: var(--marrom-claro); padding: 1.5rem 0.5rem;
+      font-size: 0.8rem; line-height: 1.6; }
+    .prompt-empty i { font-size: 2rem; opacity: 0.2; display: block; margin-bottom: 0.5rem; }
+    /* Grid de prompts no modal "Meus Prompts" */
+    .meus-prompts-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 0.75rem; }
+    .mp-card {
+      border: 1px solid var(--creme-escuro); border-radius: var(--raio-md);
+      padding: 0.875rem 1rem; background: var(--creme-claro);
+      display: flex; flex-direction: column; gap: 0.4rem; transition: var(--trans);
+    }
+    .mp-card:hover { border-color: var(--ocre); box-shadow: var(--sombra-dourada); transform: translateY(-1px); }
+    .mp-card-nome { font-size: 0.88rem; font-weight: 700; color: var(--marrom-escuro);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mp-card-preview { font-size: 0.76rem; color: var(--marrom-claro); line-height: 1.5;
+      overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      flex: 1; }
+    .mp-card-footer { display: flex; gap: 0.4rem; margin-top: 0.2rem; padding-top: 0.5rem;
+      border-top: 1px solid var(--creme-escuro); }
+    .mp-card-btn { flex: 1; padding: 0.3rem 0; border-radius: var(--raio); font-size: 0.73rem;
+      font-weight: 700; cursor: pointer; border: 1px solid; font-family: var(--fonte-corpo);
+      display: flex; align-items: center; justify-content: center; gap: 0.3rem; transition: var(--trans); }
+    .mp-card-btn.editar { border-color: var(--ocre); color: var(--ocre); background: var(--ocre-claro); }
+    .mp-card-btn.editar:hover { background: rgba(192,125,42,0.18); }
+    .mp-card-btn.excluir { border-color: rgba(139,46,46,0.3); color: var(--vermelho-vintage); background: rgba(139,46,46,0.05); }
+    .mp-card-btn.excluir:hover { background: rgba(139,46,46,0.12); }
+    .prompt-sel-info { font-size: 0.72rem; color: var(--ocre-hover); font-weight: 600;
+      display: flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0; }
+    .psinfo-nome { font-style: italic; max-width: 180px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; }
+    .chip-selecionado {
+      display: inline-flex; align-items: center;
+      background: rgba(192,125,42,0.18); color: var(--dourado);
+      border: 1px solid rgba(212,169,106,0.35); border-radius: 20px;
+      padding: 2px 8px; font-size: 0.68rem; white-space: nowrap; max-width: 160px;
+      overflow: hidden; text-overflow: ellipsis; cursor: default;
+    }
+    .chat-usar-btn {
+      margin-top: 0.5rem; padding: 0.25rem 0.75rem;
+      background: rgba(192,125,42,0.2); color: var(--dourado);
+      border: 1px solid rgba(212,169,106,0.4); border-radius: 20px;
+      font-size: 0.7rem; cursor: pointer; font-family: inherit;
+      transition: background 0.2s;
+    }
+    .chat-usar-btn:hover { background: rgba(192,125,42,0.4); }
+    .prompt-card-nome { font-size: 0.8rem; font-weight: 700; color: var(--dourado);
+      margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prompt-card-preview { font-size: 0.72rem; color: rgba(212,169,106,0.55);
+      line-height: 1.5; }
+
+    /* ═══════════════════════════════════════════════
+       MODAL EDITOR DE PROMPT — 70vw Gourmet
+    ═══════════════════════════════════════════════ */
+    #modalEditorPrompt {
+      position: fixed; inset: 0; z-index: 2100;
+      background: rgba(20,10,5,0.75); backdrop-filter: blur(7px);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+      opacity: 0; visibility: hidden; transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    #modalEditorPrompt.visivel { opacity: 1; visibility: visible; }
+    .editor-caixa {
+      width: 95vw; max-width: 1700px; height: 92vh; max-height: 980px;
+      background: linear-gradient(155deg, #5A3318 0%, #4A2510 55%, #4F2912 100%);
+      border-radius: 16px; border: 1px solid rgba(212,169,106,0.32);
+      box-shadow: 0 32px 96px rgba(0,0,0,0.55), 0 0 0 1px rgba(212,169,106,0.1);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .editor-header {
+      padding: 0.9rem 1.4rem; border-bottom: 1px solid rgba(212,169,106,0.2);
+      background: rgba(0,0,0,0.12); display: flex; align-items: center; gap: 0.875rem; flex-shrink: 0;
+    }
+    .editor-icon {
+      width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--ocre) 0%, var(--ocre-hover) 100%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .editor-icon i { color: #fff; font-size: 0.9rem; }
+    .editor-titulos { display: flex; flex-direction: column; gap: 1px; }
+    .editor-titulo { font-family: var(--fonte-titulo); font-size: 1.05rem; color: var(--creme-claro); }
+    .editor-subtitulo { font-size: 0.72rem; color: rgba(212,169,106,0.75); }
+    .editor-nome-wrap { flex: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; margin-left: 0.25rem; }
+    .editor-nome-input {
+      flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(212,169,106,0.28);
+      border-radius: var(--raio-md); color: #FBF6EC; font-family: var(--fonte-corpo);
+      font-size: 0.85rem; font-weight: 600; padding: 0.42rem 0.875rem; min-width: 0;
+    }
+    .editor-nome-input:focus { outline: none; border-color: var(--ocre); background: rgba(255,255,255,0.14); }
+    .editor-nome-input::placeholder { color: rgba(245,239,224,0.4); }
+    .editor-draft-badge {
+      font-size: 0.68rem; color: rgba(212,169,106,0.7); white-space: nowrap; flex-shrink: 0;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .editor-draft-badge.salvo { color: rgba(107,191,110,0.75); }
+    .editor-body { flex: 1; display: grid; grid-template-columns: 420px 1fr 200px; overflow: hidden; min-height: 0; }
+    .ep { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+    .ep + .ep { border-left: 1px solid rgba(212,169,106,0.15); }
+    .ep-header {
+      padding: 0.55rem 0.875rem; flex-shrink: 0; border-bottom: 1px solid rgba(212,169,106,0.15);
+      background: rgba(0,0,0,0.12); font-size: 0.68rem; font-weight: 800; letter-spacing: 1.3px;
+      text-transform: uppercase; color: rgba(212,169,106,0.75); display: flex; align-items: center; gap: 0.4rem;
+    }
+    .ep-header i { color: var(--ocre); }
+
+    /* Chat */
+    .chat-hist { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.55rem; min-height: 0; }
+    .chat-b {
+      max-width: 90%; padding: 0.55rem 0.8rem; border-radius: 14px;
+      font-size: 0.79rem; line-height: 1.55; animation: fadeInUp 0.2s ease-out both;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .chat-b.u { align-self: flex-end; background: linear-gradient(135deg, #C07D2A 0%, #8A5010 100%); color: #FBF6EC; border-bottom-right-radius: 4px; }
+    .chat-b.g { align-self: flex-start; background: rgba(255,255,255,0.12); border: 1px solid rgba(212,169,106,0.2); color: rgba(245,239,224,0.95); border-bottom-left-radius: 4px; }
+    .chat-b.s { align-self: center; font-size: 0.7rem; font-style: italic; background: rgba(212,169,106,0.12); border: 1px solid rgba(212,169,106,0.18); color: rgba(212,169,106,0.75); border-radius: 8px; padding: 0.35rem 0.7rem; text-align: center; max-width: 80%; }
+    .chat-b-acoes { display: flex; gap: 0.3rem; margin-top: 0.4rem; flex-wrap: wrap; }
+    .chat-bmini { padding: 3px 9px; border-radius: 6px; font-size: 0.68rem; font-weight: 700; border: 1px solid rgba(212,169,106,0.28); background: rgba(212,169,106,0.09); color: #D4A96A; cursor: pointer; transition: all 0.12s; font-family: var(--fonte-corpo); }
+    .chat-bmini:hover { background: rgba(212,169,106,0.2); }
+    .chat-typing { align-self: flex-start; padding: 0.55rem 0.875rem; background: rgba(255,255,255,0.12); border: 1px solid rgba(212,169,106,0.2); border-radius: 14px; border-bottom-left-radius: 4px; }
+    .chat-dots { display: flex; gap: 4px; align-items: center; }
+    .chat-dots span { width: 6px; height: 6px; border-radius: 50%; background: #D4A96A; animation: cdot 1.1s ease-in-out infinite; }
+    .chat-dots span:nth-child(2){ animation-delay:.2s; } .chat-dots span:nth-child(3){ animation-delay:.4s; }
+    @keyframes cdot{0%,80%,100%{transform:scale(.7);opacity:.4}40%{transform:scale(1);opacity:1}}
+    .chat-foot { flex-shrink: 0; padding: 0.65rem; border-top: 1px solid rgba(212,169,106,0.15); background: rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 0.4rem; }
+    .chat-chips-sel { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    .chat-chip-badge {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 2px 7px; border-radius: 100px; font-size: 0.67rem; font-weight: 700;
+      background: rgba(212,169,106,0.14); border: 1px solid rgba(212,169,106,0.28); color: #D4A96A;
+      cursor: pointer; transition: all 0.12s;
+    }
+    .chat-chip-badge:hover { background: rgba(212,169,106,0.07); opacity: 0.7; }
+    .chat-chip-badge i { font-size: 0.55rem; }
+    .chat-input-row { display: flex; gap: 0.4rem; align-items: flex-end; }
+    .chat-ta {
+      flex: 1; resize: none; min-height: 36px; max-height: 80px;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(212,169,106,0.25);
+      border-radius: var(--raio-md); color: #FBF6EC;
+      font-family: var(--fonte-corpo); font-size: 0.78rem; padding: 0.45rem 0.7rem; line-height: 1.4;
+    }
+    .chat-ta:focus { outline: none; border-color: var(--ocre); }
+    .chat-ta::placeholder { color: rgba(245,239,224,0.35); }
+    .chat-send { width: 34px; height: 34px; border-radius: var(--raio-md); border: none; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--ocre) 0%, var(--ocre-hover) 100%);
+      color: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: var(--trans); font-size: 0.8rem; }
+    .chat-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(192,125,42,0.4); }
+    .chat-send:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Editor central */
+    .editor-ta {
+      flex: 1; resize: none; background: rgba(255,255,255,0.07); border: none;
+      color: #FBF6EC; font-family: var(--fonte-corpo); font-size: 0.84rem;
+      line-height: 1.75; padding: 1.1rem 1.25rem; min-height: 0; box-sizing: border-box; outline: none;
+    }
+    .editor-ta::placeholder { color: rgba(245,239,224,0.3); }
+    .editor-tbar {
+      flex-shrink: 0; padding: 0.55rem 0.875rem; border-top: 1px solid rgba(212,169,106,0.15);
+      background: rgba(0,0,0,0.12); display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+    }
+    .etb {
+      padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(212,169,106,0.25);
+      background: rgba(212,169,106,0.1); color: rgba(245,239,224,0.8);
+      font-size: 0.7rem; font-weight: 700; cursor: pointer; transition: all 0.12s;
+      font-family: var(--fonte-corpo); display: inline-flex; align-items: center; gap: 0.3rem;
+    }
+    .etb:hover { background: rgba(212,169,106,0.2); color: #D4A96A; border-color: rgba(212,169,106,0.45); }
+    .etb.ok { background: linear-gradient(135deg, var(--ocre) 0%, var(--ocre-hover) 100%); color: white; border-color: transparent; }
+    .etb.ok:hover { box-shadow: 0 3px 10px rgba(192,125,42,0.4); }
+    .editor-chars { margin-left: auto; font-size: 0.66rem; color: rgba(212,169,106,0.6); }
+
+    /* Sugestões */
+    .sug-scroll { flex: 1; overflow-y: auto; padding: 0.65rem 0.75rem; }
+    .sug-cat { margin-bottom: 0.875rem; }
+    .sug-cat-label {
+      font-size: 0.62rem; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase;
+      color: rgba(212,169,106,0.7); margin-bottom: 0.35rem;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .sug-cat-label i { font-size: 0.58rem; color: var(--ocre); }
+    .sug-chips { display: flex; flex-direction: column; gap: 0.25rem; }
+    .sug-chip {
+      padding: 0.35rem 0.6rem; border-radius: 6px; font-size: 0.71rem; line-height: 1.4;
+      border: 1px solid rgba(212,169,106,0.2); background: rgba(255,255,255,0.06);
+      color: rgba(245,239,224,0.85); cursor: pointer; transition: all 0.12s;
+      text-align: left; font-family: var(--fonte-corpo);
+    }
+    .sug-chip:hover { background: rgba(212,169,106,0.15); border-color: rgba(212,169,106,0.4); color: #D4A96A; }
+    .sug-chip.sel { background: rgba(212,169,106,0.22); border-color: rgba(212,169,106,0.5); color: #D4A96A; }
+
+    /* Footer editor */
+    .editor-foot {
+      padding: 0.7rem 1.4rem; border-top: 1px solid rgba(212,169,106,0.15);
+      background: rgba(0,0,0,0.15); display: flex; align-items: center;
+      justify-content: space-between; gap: 0.75rem; flex-shrink: 0;
+    }
+    .editor-foot-info { font-size: 0.72rem; color: rgba(212,169,106,0.65); display: flex; align-items: center; gap: 0.5rem; }
+    .editor-foot-btns { display: flex; gap: 0.45rem; }
+    .ebtn {
+      padding: 0.48rem 1rem; border: none; border-radius: var(--raio-md);
+      font-family: var(--fonte-corpo); font-size: 0.78rem; font-weight: 700;
+      cursor: pointer; transition: var(--trans); display: inline-flex; align-items: center; gap: 0.38rem;
+    }
+    .ebtn.sec { background: rgba(255,255,255,0.055); color: rgba(245,239,224,0.55); border: 1px solid rgba(255,255,255,0.09); }
+    .ebtn.sec:hover { background: rgba(255,255,255,0.1); color: rgba(245,239,224,0.88); }
+    .ebtn.ok { background: linear-gradient(135deg, var(--ocre) 0%, var(--ocre-hover) 100%); color: white; box-shadow: 0 2px 8px rgba(192,125,42,0.35); }
+    .ebtn.ok:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(192,125,42,0.5); }
+
+    /* Barra de tópicos do editor */
+    .topicos-bar {
+      flex-shrink: 0; padding: 0.35rem 0.875rem; border-bottom: 1px solid rgba(212,169,106,0.12);
+      background: rgba(0,0,0,0.08); display: flex; align-items: center; gap: 0.3rem;
+      flex-wrap: wrap; min-height: 32px;
+    }
+    .topicos-bar-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+      color: rgba(212,169,106,0.5); white-space: nowrap; margin-right: 0.2rem; }
+    .topico-badge {
+      padding: 2px 8px; border-radius: 20px; font-size: 0.68rem; font-weight: 600;
+      border: 1px solid rgba(212,169,106,0.25); background: rgba(212,169,106,0.1);
+      color: rgba(212,169,106,0.85); cursor: pointer; transition: all 0.14s;
+      font-family: var(--fonte-corpo); white-space: nowrap; max-width: 140px;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .topico-badge:hover { background: rgba(212,169,106,0.22); color: #D4A96A; border-color: rgba(212,169,106,0.45); }
+
+    /* Botões de ação nas respostas do Gemini */
+    .chat-acoes-bloco { margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .chat-acao-btn {
+      padding: 0.38rem 0.8rem; border-radius: 8px; font-size: 0.73rem; font-weight: 700;
+      cursor: pointer; transition: all 0.14s; font-family: var(--fonte-corpo);
+      display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid;
+      text-align: left; width: 100%; box-sizing: border-box;
+    }
+    .chat-acao-completo { background: rgba(74,103,65,0.25); border-color: rgba(74,103,65,0.5); color: #8DC98A; }
+    .chat-acao-completo:hover { background: rgba(74,103,65,0.4); }
+    .chat-acao-topico { background: rgba(46,74,107,0.25); border-color: rgba(46,74,107,0.5); color: #88AACC; }
+    .chat-acao-topico:hover { background: rgba(46,74,107,0.4); }
+    .chat-acao-trecho { background: rgba(139,110,46,0.25); border-color: rgba(192,125,42,0.4); color: #D4A96A; }
+    .chat-acao-trecho:hover { background: rgba(139,110,46,0.4); }
+    .chat-acao-info { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); color: rgba(245,239,224,0.7); }
+    .chat-acao-info:hover { background: rgba(255,255,255,0.12); }
+    .chat-preview-bloco {
+      margin-top: 0.35rem; padding: 0.45rem 0.65rem; border-radius: 6px;
+      background: rgba(0,0,0,0.2); border-left: 3px solid rgba(212,169,106,0.3);
+      font-size: 0.7rem; color: rgba(245,239,224,0.55); font-family: monospace;
+      white-space: pre-wrap; max-height: 80px; overflow: hidden;
+      position: relative;
+    }
+    .chat-preview-bloco::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
+      background: linear-gradient(transparent, rgba(60,28,10,0.85)); }
+
+    /* ═══════════════════════════════════════════════
+       TABS DE MODO — Coluna Esquerda
+    ═══════════════════════════════════════════════ */
+    .modo-tabs {
+      display: flex; gap: 0;
+      border-bottom: var(--borda-papel);
+      margin: -1.5rem -1.5rem 0;
+      padding: 0 0.5rem;
+      background: linear-gradient(180deg, var(--creme-claro) 0%, var(--creme-base) 100%);
+      position: sticky; top: 0; z-index: 5;
+      flex-shrink: 0;
+    }
+    .modo-tab {
+      display: flex; align-items: center; gap: 0.35rem;
+      padding: 0.65rem 0.875rem;
+      font-size: 0.74rem; font-weight: 700;
+      color: var(--marrom-claro);
+      border: none; background: transparent; cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: var(--trans); white-space: nowrap;
+      font-family: var(--fonte-corpo);
+    }
+    .modo-tab:hover { color: var(--marrom-escuro); }
+    .modo-tab.ativo { color: var(--ocre); border-bottom-color: var(--ocre); }
+    .modo-tab i { font-size: 0.7rem; }
+    .modo-conteudo { display: none; flex-direction: column; gap: 1.25rem; padding-top: 0.75rem; }
+    .modo-conteudo.ativo { display: flex; }
+
+    /* Área de texto para transcrição direta */
+    .transcricao-area {
+      width: 100%; min-height: 150px; max-height: 260px; resize: vertical;
+      padding: 0.75rem 0.875rem;
+      background: var(--creme-base); border: 1px solid var(--creme-escuro);
+      border-radius: var(--raio-md); color: var(--marrom-escuro);
+      font-family: var(--fonte-corpo); font-size: 0.82rem; line-height: 1.6;
+      transition: var(--trans);
+      box-shadow: inset 0 1px 3px rgba(44,24,16,0.06);
+    }
+    .transcricao-area:focus {
+      outline: none; border-color: var(--dourado);
+      box-shadow: 0 0 0 3px rgba(212,169,106,0.15), inset 0 1px 3px rgba(30,18,10,0.04);
+    }
+    .transcricao-area::placeholder { color: var(--creme-escuro); }
+
+    /* Caixa informativa */
+    .info-box {
+      background: var(--azul-claro); border: 1px solid rgba(46,74,107,0.18);
+      border-radius: var(--raio-md); padding: 0.75rem 1rem;
+      font-size: 0.8rem; color: var(--azul-vintage); line-height: 1.5;
+    }
+    .info-box i { margin-right: 0.3rem; }
+    .info-box.ocre { background: var(--ocre-claro); border-color: rgba(192,125,42,0.2); color: var(--ocre-hover); }
+    .info-box.verde { background: var(--verde-claro); border-color: rgba(74,103,65,0.2); color: var(--verde-vintage); }
+
+    /* ═══════════════════════════════════════════════
+       EDITOR COMPLETO DE ATA — MODAL 90vw
+    ═══════════════════════════════════════════════ */
+    .ata-editor-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 3600;
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .ata-editor-overlay.visivel { display: flex; animation: fadeIn 0.18s ease; }
+    .ata-editor-modal {
+      width: 90vw; height: 90vh; display: flex; flex-direction: column;
+      background: var(--creme-claro); border-radius: var(--raio-lg);
+      box-shadow: 0 28px 90px rgba(0,0,0,0.38); overflow: hidden;
+    }
+    /* Header */
+    .ata-editor-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.85rem 1.3rem; background: var(--cafe-expresso);
+      flex-shrink: 0; gap: 1rem;
+    }
+    .ata-editor-title {
+      font-family: var(--fonte-titulo); font-size: 1.05rem; font-weight: 700;
+      color: var(--dourado); display: flex; align-items: center; gap: 0.5rem;
+    }
+    /* Body: sidebar + main */
+    .ata-editor-body { display: flex; flex: 1 1 0; overflow: hidden; min-height: 0; }
+    /* Templates sidebar */
+    .ata-templates-sidebar {
+      width: 148px; flex-shrink: 0; background: var(--creme-medio);
+      border-right: 1px solid var(--creme-escuro); overflow-y: auto;
+      padding: 0.75rem 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;
+      align-self: stretch; min-height: 0;
+    }
+    .ata-templates-title {
+      font-size: 0.63rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--marrom-claro); padding: 0 0.2rem 0.4rem;
+      border-bottom: 1px solid var(--creme-escuro); display: flex; align-items: center; gap: 0.3rem;
+    }
+    .ata-template-card {
+      border-radius: var(--raio); border: 2px solid transparent; cursor: pointer;
+      overflow: hidden; transition: var(--trans); background: white;
+      box-shadow: var(--sombra-papel);
+    }
+    .ata-template-card:hover { transform: translateY(-2px); box-shadow: var(--sombra-elevada); }
+    .ata-template-card.ativo { border-color: var(--ocre); box-shadow: var(--sombra-dourada); }
+    .ata-tpl-preview {
+      height: 70px; overflow: hidden; padding: 6px 7px; position: relative;
+    }
+    .ata-tpl-name {
+      font-size: 0.63rem; font-weight: 700; text-align: center; padding: 4px 3px;
+      color: var(--marrom-escuro); border-top: 1px solid var(--creme-medio);
+    }
+    /* Editor main */
+    .ata-editor-main { flex: 1 1 0; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+    /* Toolbar */
+    .ata-toolbar {
+      background: var(--creme-claro); border-bottom: 2px solid var(--creme-escuro);
+      padding: 0.35rem 0.6rem; display: flex; flex-wrap: wrap; gap: 2px;
+      align-items: center; flex-shrink: 0; user-select: none;
+    }
+    .ata-tb-sep {
+      width: 1px; height: 22px; background: var(--creme-escuro); margin: 0 3px;
+      align-self: center; flex-shrink: 0;
+    }
+    .ata-tb-btn {
+      border: none; background: transparent; cursor: pointer; padding: 4px 6px;
+      border-radius: var(--raio); font-size: 0.75rem; color: var(--marrom-escuro);
+      display: flex; align-items: center; justify-content: center;
+      min-width: 28px; height: 28px; transition: background 0.15s; position: relative;
+      font-family: var(--fonte-corpo);
+    }
+    .ata-tb-btn:hover { background: var(--creme-medio); }
+    .ata-tb-btn:active { background: var(--creme-escuro); }
+    .ata-tb-select {
+      border: 1px solid var(--creme-escuro); background: white; cursor: pointer;
+      font-size: 0.73rem; color: var(--marrom-escuro); border-radius: var(--raio);
+      height: 28px; padding: 0 5px; outline: none; font-family: var(--fonte-corpo);
+      transition: border-color 0.15s;
+    }
+    .ata-tb-select:focus { border-color: var(--ocre); }
+    .ata-tb-color {
+      -webkit-appearance: none; appearance: none; width: 28px; height: 28px;
+      border: 1px solid var(--creme-escuro); border-radius: var(--raio);
+      cursor: pointer; padding: 2px; background: white; flex-shrink: 0;
+    }
+    .ata-tb-color::-webkit-color-swatch-wrapper { padding: 1px; }
+    .ata-tb-color::-webkit-color-swatch { border-radius: 2px; border: none; }
+    .ata-tb-label { font-size: 0.65rem; color: var(--marrom-claro); margin: 0 2px; }
+    /* Canvas wrap */
+    .ata-canvas-wrap {
+      flex: 1 1 0; overflow-y: auto; padding: 2rem; background: #ddd5c0;
+      display: flex; justify-content: center; min-height: 0;
+    }
+    .ata-page {
+      width: 100%; max-width: 820px; min-height: calc(100% - 2rem);
+      background: white; box-shadow: 0 4px 30px rgba(0,0,0,0.18);
+      padding: 48px 60px; position: relative; transition: all 0.3s;
+    }
+    .ata-canvas {
+      outline: none; min-height: 400px; font-size: 14px; line-height: 1.8;
+      color: #1a1a1a; font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .ata-canvas:focus { outline: none; }
+    .ata-canvas h1 { font-size: 1.6em; font-family: 'DM Serif Display',Georgia,serif; margin: 0.8em 0 0.4em; line-height: 1.3; }
+    .ata-canvas h2 { font-size: 1.2em; font-family: 'DM Serif Display',Georgia,serif; margin: 0.7em 0 0.35em; }
+    .ata-canvas h3 { font-size: 1em; font-weight: 700; margin: 0.6em 0 0.3em; }
+    .ata-canvas h4 { font-size: 0.9em; font-weight: 700; margin: 0.5em 0 0.25em; }
+    .ata-canvas p  { margin: 0.4em 0; }
+    .ata-canvas ul, .ata-canvas ol { padding-left: 1.6em; margin: 0.4em 0; }
+    .ata-canvas li { margin-bottom: 0.2em; }
+    .ata-canvas table { border-collapse: collapse; width: 100%; margin: 0.8em 0; font-size: 0.9em; }
+    .ata-canvas td, .ata-canvas th { border: 1px solid #ddd; padding: 7px 12px; vertical-align: top; }
+    .ata-canvas th { background: #f5f5f5; font-weight: 700; text-align: left; }
+    .ata-canvas blockquote { border-left: 3px solid #ccc; padding-left: 1em; color: #666; margin: 0.7em 0; font-style: italic; }
+    .ata-canvas hr { border: none; border-top: 1px solid #ddd; margin: 1.2em 0; }
+    .ata-canvas a { color: var(--azul-vintage); }
+    .ata-canvas pre { background: #f5f5f0; padding: 0.75em 1em; border-radius: 4px; font-family: 'Courier New',monospace; font-size: 0.85em; white-space: pre-wrap; }
+    /* Footer */
+    .ata-editor-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.7rem 1.3rem; border-top: 1px solid var(--creme-escuro);
+      flex-shrink: 0; background: var(--creme-claro); gap: 1rem;
+    }
+    .ata-editor-hint { font-size: 0.7rem; color: var(--marrom-claro); }
+    /* Btn abrir editor completo */
+    .btn-editor-completo {
+      display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.7rem;
+      border-radius: var(--raio); background: var(--ocre); color: white;
+      font-size: 0.74rem; font-weight: 700; border: none; cursor: pointer;
+      transition: var(--trans); white-space: nowrap; font-family: var(--fonte-corpo);
+      box-shadow: 0 2px 8px rgba(192,125,42,0.3); flex-shrink: 0;
+    }
+    .btn-editor-completo:hover { background: var(--ocre-hover); transform: translateY(-1px); box-shadow: var(--sombra-dourada); }
+
+    /* ── 5 TEMPLATES ── */
+    /* T1: Executivo Premium */
+    .ata-page.tpl-executivo { background: #fdfdfd; }
+    .ata-page.tpl-executivo .ata-canvas { font-family: Georgia,serif; color: #111; font-size: 13.5px; line-height: 1.85; }
+    .ata-page.tpl-executivo .ata-canvas h1 { font-family: 'DM Serif Display',Georgia,serif; color: #fff; background: linear-gradient(135deg,#0d1b2a 0%,#1b3a5c 100%); padding: 0.5em 1.1em; border-radius: 4px; margin: 0 -16px 1em; letter-spacing: 0.5px; font-size: 1.45em; }
+    .ata-page.tpl-executivo .ata-canvas h2 { font-family: Georgia,serif; color: #1b3a5c; border-bottom: 2px solid #c9a227; padding-bottom: 0.2em; letter-spacing: 0.5px; text-transform: uppercase; font-size: 0.88em; margin-top: 1.4em; }
+    .ata-page.tpl-executivo .ata-canvas h3 { color: #1b3a5c; font-size: 0.92em; font-style: italic; }
+    .ata-page.tpl-executivo .ata-canvas th { background: #1b3a5c; color: #fff; border-color: #c9a227; }
+    .ata-page.tpl-executivo .ata-canvas td { border-color: #ddd; }
+    .ata-page.tpl-executivo .ata-canvas blockquote { border-left-color: #c9a227; color: #444; }
+
+    /* T2: Moderno Gradiente */
+    .ata-page.tpl-moderno { background: #fafbfc; }
+    .ata-page.tpl-moderno .ata-canvas { font-family: 'Plus Jakarta Sans',sans-serif; color: #1e1e2e; font-size: 13.5px; line-height: 1.8; }
+    .ata-page.tpl-moderno .ata-canvas h1 { font-family: 'Plus Jakarta Sans',sans-serif; font-weight: 800; background: linear-gradient(120deg,#6c3fc5,#2d7bde); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 1.65em; border-bottom: 3px solid #6c3fc5; padding-bottom: 0.25em; }
+    .ata-page.tpl-moderno .ata-canvas h2 { font-family: 'Plus Jakarta Sans',sans-serif; font-weight: 700; color: #fff; background: linear-gradient(90deg,#6c3fc5,#2d7bde); padding: 0.28em 0.8em; border-radius: 4px; font-size: 0.84em; letter-spacing: 0.5px; text-transform: uppercase; display: block; margin-top: 1.4em; }
+    .ata-page.tpl-moderno .ata-canvas h3 { color: #6c3fc5; font-weight: 700; font-size: 0.95em; border-left: 3px solid #6c3fc5; padding-left: 0.6em; }
+    .ata-page.tpl-moderno .ata-canvas th { background: #6c3fc5; color: #fff; border-color: #9b70e8; }
+    .ata-page.tpl-moderno .ata-canvas td { border-color: #e0d4f7; }
+
+    /* T3: Clássico Elegante */
+    .ata-page.tpl-classico { background: #fffff8; border: 1px solid #d9cfae; }
+    .ata-page.tpl-classico .ata-canvas { font-family: Georgia,'Times New Roman',serif; color: #2c2416; font-size: 14px; line-height: 1.9; }
+    .ata-page.tpl-classico .ata-canvas h1 { font-family: 'DM Serif Display',Georgia,serif; color: #2c2416; text-align: center; font-size: 1.55em; font-style: italic; border-top: 1px solid #d9cfae; border-bottom: 1px solid #d9cfae; padding: 0.4em 0; margin: 0.4em 0 0.8em; letter-spacing: 0.5px; }
+    .ata-page.tpl-classico .ata-canvas h2 { font-family: 'DM Serif Display',Georgia,serif; color: #4a3728; font-size: 1em; font-style: italic; margin-top: 1.3em; }
+    .ata-page.tpl-classico .ata-canvas h3 { font-family: Georgia,serif; color: #5c3d2e; font-size: 0.92em; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ata-page.tpl-classico .ata-canvas th { background: #f5ede0; color: #2c2416; border-color: #d9cfae; }
+    .ata-page.tpl-classico .ata-canvas td { border-color: #e8dfc0; }
+    .ata-page.tpl-classico .ata-canvas blockquote { border-left-color: #8b6347; font-style: italic; color: #5c3d2e; }
+
+    /* T4: Minimalista Puro */
+    .ata-page.tpl-minimal { background: #fff; }
+    .ata-page.tpl-minimal .ata-canvas { font-family: 'Plus Jakarta Sans',sans-serif; color: #222; font-size: 13px; line-height: 1.78; }
+    .ata-page.tpl-minimal .ata-canvas h1 { font-family: 'Plus Jakarta Sans',sans-serif; font-weight: 800; color: #111; font-size: 1.5em; letter-spacing: -0.5px; border: none; padding: 0; margin-bottom: 0.5em; }
+    .ata-page.tpl-minimal .ata-canvas h2 { font-weight: 700; color: #333; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1.8px; margin-top: 1.8em; padding-bottom: 0.3em; border-bottom: 1px solid #eee; font-family: 'Plus Jakarta Sans',sans-serif; }
+    .ata-page.tpl-minimal .ata-canvas h3 { font-weight: 600; color: #555; font-size: 0.9em; }
+    .ata-page.tpl-minimal .ata-canvas th { background: #fafafa; border-color: #e8e8e8; }
+    .ata-page.tpl-minimal .ata-canvas td { border-color: #f0f0f0; }
+    .ata-page.tpl-minimal .ata-canvas blockquote { border-left-color: #ccc; color: #777; }
+
+    /* T5: Corporativo Verde */
+    .ata-page.tpl-verde { background: #f7faf5; }
+    .ata-page.tpl-verde .ata-canvas { font-family: 'Plus Jakarta Sans',sans-serif; color: #1a2e1a; font-size: 13.5px; line-height: 1.8; }
+    .ata-page.tpl-verde .ata-canvas h1 { font-family: 'DM Serif Display',Georgia,serif; color: #fff; background: linear-gradient(135deg,#0e3311 0%,#1e6320 100%); padding: 0.5em 1.1em; margin: 0 -16px 1em; font-size: 1.45em; letter-spacing: 0.3px; }
+    .ata-page.tpl-verde .ata-canvas h2 { color: #0e3311; border-left: 4px solid #2d7a2d; padding-left: 0.65em; font-size: 0.88em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Plus Jakarta Sans',sans-serif; margin-top: 1.4em; }
+    .ata-page.tpl-verde .ata-canvas h3 { color: #1e6320; font-weight: 700; font-size: 0.92em; }
+    .ata-page.tpl-verde .ata-canvas th { background: #1e6320; color: #fff; border-color: #4a9a4a; }
+    .ata-page.tpl-verde .ata-canvas td { border-color: #c8e6c8; }
+    .ata-page.tpl-verde .ata-canvas blockquote { border-left-color: #2d7a2d; color: #2a4a2a; }
+
   </style>
 </head>
 <body>
+
+<!-- ==================== TELA DE CARREGAMENTO ==================== -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-vignette"></div>
+  <div class="loading-content">
+    <p class="loading-saudacao" id="loadingGreeting">Olá ☕</p>
+    <div class="loading-cup-wrap">
+      <div class="loading-cup-icon">
+        <i class="fas fa-mug-hot"></i>
+      </div>
+    </div>
+    <h1 class="loading-title">Smart Meeting</h1>
+    <p class="loading-subtitle">Gestão de Reuniões</p>
+    <div class="loading-progress">
+      <div class="loading-progress-bar"></div>
+    </div>
+    <p class="loading-status" id="loadingStatus">Inicializando...</p>
+  </div>
+</div>
 
 <!-- Toast Container -->
 <div id="toasts"></div>
@@ -1577,7 +2193,6 @@
     </a>
     <nav class="header-nav">
       <a href="#" class="nav-link ativo" data-pagina="reunioes"><i class="fas fa-video"></i> Reuniões</a>
-      <a href="#" class="nav-link" data-pagina="relatorios"><i class="fas fa-clipboard-check"></i> Relatórios IA</a>
       <a href="#" class="nav-link" data-pagina="projeto"><i class="fas fa-project-diagram"></i> Projetos</a>
     </nav>
     <div class="header-status">
@@ -1589,6 +2204,9 @@
         <span class="dot"></span>
         <span>Drive</span>
       </div>
+      <button class="btn btn-sm" style="border-color:rgba(212,169,106,0.4);color:#D4A96A;background:rgba(212,169,106,0.1);font-weight:700;" onclick="abrirMeusPrompts()" title="Criar e gerenciar prompts personalizados para as atas">
+        <i class="fas fa-wand-magic-sparkles"></i> Meus Prompts
+      </button>
       <button class="btn btn-sm btn-secundario" style="border-color:rgba(245,239,224,0.15);color:rgba(245,239,224,0.55);background:rgba(255,255,255,0.06);" onclick="abrirConsole()">
         <i class="fas fa-terminal"></i> Console
         <span class="console-badge" id="badgeConsole" style="display:none">0</span>
@@ -1613,87 +2231,209 @@
   <!-- ══ COLUNA ESQUERDA ══ -->
   <aside class="coluna-esq">
 
-    <!-- Gravação -->
-    <div class="card fade-in-up">
-      <div class="card-header">
-        <div class="card-titulo"><i class="fas fa-microphone"></i> Gravar Reunião</div>
-        <span id="statusGrav" style="font-size:0.72rem;font-weight:700;letter-spacing:0.8px;color:var(--marrom-claro);">PRONTO</span>
-      </div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:1rem;">
-        <div class="gravacao-visual" id="visualContainer">
-          <canvas id="visualCanvas"></canvas>
-          <div class="gravacao-placeholder" id="visualPlaceholder">
-            <i class="fas fa-waveform-lines"></i>
-            <span>Visualização de áudio</span>
-          </div>
-        </div>
-        <div>
-          <div class="timer-display" id="timerDisplay">00:00:00</div>
-          <div class="status-grav" id="statusGravLabel">Aguardando...</div>
-        </div>
-        <div class="controles-grav">
-          <button class="btn btn-primario" id="btnIniciar" onclick="iniciarGravacao()">
-            <i class="fas fa-circle"></i> Iniciar
-          </button>
-          <button class="btn btn-secundario" id="btnPausar" onclick="pausarGravacao()" disabled>
-            <i class="fas fa-pause"></i>
-          </button>
-          <button class="btn btn-vermelho" id="btnParar" onclick="pararGravacao()" disabled>
-            <i class="fas fa-stop"></i> Encerrar
-          </button>
-        </div>
-
-      </div>
+    <!-- Tabs de modo -->
+    <div class="modo-tabs">
+      <button class="modo-tab ativo" id="tabMicrofone" onclick="trocarModoColuna('Microfone')">
+        <i class="fas fa-microphone"></i> Microfone
+      </button>
+      <button class="modo-tab" id="tabOnline" onclick="trocarModoColuna('Online')">
+        <i class="fas fa-desktop"></i> Online
+      </button>
+      <button class="modo-tab" id="tabTranscricao" onclick="trocarModoColuna('Transcricao')">
+        <i class="fas fa-keyboard"></i> Transcrição
+      </button>
     </div>
 
-    <!-- Upload -->
-    <div class="card fade-in-up">
-      <div class="card-header">
-        <div class="card-titulo"><i class="fas fa-file-audio"></i> Enviar Áudio</div>
-      </div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:0.875rem;">
+    <!-- ── MODO 1: Microfone (gravação e upload existentes) ── -->
+    <div class="modo-conteudo ativo" id="modoMicrofone">
 
-        <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
-          <i class="fas fa-cloud-arrow-up"></i>
-          <h3>Arraste o áudio aqui</h3>
-          <p>ou clique para selecionar · MP3, WAV, WebM, M4A até 500MB</p>
+      <!-- Gravação -->
+      <div class="card fade-in-up">
+        <div class="card-header">
+          <div class="card-titulo"><i class="fas fa-microphone"></i> Gravar Reunião</div>
+          <span id="statusGrav" style="font-size:0.72rem;font-weight:700;letter-spacing:0.8px;color:var(--marrom-claro);">PRONTO</span>
         </div>
-        <input type="file" id="fileInput" style="display:none" accept="audio/*" onchange="onFileSelect(event)">
-
-        <div class="arquivo-preview" id="arquivoPreview" style="display:none">
-          <i class="fas fa-file-audio"></i>
-          <div style="flex:1;min-width:0">
-            <div class="arquivo-nome" id="arquivoNome">—</div>
-            <div class="arquivo-tam" id="arquivoTam">—</div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:1rem;">
+          <div class="gravacao-visual" id="visualContainer">
+            <canvas id="visualCanvas"></canvas>
+            <div class="gravacao-placeholder" id="visualPlaceholder">
+              <i class="fas fa-waveform-lines"></i>
+              <span>Visualização de áudio</span>
+            </div>
           </div>
-          <button class="btn-remover" onclick="removerArquivo()" title="Remover"><i class="fas fa-times"></i></button>
+          <div>
+            <div class="timer-display" id="timerDisplay">00:00:00</div>
+            <div class="status-grav" id="statusGravLabel">Aguardando...</div>
+          </div>
+          <div class="controles-grav">
+            <button class="btn btn-primario" id="btnIniciar" onclick="iniciarGravacao()">
+              <i class="fas fa-circle"></i> Iniciar
+            </button>
+            <button class="btn btn-secundario" id="btnPausar" onclick="pausarGravacao()" disabled>
+              <i class="fas fa-pause"></i>
+            </button>
+            <button class="btn btn-vermelho" id="btnParar" onclick="pararGravacao()" disabled>
+              <i class="fas fa-stop"></i> Encerrar
+            </button>
+          </div>
         </div>
-
-        <div class="form-grupo">
-          <label class="form-label">Título da Reunião</label>
-          <input type="text" class="form-input" id="inputTitulo" placeholder="Ex: Reunião de Sprint Planning">
-        </div>
-        <div class="form-grupo">
-          <label class="form-label">Participantes</label>
-          <input type="text" class="form-input" id="inputParticipantes" placeholder="João, Maria, Pedro...">
-        </div>
-        <div class="form-grupo" style="margin-bottom:0">
-          <label class="form-label">Departamento</label>
-          <select class="form-input" id="inputDepartamento">
-            <option value="">Selecione...</option>
-          </select>
-        </div>
-
-        <div class="progresso-wrap" id="progressoWrap">
-          <div class="progresso-trilha"><div class="progresso-fill" id="progressoFill"></div></div>
-          <div class="progresso-info"><span id="progressoTexto">Enviando...</span><span id="progressoPct">0%</span></div>
-        </div>
-
-        <button class="btn btn-verde" id="btnEnviar" onclick="abrirModalConfigurarEnvio()" disabled style="width:100%;justify-content:center;">
-          <i class="fas fa-paper-plane"></i> Processar com IA
-        </button>
       </div>
-    </div>
+
+      <!-- Upload -->
+      <div class="card fade-in-up">
+        <div class="card-header">
+          <div class="card-titulo"><i class="fas fa-file-audio"></i> Enviar Áudio</div>
+        </div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:0.875rem;">
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+            <i class="fas fa-cloud-arrow-up"></i>
+            <h3>Arraste o áudio aqui</h3>
+            <p>ou clique para selecionar · MP3, WAV, WebM, M4A até 500MB</p>
+          </div>
+          <input type="file" id="fileInput" style="display:none" accept="audio/*" onchange="onFileSelect(event)">
+          <div class="arquivo-preview" id="arquivoPreview" style="display:none">
+            <i class="fas fa-file-audio"></i>
+            <div style="flex:1;min-width:0">
+              <div class="arquivo-nome" id="arquivoNome">—</div>
+              <div class="arquivo-tam" id="arquivoTam">—</div>
+            </div>
+            <button class="btn-download-audio" onclick="downloadArquivo()" title="Baixar áudio"><i class="fas fa-download"></i></button>
+            <button class="btn-remover" onclick="removerArquivo()" title="Remover"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="form-grupo">
+            <label class="form-label">Título da Reunião</label>
+            <input type="text" class="form-input" id="inputTitulo" placeholder="Ex: Reunião de Sprint Planning">
+          </div>
+          <div class="form-grupo">
+            <label class="form-label">Participantes</label>
+            <input type="text" class="form-input" id="inputParticipantes" placeholder="João, Maria, Pedro...">
+          </div>
+          <div class="form-grupo" style="margin-bottom:0">
+            <label class="form-label">Departamento</label>
+            <select class="form-input" id="inputDepartamento">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          <div class="progresso-wrap" id="progressoWrap">
+            <div class="progresso-trilha"><div class="progresso-fill" id="progressoFill"></div></div>
+            <div class="progresso-info"><span id="progressoTexto">Enviando...</span><span id="progressoPct">0%</span></div>
+          </div>
+          <button class="btn btn-verde" id="btnEnviar" onclick="abrirModalConfigurarEnvio()" disabled style="width:100%;justify-content:center;">
+            <i class="fas fa-paper-plane"></i> Processar com IA
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /modoMicrofone -->
+
+    <!-- ── MODO 2: Reunião Online (captura de saída + mic) ── -->
+    <div class="modo-conteudo" id="modoOnline">
+
+      <div class="card fade-in-up">
+        <div class="card-header">
+          <div class="card-titulo"><i class="fas fa-desktop"></i> Gravar Reunião Online</div>
+          <span id="statusGravOnline" style="font-size:0.72rem;font-weight:700;letter-spacing:0.8px;color:var(--marrom-claro);">PRONTO</span>
+        </div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:1rem;">
+
+          <div class="info-box">
+            <i class="fas fa-info-circle"></i>
+            Captura o <strong>áudio do sistema</strong> (Google Meet, Teams, Zoom…) e opcionalmente o <strong>microfone</strong>, misturando tudo num único arquivo.
+          </div>
+
+          <div class="gravacao-visual" style="height:72px;">
+            <div class="gravacao-placeholder" id="visualPlaceholderOnline">
+              <i class="fas fa-desktop"></i>
+              <span>Aguardando captura...</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="timer-display" id="timerDisplayOnline">00:00:00</div>
+            <div class="status-grav" id="statusGravLabelOnline">Aguardando...</div>
+          </div>
+
+          <div class="controles-grav">
+            <button class="btn btn-primario" id="btnIniciarOnline" onclick="abrirGravadorOnline()" style="flex:1;justify-content:center;">
+              <i class="fas fa-circle"></i> Iniciar Captura
+            </button>
+          </div>
+
+          <div class="arquivo-preview" id="arquivoPreviewOnline" style="display:none">
+            <i class="fas fa-file-audio"></i>
+            <div style="flex:1;min-width:0">
+              <div class="arquivo-nome" id="arquivoNomeOnline">—</div>
+              <div class="arquivo-tam" id="arquivoTamOnline">—</div>
+            </div>
+            <button class="btn-download-audio" onclick="downloadArquivoOnline()" title="Baixar áudio"><i class="fas fa-download"></i></button>
+            <button class="btn-remover" onclick="removerArquivoOnline()" title="Remover"><i class="fas fa-times"></i></button>
+          </div>
+
+          <div class="form-grupo">
+            <label class="form-label">Título da Reunião</label>
+            <input type="text" class="form-input" id="inputTituloOnline" placeholder="Ex: Daily Stand-up — Google Meet">
+          </div>
+          <div class="form-grupo">
+            <label class="form-label">Participantes</label>
+            <input type="text" class="form-input" id="inputParticipantesOnline" placeholder="João, Maria, Pedro...">
+          </div>
+          <div class="form-grupo" style="margin-bottom:0">
+            <label class="form-label">Departamento</label>
+            <select class="form-input" id="inputDepartamentoOnline">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+
+          <button class="btn btn-verde" id="btnEnviarOnline" onclick="abrirModalConfigurarEnvioOnline()" disabled style="width:100%;justify-content:center;">
+            <i class="fas fa-paper-plane"></i> Processar com IA
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /modoOnline -->
+
+    <!-- ── MODO 3: Transcrição Direta ── -->
+    <div class="modo-conteudo" id="modoTranscricao">
+
+      <div class="card fade-in-up">
+        <div class="card-header">
+          <div class="card-titulo"><i class="fas fa-keyboard"></i> Transcrição Direta</div>
+        </div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:0.875rem;">
+
+          <div class="info-box ocre">
+            <i class="fas fa-lightbulb"></i>
+            Cole aqui a transcrição da reunião e gere atas profissionais sem precisar de áudio.
+          </div>
+
+          <div class="form-grupo">
+            <label class="form-label">Transcrição <span style="color:var(--vermelho-vintage)">*</span></label>
+            <textarea class="transcricao-area" id="inputTranscricaoDireta"
+              placeholder="Cole aqui a transcrição completa da reunião...&#10;&#10;Ex:&#10;João: Vamos discutir o sprint da semana...&#10;Maria: Concordo, temos 3 tarefas em atraso..."></textarea>
+          </div>
+
+          <div class="form-grupo">
+            <label class="form-label">Título da Reunião</label>
+            <input type="text" class="form-input" id="inputTituloTranscricao" placeholder="Ex: Sprint Planning — Semana 12">
+          </div>
+          <div class="form-grupo">
+            <label class="form-label">Participantes</label>
+            <input type="text" class="form-input" id="inputParticipantesTranscricao" placeholder="João, Maria, Pedro...">
+          </div>
+          <div class="form-grupo" style="margin-bottom:0">
+            <label class="form-label">Departamento</label>
+            <select class="form-input" id="inputDepartamentoTranscricao">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+
+          <button class="btn btn-verde" onclick="abrirConfigTranscricaoDireta()" style="width:100%;justify-content:center;">
+            <i class="fas fa-wand-magic-sparkles"></i> Gerar Ata com IA
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /modoTranscricao -->
 
   </aside>
 
@@ -1774,54 +2514,260 @@
 
 <!-- Modal Configurar Envio -->
 <div class="modal-overlay" id="modalConfigurarEnvio">
-  <div class="modal-caixa larga">
+  <div class="modal-caixa larga" style="display:flex;flex-direction:column;max-height:88vh;">
     <div class="modal-header">
       <div class="modal-titulo"><i class="fas fa-sliders" style="color:var(--ocre);margin-right:6px;"></i> Configurar Processamento</div>
       <button class="modal-fechar" onclick="fecharModal('modalConfigurarEnvio')"><i class="fas fa-times"></i></button>
     </div>
-    <div class="modal-body" style="display:flex;gap:1.25rem;padding:1.25rem;overflow:hidden;">
-      <!-- Coluna esquerda: seleção de estilo + instrucao -->
-      <div style="flex:0 0 260px;display:flex;flex-direction:column;gap:1rem;overflow-y:auto;">
-        <div>
-          <p style="color:var(--marrom-claro);font-size:0.82rem;margin-bottom:0.75rem;">Selecione o estilo de ata a gerar:</p>
-          <div style="display:flex;flex-direction:column;gap:0.55rem;">
-            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
+
+    <!-- Grid 3 colunas -->
+    <div class="cfg-grid" style="flex:1;min-height:0;">
+
+      <!-- Col 1: Estilo + Instrução -->
+      <div class="cfg-col">
+        <div class="cfg-col-header"><span><i class="fas fa-wand-magic-sparkles" style="color:var(--ocre);margin-right:5px;"></i>Estilo de Ata</span></div>
+        <div class="cfg-col-inner">
+          <p style="color:var(--marrom-claro);font-size:0.8rem;line-height:1.5;">Selecione o modelo base da ata:</p>
+          <div style="display:flex;flex-direction:column;gap:0.45rem;">
+            <label class="estilo-label" onmouseover="this.style.background='var(--creme-medio)'" onmouseout="this.style.background='transparent'" style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.84rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;">
               <input type="radio" name="estiloAta" id="rdoEstiloDecisoes" value="decisoes" onchange="carregarPreviewPrompt('decisoes')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
               <span>Decisões Tomadas<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Histórico consultável de decisões aprovadas</small></span>
             </label>
-            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
+            <label class="estilo-label" onmouseover="this.style.background='var(--creme-medio)'" onmouseout="this.style.background='transparent'" style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.84rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;">
               <input type="radio" name="estiloAta" id="rdoEstiloDetalhada" value="detalhada" onchange="carregarPreviewPrompt('detalhada')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
               <span>Ata Detalhada<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Tópicos, log operacional e feedback</small></span>
             </label>
-            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
+            <label class="estilo-label" onmouseover="this.style.background='var(--creme-medio)'" onmouseout="this.style.background='transparent'" style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.84rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;">
               <input type="radio" name="estiloAta" id="rdoEstiloDevBi" value="dev_bi" onchange="carregarPreviewPrompt('dev_bi')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
               <span>DEV — Setor B.I.<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">PRD completo para o time de desenvolvimento</small></span>
             </label>
-            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.875rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;" onmouseover="this.style.background='var(--creme-claro)'" onmouseout="this.style.background='transparent'">
+            <label class="estilo-label" onmouseover="this.style.background='var(--creme-medio)'" onmouseout="this.style.background='transparent'" style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.84rem;font-weight:600;padding:0.5rem 0.6rem;border-radius:var(--raio);border:1px solid transparent;transition:background 0.15s;">
               <input type="radio" name="estiloAta" id="rdoEstiloAlinhamento" value="alinhamento" onchange="carregarPreviewPrompt('alinhamento')" style="margin-top:2px;flex-shrink:0;accent-color:var(--ocre);">
               <span>Alinhamento Rápido<small style="font-weight:400;color:var(--marrom-claro);display:block;margin-top:1px;">Resumo para dailies e syncs</small></span>
             </label>
           </div>
-        </div>
-        <div class="form-grupo" style="margin-bottom:0;">
-          <label class="form-label">Instruções adicionais <span style="font-weight:400;color:var(--marrom-claro)">(opcional)</span></label>
-          <textarea class="form-input" id="inputInstrucaoExtra" rows="4" placeholder="Ex: Foque nas decisões financeiras, ignore assuntos de RH..."></textarea>
+          <hr style="border:none;border-top:1px solid var(--creme-escuro);margin:0.25rem 0;">
+          <div style="margin-bottom:0.5rem;">
+            <label class="form-label">Prompt personalizado <span style="font-weight:400;color:var(--marrom-claro)">(substitui instrução do estilo)</span></label>
+            <div id="promptSelecionadoInfo" style="display:none;" class="prompt-sel-info">
+              <i class="fas fa-star" style="color:var(--ocre);"></i><span id="promptSelecionadoNome">—</span>
+              <button onclick="limparPromptSelecionado()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--marrom-claro);font-size:0.7rem;padding:1px 4px;border-radius:3px;" title="Limpar prompt"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="promptSelecionadoVazio" style="font-size:0.75rem;color:var(--marrom-claro);font-style:italic;padding:4px 2px;">Nenhum selecionado — selecione um Prompt ao lado →</div>
+          </div>
+          <div>
+            <label class="form-label">Instrução adicional <span style="font-weight:400;color:var(--marrom-claro)">(complementar, opcional)</span></label>
+            <textarea class="form-input" id="inputInstrucaoExtra" rows="3"
+              placeholder="Ex: Foque nas decisões financeiras..."></textarea>
+          </div>
         </div>
       </div>
-      <!-- Divisor vertical -->
-      <div style="width:1px;background:var(--creme-escuro);flex-shrink:0;"></div>
-      <!-- Coluna direita: visualizador do prompt -->
-      <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
-        <div style="font-size:0.8rem;font-weight:600;color:var(--marrom-claro);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem;">
-          <i class="fas fa-eye" style="color:var(--ocre);"></i> Visualizador do Prompt
+
+      <!-- Col 2: Visualizador do prompt -->
+      <div class="cfg-col">
+        <div class="cfg-col-header"><i class="fas fa-eye" style="color:var(--ocre);margin-right:5px;"></i>Visualizador do Prompt</div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;padding:1rem;">
+          <div id="previewPromptArea" style="flex:1;background:var(--creme-claro);border:1px solid var(--creme-escuro);border-radius:var(--raio);overflow-y:auto;padding:0.85rem;font-size:0.75rem;font-family:monospace;white-space:pre-wrap;color:var(--marrom-escuro);line-height:1.55;"><span style="color:var(--marrom-claro);font-family:inherit;font-style:italic;">← Selecione um estilo para visualizar o prompt que será enviado ao Gemini.</span></div>
         </div>
-        <div id="previewPromptArea" style="flex:1;background:var(--creme-claro);border:1px solid var(--creme-escuro);border-radius:var(--raio);overflow-y:auto;padding:0.85rem;font-size:0.76rem;font-family:monospace;white-space:pre-wrap;color:var(--marrom-escuro);line-height:1.55;min-height:220px;max-height:420px;"><span style="color:var(--marrom-claro);font-family:inherit;font-style:italic;">← Selecione um estilo para visualizar o prompt que será enviado ao Gemini.</span></div>
       </div>
-    </div>
-    <div class="modal-rodape" style="justify-content:flex-end;gap:0.5rem;">
+
+      <!-- Col 3: Meus Prompts -->
+      <div class="cfg-col">
+        <div class="cfg-col-header">
+          <span><i class="fas fa-bookmark" style="color:var(--ocre);margin-right:5px;"></i>Meus Prompts</span>
+          <button class="btn btn-sm btn-primario" style="padding:3px 9px;font-size:0.69rem;" onclick="abrirEditorPrompt(null)">
+            <i class="fas fa-plus"></i> Criar
+          </button>
+        </div>
+        <div class="cfg-col-inner" id="cfgPromptsList">
+          <div class="prompt-empty"><i class="fas fa-bookmark"></i>Carregando prompts...</div>
+        </div>
+      </div>
+
+    </div><!-- /cfg-grid -->
+
+    <div class="modal-rodape" style="justify-content:flex-end;gap:0.5rem;flex-shrink:0;">
       <button class="btn btn-sm btn-secundario" onclick="fecharModal('modalConfigurarEnvio')">Cancelar</button>
       <button class="btn btn-sm btn-verde" onclick="confirmarEnvio()"><i class="fas fa-paper-plane"></i> Processar</button>
     </div>
+  </div>
+</div>
+
+<!-- ════ MEUS PROMPTS ════ -->
+<div class="modal-overlay" id="modalMeusPrompts" onclick="if(event.target===this)fecharModal('modalMeusPrompts')">
+  <div class="modal-caixa" style="max-width:700px;width:96vw;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-titulo"><i class="fas fa-wand-magic-sparkles" style="color:var(--dourado);margin-right:0.4rem;"></i>Meus Prompts</div>
+        <div class="modal-subtitulo">Prompts personalizados para geração de atas</div>
+      </div>
+      <button class="modal-fechar" onclick="fecharModal('modalMeusPrompts')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-corpo" style="padding:1.25rem 1.5rem;min-height:200px;max-height:65vh;overflow-y:auto;">
+      <div id="meusPromptsList">
+        <div style="text-align:center;padding:2rem;color:var(--marrom-claro);font-style:italic;">Carregando...</div>
+      </div>
+    </div>
+    <div class="modal-rodape" style="justify-content:space-between;">
+      <button class="btn btn-primario" onclick="fecharModal('modalMeusPrompts');abrirEditorPrompt(null)">
+        <i class="fas fa-plus"></i> Criar novo prompt
+      </button>
+      <button class="btn btn-secundario" onclick="fecharModal('modalMeusPrompts')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ EDITOR DE PROMPT PERSONALIZADO ════ -->
+<div id="modalEditorPrompt">
+  <div class="editor-caixa">
+
+    <!-- Header -->
+    <div class="editor-header">
+      <div class="editor-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+      <div class="editor-titulos">
+        <div class="editor-titulo">Editor de Prompt</div>
+        <div class="editor-subtitulo">Crie instruções personalizadas para suas atas com ajuda do Gemini</div>
+      </div>
+      <div class="editor-nome-wrap">
+        <input type="text" class="editor-nome-input" id="editorPromptNome" placeholder="Nome do prompt (ex: Reunião de Alinhamento Executivo)">
+        <div class="editor-draft-badge" id="editorDraftBadge"><i class="fas fa-clock"></i> Rascunho salvo</div>
+      </div>
+      <button onclick="fecharEditorPrompt()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;width:32px;height:32px;cursor:pointer;color:rgba(245,239,224,0.6);font-size:0.9rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.14)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Body: 3 painéis -->
+    <div class="editor-body">
+
+      <!-- Painel 1: Chat Gemini -->
+      <div class="ep">
+        <div class="ep-header"><i class="fas fa-robot"></i> Chat com Gemini</div>
+        <div class="chat-hist" id="chatHist">
+          <div class="chat-b s">💡 Olá! Descreva o tipo de ata que precisa e eu crio um prompt perfeito para você. Também pode usar as sugestões à direita para me orientar.</div>
+        </div>
+        <div class="chat-foot">
+          <div class="chat-chips-sel" id="chatChipsSel"></div>
+          <div class="chat-input-row">
+            <textarea class="chat-ta" id="chatInput" rows="2"
+              placeholder="Ex: Quero uma ata focada em furos jurídicos e decisões contratuais..."
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarChatGemini();}"></textarea>
+            <button class="chat-send" id="chatSendBtn" onclick="enviarChatGemini()" title="Enviar (Enter)">
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Painel 2: Editor de texto -->
+      <div class="ep">
+        <div class="ep-header"><i class="fas fa-pen-nib"></i> Prompt (instrução para a IA)</div>
+        <div class="topicos-bar" id="editorTopicos">
+          <span class="topicos-bar-label">Tópicos</span>
+          <span style="font-size:0.7rem;color:rgba(212,169,106,0.4);font-style:italic;">Nenhum tópico detectado</span>
+        </div>
+        <textarea class="editor-ta" id="editorPromptTexto"
+          placeholder="Seu prompt aparecerá aqui.&#10;&#10;Você pode:&#10;• Digitar diretamente&#10;• Usar o chat do Gemini para gerar&#10;• Clicar em &quot;Usar este prompt&quot; numa resposta do chat&#10;&#10;Este texto será usado como instrução adicional ao gerar a ata."></textarea>
+        <div class="editor-tbar">
+          <button class="etb" onclick="editorLimpar()" title="Apagar tudo"><i class="fas fa-trash"></i> Limpar</button>
+          <button class="etb" onclick="editorCopiar()"><i class="fas fa-copy"></i> Copiar</button>
+          <button class="etb ok" onclick="salvarPromptEditor()"><i class="fas fa-floppy-disk"></i> Salvar Prompt</button>
+          <span class="editor-chars" id="editorChars">0 chars</span>
+        </div>
+      </div>
+
+      <!-- Painel 3: Sugestões -->
+      <div class="ep">
+        <div class="ep-header"><i class="fas fa-lightbulb"></i> Sugestões</div>
+        <div class="sug-scroll">
+
+          <div class="sug-cat">
+            <div class="sug-cat-label"><i class="fas fa-briefcase"></i> Corporativo</div>
+            <div class="sug-chips">
+              <button class="sug-chip" onclick="toggleSugestao(this,'Foco em decisões estratégicas e responsáveis')">Decisões e responsáveis</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Análise de riscos e oportunidades de negócio')">Riscos e oportunidades</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Acompanhamento de OKRs, metas e indicadores')">OKRs e metas</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Resumo executivo para C-level com linguagem objetiva')">Resumo executivo (C-level)</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Próximas ações com prazos e responsáveis definidos')">Próximas ações e prazos</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Análise de orçamento, custos e viabilidade financeira')">Orçamento e custos</button>
+            </div>
+          </div>
+
+          <div class="sug-cat">
+            <div class="sug-cat-label"><i class="fas fa-gavel"></i> Jurídico</div>
+            <div class="sug-chips">
+              <button class="sug-chip" onclick="toggleSugestao(this,'Identificar furos jurídicos, riscos legais e inconsistências contratuais')">Furos jurídicos e riscos legais</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Cláusulas, termos e condições contratuais discutidos')">Cláusulas contratuais</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Conformidade com LGPD, GDPR e legislação vigente')">Compliance e LGPD</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Responsabilidades legais, obrigações e penalidades discutidas')">Responsabilidades legais</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Pendências regulatórias, licenças e autorizações necessárias')">Pendências regulatórias</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Registros de ameaças, notificações e litígios mencionados')">Litígios e notificações</button>
+            </div>
+          </div>
+
+          <div class="sug-cat">
+            <div class="sug-cat-label"><i class="fas fa-microchip"></i> Técnico / TI</div>
+            <div class="sug-chips">
+              <button class="sug-chip" onclick="toggleSugestao(this,'Levantamento detalhado de requisitos técnicos e funcionais')">Requisitos técnicos</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Identificar furos técnicos, débitos técnicos e gaps de arquitetura')">Furos técnicos e débitos</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Decisões de arquitetura de software, padrões e tecnologias escolhidas')">Decisões de arquitetura</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Sprints, épicos, user stories e critérios de aceite definidos')">Sprints e user stories</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Integrações, APIs, dependências de sistemas e serviços externos')">Integrações e APIs</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Plano de testes, QA, homologação e critérios de go-live')">Testes e homologação</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Bugs, incidentes, problemas de produção e plano de correção')">Bugs e incidentes</button>
+            </div>
+          </div>
+
+          <div class="sug-cat">
+            <div class="sug-cat-label"><i class="fas fa-graduation-cap"></i> Educacional</div>
+            <div class="sug-chips">
+              <button class="sug-chip" onclick="toggleSugestao(this,'Aprendizados, insights e pontos de melhoria identificados')">Aprendizados e insights</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Objetivos pedagógicos, competências e habilidades discutidas')">Objetivos pedagógicos</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Plano de capacitação, treinamentos e desenvolvimento de equipe')">Plano de capacitação</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Avaliação de desempenho, feedback e plano de melhoria individual')">Avaliação e feedback</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Cronograma de módulos, trilhas de aprendizagem e prazos')">Cronograma e trilhas</button>
+            </div>
+          </div>
+
+          <div class="sug-cat">
+            <div class="sug-cat-label"><i class="fas fa-cogs"></i> Operacional</div>
+            <div class="sug-chips">
+              <button class="sug-chip" onclick="toggleSugestao(this,'Processos, fluxos de trabalho e pontos de melhoria operacional')">Processos e fluxos</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'SLAs, KPIs e indicadores de performance discutidos')">SLAs e KPIs</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Gargalos operacionais identificados e plano de resolução')">Gargalos operacionais</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Gestão de fornecedores, contratos e relações com parceiros')">Fornecedores e parceiros</button>
+            </div>
+          </div>
+
+          <div class="sug-cat">
+            <div class="sug-cat-label"><i class="fas fa-palette"></i> Formato e Estilo</div>
+            <div class="sug-chips">
+              <button class="sug-chip" onclick="toggleSugestao(this,'Use tabelas para comparações, dados e cotações')">Tabelas para comparações</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Priorize os temas por urgência e impacto no negócio')">Priorização por urgência</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Linguagem formal, técnica e objetiva, sem ambiguidades')">Linguagem formal e técnica</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Tom consultivo e analítico, com recomendações estratégicas')">Tom consultivo</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Inclua uma seção de glossário para termos técnicos usados')">Glossário de termos</button>
+              <button class="sug-chip" onclick="toggleSugestao(this,'Destaque pontos de atenção, alertas e riscos em seção separada')">Alertas e pontos de atenção</button>
+            </div>
+          </div>
+
+        </div><!-- /sug-scroll -->
+      </div><!-- /ep sugestões -->
+
+    </div><!-- /editor-body -->
+
+    <!-- Footer -->
+    <div class="editor-foot">
+      <div class="editor-foot-info">
+        <i class="fas fa-cloud"></i>
+        <span id="editorFooterInfo">Rascunho preservado automaticamente no cache local</span>
+      </div>
+      <div class="editor-foot-btns">
+        <button class="ebtn sec" onclick="fecharEditorPrompt()"><i class="fas fa-times"></i> Fechar</button>
+        <button class="ebtn ok" id="editorBtnSalvar" onclick="salvarPromptEditor()"><i class="fas fa-floppy-disk"></i> Salvar e Fechar</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1850,6 +2796,8 @@
       <!-- Coluna direita -->
       <div class="val-right-col">
         <div class="val-tabs">
+          <button class="btn-editor-completo" onclick="abrirEditorCompleto()"><i class="fas fa-pen-fancy"></i> Editar ata completa</button>
+          <div style="flex:1;"></div>
           <button class="val-tab ativo" id="valTabBtnPreview" onclick="valTrocarTab('preview',this)"><i class="fas fa-eye"></i> Preview Final</button>
           <button class="val-tab" id="valTabBtnCorr" onclick="valTrocarTab('corr',this)"><i class="fas fa-spell-check"></i> Corrigir Texto</button>
         </div>
@@ -1881,6 +2829,200 @@
         <button class="btn btn-sm btn-secundario" onclick="fecharValidacao()">Fechar sem salvar</button>
         <button class="btn btn-sm btn-secundario" onclick="valSalvar()"><i class="fas fa-floppy-disk"></i> Salvar ATA</button>
         <button class="btn btn-sm btn-verde" onclick="valEnviarEmail()"><i class="fas fa-envelope"></i> Salvar e Enviar Email</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ EDITOR COMPLETO DE ATA ════ -->
+<div class="ata-editor-overlay" id="ataEditorOverlay">
+  <div class="ata-editor-modal">
+    <div class="ata-editor-header">
+      <div class="ata-editor-title">
+        <i class="fas fa-pen-fancy"></i>Editor Completo de Ata
+        <span id="ataEditorTitulo" style="font-size:0.78rem;opacity:0.65;font-family:var(--fonte-corpo);font-weight:400;margin-left:8px;"></span>
+      </div>
+      <button class="modal-fechar" onclick="fecharEditorCompleto()" style="color:var(--dourado);"><i class="fas fa-times"></i></button>
+    </div>
+
+    <div class="ata-editor-body">
+      <!-- ── Sidebar de Templates ── -->
+      <div class="ata-templates-sidebar">
+        <div class="ata-templates-title"><i class="fas fa-palette"></i> Modelos</div>
+
+        <!-- Template 0: Original -->
+        <div class="ata-template-card ativo" id="ataTPLCard0" onclick="aplicarTemplateEditor('')">
+          <div class="ata-tpl-preview" style="background:#FBF6EC;">
+            <div style="font-weight:800;font-size:7px;color:#1E120A;border-bottom:1px solid #D4A96A;padding-bottom:2px;margin-bottom:3px;font-family:'DM Serif Display',Georgia,serif;">Ata da Reunião</div>
+            <div style="font-size:6px;color:#5C3D2E;font-weight:700;margin:2px 0;">1. Abertura</div>
+            <div style="font-size:5.5px;color:#1E120A;line-height:1.35;">Conteúdo da pauta e decisões...</div>
+          </div>
+          <div class="ata-tpl-name">☕ Original</div>
+        </div>
+
+        <!-- Template 1: Executivo Premium -->
+        <div class="ata-template-card" id="ataTPLCard1" onclick="aplicarTemplateEditor('tpl-executivo')">
+          <div class="ata-tpl-preview" style="background:#fdfdfd;">
+            <div style="background:linear-gradient(135deg,#0d1b2a,#1b3a5c);color:#fff;font-weight:800;font-size:6px;padding:2px 5px;border-radius:2px;margin-bottom:3px;letter-spacing:0.3px;">ATA DA REUNIÃO</div>
+            <div style="font-size:5.5px;color:#1b3a5c;font-weight:700;border-bottom:1px solid #c9a227;margin:2px 0;padding-bottom:1px;text-transform:uppercase;letter-spacing:0.3px;font-family:Georgia,serif;">SEÇÃO PRINCIPAL</div>
+            <div style="font-size:5px;color:#333;line-height:1.35;font-family:Georgia,serif;">Conteúdo executivo formal...</div>
+          </div>
+          <div class="ata-tpl-name">💼 Executivo</div>
+        </div>
+
+        <!-- Template 2: Moderno Gradiente -->
+        <div class="ata-template-card" id="ataTPLCard2" onclick="aplicarTemplateEditor('tpl-moderno')">
+          <div class="ata-tpl-preview" style="background:#fafbfc;">
+            <div style="font-weight:800;font-size:7px;background:linear-gradient(120deg,#6c3fc5,#2d7bde);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;border-bottom:2px solid #6c3fc5;padding-bottom:2px;margin-bottom:3px;">Ata Reunião</div>
+            <div style="background:linear-gradient(90deg,#6c3fc5,#2d7bde);color:#fff;font-size:5.5px;font-weight:700;padding:1px 4px;border-radius:3px;display:inline-block;margin-bottom:2px;">SEÇÃO</div>
+            <div style="font-size:5px;color:#1e1e2e;line-height:1.35;">Conteúdo moderno e dinâmico...</div>
+          </div>
+          <div class="ata-tpl-name">🚀 Moderno</div>
+        </div>
+
+        <!-- Template 3: Clássico Elegante -->
+        <div class="ata-template-card" id="ataTPLCard3" onclick="aplicarTemplateEditor('tpl-classico')">
+          <div class="ata-tpl-preview" style="background:#fffff8;border:1px solid #d9cfae;">
+            <div style="font-family:Georgia,serif;font-style:italic;font-size:7px;color:#2c2416;text-align:center;border-top:1px solid #d9cfae;border-bottom:1px solid #d9cfae;padding:1px 0;margin-bottom:3px;">Ata da Reunião</div>
+            <div style="font-family:Georgia,serif;font-style:italic;font-size:6px;color:#4a3728;margin:2px 0;">§ Seção Principal</div>
+            <div style="font-size:5px;color:#2c2416;font-family:Georgia,serif;line-height:1.4;">Conteúdo clássico e elegante...</div>
+          </div>
+          <div class="ata-tpl-name">📜 Clássico</div>
+        </div>
+
+        <!-- Template 4: Minimalista Puro -->
+        <div class="ata-template-card" id="ataTPLCard4" onclick="aplicarTemplateEditor('tpl-minimal')">
+          <div class="ata-tpl-preview" style="background:#fff;">
+            <div style="font-weight:800;font-size:7.5px;color:#111;letter-spacing:-0.3px;margin-bottom:4px;">Ata da Reunião<div style="width:14px;height:2px;background:#111;margin-top:2px;"></div></div>
+            <div style="font-size:5.5px;color:#444;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin:2px 0;border-bottom:1px solid #eee;padding-bottom:1px;">SEÇÃO</div>
+            <div style="font-size:5px;color:#333;line-height:1.35;">Conteúdo limpo e direto...</div>
+          </div>
+          <div class="ata-tpl-name">⬜ Minimalista</div>
+        </div>
+
+        <!-- Template 5: Corporativo Verde -->
+        <div class="ata-template-card" id="ataTPLCard5" onclick="aplicarTemplateEditor('tpl-verde')">
+          <div class="ata-tpl-preview" style="background:#f7faf5;">
+            <div style="background:linear-gradient(135deg,#0e3311,#1e6320);color:#fff;font-weight:800;font-size:6px;padding:2px 5px;margin-bottom:3px;letter-spacing:0.3px;font-family:'DM Serif Display',Georgia,serif;">ATA DA REUNIÃO</div>
+            <div style="font-size:5.5px;color:#0e3311;font-weight:700;border-left:2px solid #2d7a2d;padding-left:3px;margin:2px 0;text-transform:uppercase;">SEÇÃO</div>
+            <div style="font-size:5px;color:#1a2e1a;line-height:1.35;">Conteúdo corporativo verde...</div>
+          </div>
+          <div class="ata-tpl-name">🌿 Corporativo</div>
+        </div>
+      </div>
+
+      <!-- ── Editor Principal ── -->
+      <div class="ata-editor-main">
+
+        <!-- Toolbar -->
+        <div class="ata-toolbar">
+          <!-- Histórico -->
+          <button class="ata-tb-btn" title="Desfazer (Ctrl+Z)" onmousedown="event.preventDefault();_ataExec('undo')"><i class="fas fa-undo"></i></button>
+          <button class="ata-tb-btn" title="Refazer (Ctrl+Y)" onmousedown="event.preventDefault();_ataExec('redo')"><i class="fas fa-redo"></i></button>
+          <div class="ata-tb-sep"></div>
+
+          <!-- Estilo de bloco -->
+          <select class="ata-tb-select" title="Estilo" onchange="_ataEstiloBloco(this.value);this.value=''" style="width:94px;">
+            <option value="">Estilo...</option>
+            <option value="p">Normal</option>
+            <option value="h1">Título 1</option>
+            <option value="h2">Título 2</option>
+            <option value="h3">Título 3</option>
+            <option value="h4">Título 4</option>
+            <option value="blockquote">Citação</option>
+            <option value="pre">Código</option>
+          </select>
+          <div class="ata-tb-sep"></div>
+
+          <!-- Fonte -->
+          <select class="ata-tb-select" title="Fonte" onchange="_ataExec('fontName',this.value)" style="width:130px;">
+            <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Trebuchet MS">Trebuchet MS</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+
+          <!-- Tamanho -->
+          <select class="ata-tb-select" title="Tamanho" onchange="_ataExec('fontSize',this.value)" style="width:52px;">
+            <option value="1">8</option>
+            <option value="2">10</option>
+            <option value="3" selected>12</option>
+            <option value="4">14</option>
+            <option value="5">18</option>
+            <option value="6">24</option>
+            <option value="7">36</option>
+          </select>
+          <div class="ata-tb-sep"></div>
+
+          <!-- Formatação de texto -->
+          <button class="ata-tb-btn" title="Negrito (Ctrl+B)" onmousedown="event.preventDefault();_ataExec('bold')"><i class="fas fa-bold"></i></button>
+          <button class="ata-tb-btn" title="Itálico (Ctrl+I)" onmousedown="event.preventDefault();_ataExec('italic')"><i class="fas fa-italic"></i></button>
+          <button class="ata-tb-btn" title="Sublinhado (Ctrl+U)" onmousedown="event.preventDefault();_ataExec('underline')"><i class="fas fa-underline"></i></button>
+          <button class="ata-tb-btn" title="Tachado" onmousedown="event.preventDefault();_ataExec('strikeThrough')"><i class="fas fa-strikethrough"></i></button>
+          <button class="ata-tb-btn" title="Sobrescrito" onmousedown="event.preventDefault();_ataExec('superscript')"><i class="fas fa-superscript"></i></button>
+          <button class="ata-tb-btn" title="Subscrito" onmousedown="event.preventDefault();_ataExec('subscript')"><i class="fas fa-subscript"></i></button>
+          <div class="ata-tb-sep"></div>
+
+          <!-- Cores -->
+          <span class="ata-tb-label">A</span>
+          <input class="ata-tb-color" type="color" title="Cor do texto" value="#1a1a1a" id="ataTextColor" onchange="_ataExec('foreColor',this.value)">
+          <i class="fas fa-highlighter ata-tb-label" style="font-size:0.7rem;"></i>
+          <input class="ata-tb-color" type="color" title="Realce de fundo" value="#ffff00" id="ataBgColor" onchange="_ataExec('hiliteColor',this.value)">
+          <div class="ata-tb-sep"></div>
+
+          <!-- Alinhamento -->
+          <button class="ata-tb-btn" title="Alinhar à esquerda" onmousedown="event.preventDefault();_ataExec('justifyLeft')"><i class="fas fa-align-left"></i></button>
+          <button class="ata-tb-btn" title="Centralizar" onmousedown="event.preventDefault();_ataExec('justifyCenter')"><i class="fas fa-align-center"></i></button>
+          <button class="ata-tb-btn" title="Alinhar à direita" onmousedown="event.preventDefault();_ataExec('justifyRight')"><i class="fas fa-align-right"></i></button>
+          <button class="ata-tb-btn" title="Justificar" onmousedown="event.preventDefault();_ataExec('justifyFull')"><i class="fas fa-align-justify"></i></button>
+          <div class="ata-tb-sep"></div>
+
+          <!-- Listas & Recuo -->
+          <button class="ata-tb-btn" title="Lista com marcadores" onmousedown="event.preventDefault();_ataExec('insertUnorderedList')"><i class="fas fa-list-ul"></i></button>
+          <button class="ata-tb-btn" title="Lista numerada" onmousedown="event.preventDefault();_ataExec('insertOrderedList')"><i class="fas fa-list-ol"></i></button>
+          <button class="ata-tb-btn" title="Diminuir recuo" onmousedown="event.preventDefault();_ataExec('outdent')"><i class="fas fa-outdent"></i></button>
+          <button class="ata-tb-btn" title="Aumentar recuo" onmousedown="event.preventDefault();_ataExec('indent')"><i class="fas fa-indent"></i></button>
+          <div class="ata-tb-sep"></div>
+
+          <!-- Inserir -->
+          <button class="ata-tb-btn" title="Inserir link" onmousedown="event.preventDefault();_ataInserirLink()"><i class="fas fa-link"></i></button>
+          <button class="ata-tb-btn" title="Linha horizontal" onmousedown="event.preventDefault();_ataExec('insertHorizontalRule')"><i class="fas fa-minus"></i></button>
+          <button class="ata-tb-btn" title="Inserir tabela" onmousedown="event.preventDefault();_ataInserirTabela()"><i class="fas fa-table"></i></button>
+          <div class="ata-tb-sep"></div>
+
+          <!-- Limpar -->
+          <button class="ata-tb-btn" title="Remover formatação" onmousedown="event.preventDefault();_ataExec('removeFormat')"><i class="fas fa-remove-format"></i></button>
+          <button class="ata-tb-btn" title="Selecionar tudo" onmousedown="event.preventDefault();_ataExec('selectAll')"><i class="fas fa-object-group"></i></button>
+
+          <!-- Word count (lado direito) -->
+          <span id="ataWordCount" style="margin-left:auto;font-size:0.65rem;color:var(--marrom-claro);white-space:nowrap;padding-right:4px;"></span>
+        </div>
+
+        <!-- Área do documento -->
+        <div class="ata-canvas-wrap">
+          <div class="ata-page" id="ataEditorPage">
+            <div class="ata-canvas" id="ataEditorCanvas"
+                 contenteditable="true"
+                 spellcheck="false"
+                 oninput="_ataAtualizarContagem()"
+                 onkeydown="_ataKeydown(event)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="ata-editor-footer">
+      <div class="ata-editor-hint">
+        <i class="fas fa-keyboard" style="margin-right:5px;"></i>
+        <strong>Ctrl+S</strong> salva · <strong>Ctrl+B/I/U</strong> formata · O modelo visual é aplicado ao documento final
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <button class="btn btn-sm btn-secundario" onclick="fecharEditorCompleto()"><i class="fas fa-xmark"></i> Cancelar</button>
+        <button class="btn btn-sm btn-verde" onclick="salvarEditorCompleto()"><i class="fas fa-floppy-disk"></i> Salvar Ata</button>
       </div>
     </div>
   </div>
@@ -2056,6 +3198,9 @@ let todosProjetosAssoc = [];
 // Estado ATA atual no painel
 let ataAtualReunId = null, ataAtualTexto = '';
 
+// Modo de envio: 'microfone' | 'online' | 'transcricao'
+var modoConfigurarEnvio = 'microfone';
+
 // Constantes de envio
 const FATIA_MB = 6 * 1024 * 1024;
 const CHUNKS_PAR = 3;
@@ -2068,14 +3213,28 @@ document.addEventListener('DOMContentLoaded', () => {
   var elNome = document.getElementById('headerUsuarioNome');
   if (elNome && typeof USUARIO_NOME !== 'undefined') elNome.textContent = USUARIO_NOME;
 
+  // Saudação personalizada na tela de carregamento
+  var elGreet = document.getElementById('loadingGreeting');
+  if (elGreet) {
+    var nomeUsuario = (typeof USUARIO_NOME !== 'undefined' && USUARIO_NOME)
+      ? USUARIO_NOME.trim().split(' ')[0] : '';
+    elGreet.textContent = (nomeUsuario ? 'Olá, ' + nomeUsuario : 'Olá') + ' ☕';
+  }
+
   // Sessão já verificada pelo servidor (doGet). Inicializa diretamente para
   // evitar loop de redirecionamento causado por falha transitória no google.script.run.
   if (typeof SESSAO_TOKEN !== 'undefined' && SESSAO_TOKEN) {
+    var elStatus = document.getElementById('loadingStatus');
+    if (elStatus) elStatus.textContent = 'Carregando reuniões...';
     verificarConfig();
     carregarCatalogo();
     carregarAudiosNaoProcessados();
     setupDropzone();
     log('INFO', '🚀 Smart Meeting inicializado');
+    setTimeout(function() {
+      var ls = document.getElementById('loadingScreen');
+      if (ls) ls.classList.add('hidden');
+    }, 900);
   } else {
     _redirecionarLogin();
   }
@@ -2085,29 +3244,26 @@ document.addEventListener('DOMContentLoaded', () => {
 //  CONFIGURAÇÃO / HEADER STATUS
 // ═══════════════════════════════════════
 function popularSelectDepartamentosReunioes(departamentos) {
-  var sel = document.getElementById('inputDepartamento');
-  if (!sel) return;
-  var modoAdmin = typeof MODO_ADMIN_URL !== 'undefined' && MODO_ADMIN_URL;
-  var perfil = typeof USUARIO_PERFIL !== 'undefined' ? USUARIO_PERFIL : '';
-  var ehAdmin = modoAdmin || perfil === 'admin';
-  // Filtrar departamentos pelo perfil (admin vê todos, outros veem apenas os seus)
-  // Como não temos departamentosIds no frontend de reuniões, admin ou usuário sem restrição vê todos
-  sel.innerHTML = '<option value="">Selecione...</option>';
-  var frag = document.createDocumentFragment();
-  (departamentos || []).forEach(function(d) {
-    var opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.nome || d.id;
-    frag.appendChild(opt);
+  var ids = ['inputDepartamento', 'inputDepartamentoOnline', 'inputDepartamentoTranscricao'];
+  ids.forEach(function(id) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Selecione...</option>';
+    var frag = document.createDocumentFragment();
+    (departamentos || []).forEach(function(d) {
+      var opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = d.nome || d.id;
+      frag.appendChild(opt);
+    });
+    sel.appendChild(frag);
+    if ((departamentos || []).length === 1) {
+      sel.value = departamentos[0].id;
+      sel.disabled = true;
+    } else {
+      sel.disabled = false;
+    }
   });
-  sel.appendChild(frag);
-  // Auto-selecionar e desabilitar se só houver um departamento
-  if ((departamentos || []).length === 1) {
-    sel.value = departamentos[0].id;
-    sel.disabled = true;
-  } else {
-    sel.disabled = false;
-  }
 }
 
 function verificarConfig() {
@@ -2431,6 +3587,52 @@ function abrirGravadorPopup(autostart) {
 window.addEventListener('message', function(evt) {
   if (!evt.data) return;
 
+  // ── Popup de REUNIÃO ONLINE ──────────────────────────────────────────────
+  if (evt.data.type === 'sm_gravando_online') {
+    segsGravadosOnline = 0;
+    timerIntervalOnline && clearInterval(timerIntervalOnline);
+    timerIntervalOnline = setInterval(function() {
+      segsGravadosOnline++;
+      var td = document.getElementById('timerDisplayOnline');
+      if (td) {
+        var h = Math.floor(segsGravadosOnline / 3600),
+            m = Math.floor((segsGravadosOnline % 3600) / 60),
+            s = segsGravadosOnline % 60;
+        td.textContent = [h, m, s].map(function(x) { return x < 10 ? '0' + x : x; }).join(':');
+        td.className = 'timer-display gravando';
+      }
+      var lb = document.getElementById('statusGravLabelOnline');
+      if (lb) { lb.textContent = 'Gravando...'; lb.className = 'status-grav gravando'; }
+    }, 1000);
+    var sg = document.getElementById('statusGravOnline');
+    if (sg) sg.textContent = 'GRAVANDO';
+    log('INFO', '🔴 Reunião online gravando via popup...');
+    return;
+  }
+
+  if (evt.data.type === 'sm_audio_blob_online') {
+    var blobOl = evt.data.blob, mimeOl = evt.data.mimeType || 'audio/webm', durOl = evt.data.duracaoSegundos || 0;
+    if (!(blobOl instanceof Blob) || blobOl.size === 0) { log('ALERTA', '⚠️ Popup online enviou blob inválido'); return; }
+    clearInterval(timerIntervalOnline); timerIntervalOnline = null;
+    var extOl = mimeOl.includes('mp4') ? 'mp4' : mimeOl.includes('ogg') ? 'ogg' : 'webm';
+    arquivoAtualOnline = new File([blobOl], 'reuniao-online.' + extOl, { type: mimeOl });
+    if (durOl > 0) segsGravadosOnline = durOl;
+    mostrarArquivoOnline(arquivoAtualOnline);
+    var tdOl = document.getElementById('timerDisplayOnline');
+    if (tdOl) tdOl.className = 'timer-display';
+    var lbOl = document.getElementById('statusGravLabelOnline');
+    if (lbOl) { lbOl.textContent = 'Gravação recebida ✓'; lbOl.className = 'status-grav'; }
+    var sgOl = document.getElementById('statusGravOnline');
+    if (sgOl) sgOl.textContent = 'PRONTO';
+    log('SUCESSO', '✅ Áudio online recebido: ' + fmtBytes(blobOl.size));
+    toast('Áudio da reunião online recebido! Preencha os dados e processe.', 'sucesso', 5000);
+    if (_popupGravadorOnline && !_popupGravadorOnline.closed) {
+      try { _popupGravadorOnline.close(); } catch(_) {}
+    }
+    return;
+  }
+
+  // ── Popup de MICROFONE ───────────────────────────────────────────────────
   // Popup confirmou que gravação iniciou → atualiza UI da página principal
   if (evt.data.type === 'sm_gravando') {
     timerInterval && clearInterval(timerInterval);
@@ -2619,30 +3821,82 @@ function removerArquivo() {
   log('INFO', '🗑️ Arquivo removido');
 }
 
+function downloadArquivo() {
+  if (!arquivoAtual) return;
+  var url = URL.createObjectURL(arquivoAtual);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = arquivoAtual.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 10000);
+}
+
 // ═══════════════════════════════════════
 //  ENVIO DE ÁUDIO
 // ═══════════════════════════════════════
 function abrirModalConfigurarEnvio() {
   if (!arquivoAtual) { toast('Selecione um arquivo', 'aviso'); return; }
+  modoConfigurarEnvio = 'microfone';
+  _promptCustomSelecionado = null;
   // Reset radio buttons, instrucao e preview
   document.querySelectorAll('input[name="estiloAta"]').forEach(r => r.checked = false);
   document.getElementById('inputInstrucaoExtra').value = '';
+  var info = document.getElementById('promptSelecionadoInfo');
+  if (info) info.style.display = 'none';
+  var vazio = document.getElementById('promptSelecionadoVazio');
+  if (vazio) vazio.style.display = '';
   document.getElementById('previewPromptArea').innerHTML = '<span style="color:var(--marrom-claro);font-family:inherit;font-style:italic;">← Selecione um estilo para visualizar o prompt que será enviado ao Gemini.</span>';
   document.getElementById('modalConfigurarEnvio').classList.add('visivel');
+  _carregarPromptsUsuario();
 }
 
 function confirmarEnvio() {
   const rdoSelecionado = document.querySelector('input[name="estiloAta"]:checked');
-  if (!rdoSelecionado) { toast('Selecione um estilo de ata', 'aviso'); return; }
+  // Estilo obrigatório apenas quando não há prompt personalizado selecionado
+  if (!rdoSelecionado && !_promptCustomSelecionado) { toast('Selecione um estilo de ata ou um Prompt Personalizado', 'aviso'); return; }
 
+  const estiloValor    = rdoSelecionado ? rdoSelecionado.value : 'decisoes';
   const instrucaoExtra = document.getElementById('inputInstrucaoExtra').value.trim();
   fecharModal('modalConfigurarEnvio');
 
+  // Modo transcrição direta
+  if (modoConfigurarEnvio === 'transcricao') {
+    processarTranscricaoDireta(estiloValor, instrucaoExtra);
+    return;
+  }
+
+  // Modo reunião online — temporariamente substitui arquivoAtual + campos do form
+  if (modoConfigurarEnvio === 'online') {
+    if (!arquivoAtualOnline) { toast('Nenhum áudio online disponível.', 'erro'); return; }
+    var _bkpArq  = arquivoAtual;
+    var _bkpTit  = document.getElementById('inputTitulo').value;
+    var _bkpPart = document.getElementById('inputParticipantes').value;
+    var _bkpDept = document.getElementById('inputDepartamento').value;
+    arquivoAtual = arquivoAtualOnline;
+    document.getElementById('inputTitulo').value       = document.getElementById('inputTituloOnline').value;
+    document.getElementById('inputParticipantes').value = document.getElementById('inputParticipantesOnline').value;
+    var selDeptOnline = document.getElementById('inputDepartamentoOnline');
+    var selDept       = document.getElementById('inputDepartamento');
+    if (selDept && selDeptOnline) selDept.value = selDeptOnline.value;
+    _executarEnvio([estiloValor], instrucaoExtra);
+    // Restaura campos após dispatch (sync — _executarEnvio é async mas a atribuição local já ocorreu)
+    setTimeout(function() {
+      arquivoAtual = _bkpArq;
+      document.getElementById('inputTitulo').value       = _bkpTit;
+      document.getElementById('inputParticipantes').value = _bkpPart;
+      if (selDept) selDept.value = _bkpDept;
+    }, 100);
+    return;
+  }
+
+  // Modo microfone (padrão)
   // Se há um áudio pendente carregado no dropzone, processa via Drive (sem re-upload)
   if (reuniaoIdPendente) {
-    _executarProcessamentoPendente([rdoSelecionado.value], instrucaoExtra);
+    _executarProcessamentoPendente([estiloValor], instrucaoExtra);
   } else {
-    _executarEnvio([rdoSelecionado.value], instrucaoExtra);
+    _executarEnvio([estiloValor], instrucaoExtra);
   }
 }
 
@@ -2738,6 +3992,7 @@ async function _executarEnvio(estilosAta, instrucaoExtra) {
   const titulo = document.getElementById('inputTitulo').value || 'Reunião ' + new Date().toLocaleDateString('pt-BR');
   const participantes = document.getElementById('inputParticipantes').value || '';
   const estilo = estilosAta[0] || 'decisoes';
+  const promptCustom = _promptCustomSelecionado ? (_promptCustomSelecionado.conteudo || '') : '';
 
   let arq = arquivoAtual;
   const precisaComprimir = arq.size > 15*1024*1024;
@@ -2780,11 +4035,11 @@ async function _executarEnvio(estilosAta, instrucaoExtra) {
     if (arq.size < 12*1024*1024) {
       log('INFO', '📦 Arquivo pequeno — envio direto');
       const b64 = await arqParaBase64(arq);
-      await _fluxoDireto(b64, titulo, participantes, estilosAta, instrucaoExtra);
+      await _fluxoDireto(b64, titulo, participantes, estilosAta, instrucaoExtra, promptCustom);
     } else {
       log('INFO', '📦 Arquivo grande — pipeline chunks');
       const bkp = arquivoAtual; arquivoAtual = arq;
-      await _fluxoGrande(titulo, participantes, estilosAta, instrucaoExtra);
+      await _fluxoGrande(titulo, participantes, estilosAta, instrucaoExtra, promptCustom);
       arquivoAtual = bkp;
     }
   } catch(e) {
@@ -2795,7 +4050,7 @@ async function _executarEnvio(estilosAta, instrucaoExtra) {
 }
 
 // Gera ATA segmento a segmento a partir do frontend (comum aos dois pipelines)
-async function _gerarAtaFrontend(transcricao, estilosAta, instrucaoExtra, titulo, participantes) {
+async function _gerarAtaFrontend(transcricao, estilosAta, instrucaoExtra, titulo, participantes, promptCustom) {
   const ataEstilos = {};
   procEtapa('ata', 'ativa', 0);
 
@@ -2808,11 +4063,12 @@ async function _gerarAtaFrontend(transcricao, estilosAta, instrucaoExtra, titulo
       const seg = segs[s];
       procSegmento('ata', seg.id, seg.nome, 'ativa', '');
       procEtapa('ata', 'ativa', Math.round(((e * nSegs + s) / (estilosAta.length * nSegs)) * 100));
-      atualizarLoading(`Gerando ATA — ${seg.nome}...`);
-      log('INFO', `📋 Segmento: ${seg.nome}`);
+      atualizarLoading(`Gerando ATA — ${seg.nome}${promptCustom ? ' [prompt personalizado]' : ''}...`);
+      log('INFO', `📋 Segmento: ${seg.nome}${promptCustom ? ' (prompt customizado ativo)' : ''}`);
 
       const r = await chamarServidor('gerarSegmentoAtaSingle', {
-        estilo, segmentoId: seg.id, titulo, participantes, instrucaoExtra, transcricao
+        estilo, segmentoId: seg.id, titulo, participantes, instrucaoExtra, transcricao,
+        promptCustom: promptCustom || ''
       });
       (r.logs||[]).forEach(l => log(l.tipo, l.mensagem));
 
@@ -2831,7 +4087,7 @@ async function _gerarAtaFrontend(transcricao, estilosAta, instrucaoExtra, titulo
 }
 
 // Pipeline pequeno: transcreve inline → ATA por segmento → salva
-async function _fluxoDireto(b64, titulo, participantes, estilosAta, instrucaoExtra) {
+async function _fluxoDireto(b64, titulo, participantes, estilosAta, instrucaoExtra, promptCustom) {
   var depSel = document.getElementById('inputDepartamento');
   var departamentoId   = depSel ? depSel.value : '';
   var departamentoNome = depSel && depSel.selectedIndex >= 0 ? depSel.options[depSel.selectedIndex].text : '';
@@ -2856,7 +4112,7 @@ async function _fluxoDireto(b64, titulo, participantes, estilosAta, instrucaoExt
   log('SUCESSO', `✅ Transcrição: ${rT.transcricao.length} chars`);
 
   // ATA (por segmento, via frontend)
-  const ataEstilos = await _gerarAtaFrontend(rT.transcricao, estilosAta, instrucaoExtra, titulo, participantes);
+  const ataEstilos = await _gerarAtaFrontend(rT.transcricao, estilosAta, instrucaoExtra, titulo, participantes, promptCustom);
   const ataBase = Object.values(ataEstilos)[0] || '';
 
   // Salvar
@@ -2888,7 +4144,7 @@ async function _fluxoDireto(b64, titulo, participantes, estilosAta, instrucaoExt
 }
 
 // Pipeline grande: chunks → upload Gemini → transcrição → ATA por segmento → salva
-async function _fluxoGrande(titulo, participantes, estilosAta, instrucaoExtra) {
+async function _fluxoGrande(titulo, participantes, estilosAta, instrucaoExtra, promptCustom) {
   const tipo = arquivoAtual.type || 'audio/webm';
   const tam  = arquivoAtual.size;
   const nChunks = Math.ceil(tam / FATIA_MB);
@@ -2966,7 +4222,7 @@ async function _fluxoGrande(titulo, participantes, estilosAta, instrucaoExtra) {
   const transcricao = r2.transcricao;
 
   // ATA (por segmento, via frontend)
-  const ataEstilos = await _gerarAtaFrontend(transcricao, estilosAta, instrucaoExtra, titulo, participantes);
+  const ataEstilos = await _gerarAtaFrontend(transcricao, estilosAta, instrucaoExtra, titulo, participantes, promptCustom);
   const ataFinal = Object.values(ataEstilos)[0] || '';
 
   // Salvar
@@ -4473,6 +5729,1001 @@ function limparForm() {
   if (depSel) depSel.value = '';
   document.getElementById('timerDisplay').textContent = '00:00:00';
   segsGravados = 0;
+}
+
+// ═══════════════════════════════════════
+//  MODO DA COLUNA ESQUERDA
+// ═══════════════════════════════════════
+function trocarModoColuna(modo) {
+  document.querySelectorAll('.modo-tab').forEach(function(t) { t.classList.remove('ativo'); });
+  document.querySelectorAll('.modo-conteudo').forEach(function(c) { c.classList.remove('ativo'); });
+  var tabEl = document.getElementById('tab' + modo);
+  var modoEl = document.getElementById('modo' + modo);
+  if (tabEl) tabEl.classList.add('ativo');
+  if (modoEl) modoEl.classList.add('ativo');
+}
+
+// ═══════════════════════════════════════
+//  GRAVADOR DE REUNIÃO ONLINE
+// ═══════════════════════════════════════
+var arquivoAtualOnline = null;
+var _popupGravadorOnline = null;
+var segsGravadosOnline = 0;
+var timerIntervalOnline = null;
+
+function _htmlGravadorOnline() {
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0">' +
+    '<title>Smart Meeting \u2014 Gravador Online</title>' +
+    '<style>' +
+    '*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:system-ui,sans-serif;background:#1E120A;color:#F5EFE0;' +
+    'min-height:100vh;display:flex;flex-direction:column;align-items:center;' +
+    'justify-content:center;padding:1.5rem 2rem;gap:1.25rem;text-align:center}' +
+    'h2{font-size:1.05rem;color:#D4A96A}' +
+    '.desc{font-size:0.8rem;color:rgba(245,239,224,0.6);max-width:360px;line-height:1.6}' +
+    '.warn{background:rgba(192,125,42,0.15);border:1px solid rgba(192,125,42,0.3);' +
+    'border-radius:8px;padding:0.65rem 1rem;font-size:0.78rem;color:#D4A96A;' +
+    'max-width:360px;line-height:1.5}' +
+    '.timer{font-size:3rem;font-family:Georgia,serif;letter-spacing:4px;color:#D4A96A}' +
+    '.timer.gravando{animation:puls 1.2s ease-in-out infinite}' +
+    '@keyframes puls{0%,100%{opacity:1}50%{opacity:0.45}}' +
+    '.status{font-size:0.76rem;color:rgba(245,239,224,0.5);' +
+    'letter-spacing:1px;text-transform:uppercase;min-height:1.3em}' +
+    '.btns{display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center}' +
+    '.btn{padding:0.65rem 1.5rem;border:none;border-radius:8px;font-size:0.85rem;' +
+    'font-weight:700;cursor:pointer;transition:all 0.2s;font-family:inherit}' +
+    '.btn-ok{background:#C07D2A;color:#FBF6EC}.btn-ok:hover{background:#9B621A}' +
+    '.btn-stop{background:#8B2E2E;color:#FBF6EC;display:none}.btn-stop:hover{background:#721e1e}' +
+    '.btn:disabled{opacity:0.4;cursor:not-allowed}' +
+    '.opt{display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;' +
+    'cursor:pointer;color:rgba(245,239,224,0.75)}' +
+    '.opt input{accent-color:#C07D2A;width:16px;height:16px}' +
+    '<\/style><\/head><body>' +
+    '<h2>\uD83D\uDDA5\uFE0F Gravador de Reuni\u00e3o Online<\/h2>' +
+    '<p class="desc">Captura o \u00e1udio do sistema (Google Meet, Teams, Zoom\u2026) e opcionalmente o microfone, misturando tudo em um \u00fanico arquivo.<\/p>' +
+    '<div class="warn">\u26A0\uFE0F Ao iniciar, o Chrome abrir\u00e1 um seletor de tela/aba. Escolha a aba desejada e marque obrigatoriamente <strong>\u201cCompartilhar \u00e1udio da aba\u201d<\/strong> (caixa de sele\u00e7\u00e3o na parte inferior). Sem isso nenhum som ser\u00e1 capturado.<\/div>' +
+    '<label class="opt"><input type="checkbox" id="chkMic" checked> Capturar microfone tamb\u00e9m<\/label>' +
+    '<div class="timer" id="timer">00:00:00<\/div>' +
+    '<div class="status" id="status">Aguardando...<\/div>' +
+    '<div class="btns">' +
+    '<button class="btn btn-ok" id="btnI" onclick="iniciar()">\u25B6 Iniciar Captura<\/button>' +
+    '<button class="btn btn-stop" id="btnP" onclick="parar()">\u23F9 Parar e Enviar<\/button>' +
+    '<\/div>' +
+    '<scr'+'ipt>' +
+    'var rec=null,chunks=[],stScreen=null,stMic=null,actx=null,segs=0,iv=null;' +
+    'function fmt(s){var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;' +
+    'return[h,m,ss].map(function(x){return x<10?"0"+x:x}).join(":")}' +
+    'function setSt(t){document.getElementById("status").textContent=t}' +
+    'async function iniciar(){' +
+    'try{' +
+    'document.getElementById("btnI").disabled=true;' +
+    'setSt("Aguardando sele\u00e7\u00e3o de tela...");' +
+    'stScreen=await navigator.mediaDevices.getDisplayMedia({audio:true,video:{width:1,height:1,frameRate:1}});' +
+    'stScreen.getVideoTracks().forEach(function(t){t.stop();});' +
+    'var atks=stScreen.getAudioTracks();' +
+    'if(!atks.length){setSt("\u26A0\uFE0F Nenhum \u00e1udio encontrado. Reinicie e marque \\"Compartilhar \u00e1udio\\" na sele\u00e7\u00e3o de tela.");' +
+    'document.getElementById("btnI").disabled=false;return;}' +
+    'actx=new AudioContext();' +
+    'var dest=actx.createMediaStreamDestination();' +
+    'var ss=actx.createMediaStreamSource(stScreen);ss.connect(dest);' +
+    'if(document.getElementById("chkMic").checked){' +
+    'try{stMic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true}});' +
+    'var ms=actx.createMediaStreamSource(stMic);ms.connect(dest);' +
+    'setSt("Capturando sistema + microfone...");}' +
+    'catch(em){setSt("Capturando somente sistema (mic indispon\u00edvel).")}}' +
+    'else{setSt("Capturando \u00e1udio do sistema...");}' +
+    'var ts=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"];' +
+    'var tp=ts.find(function(t){return MediaRecorder.isTypeSupported(t)})||"audio/webm";' +
+    'rec=new MediaRecorder(dest.stream,{mimeType:tp,audioBitsPerSecond:40000});' +
+    'chunks=[];' +
+    'rec.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data)};' +
+    'rec.onstop=function(){' +
+    'var blob=new Blob(chunks,{type:tp});' +
+    'setSt("Enviando para o Smart Meeting...");' +
+    'try{if(window.opener&&!window.opener.closed)' +
+    'window.opener.postMessage({type:"sm_audio_blob_online",blob:blob,mimeType:tp,duracaoSegundos:segs},"*");}' +
+    'catch(_){}' +
+    'stopAll();' +
+    'document.getElementById("timer").style.color="#2d5a1b";' +
+    'setSt("\u2705 Enviado! Pode fechar esta janela.");' +
+    'document.getElementById("btnP").style.display="none";};' +
+    'rec.start(1000);segs=0;' +
+    'iv=setInterval(function(){segs++;document.getElementById("timer").textContent=fmt(segs)},1000);' +
+    'document.getElementById("timer").className="timer gravando";' +
+    'document.getElementById("btnI").style.display="none";' +
+    'document.getElementById("btnP").style.display="flex";' +
+    'try{if(window.opener&&!window.opener.closed)' +
+    'window.opener.postMessage({type:"sm_gravando_online"},"*");}catch(_){}' +
+    '}catch(e){' +
+    'if(e.name==="NotAllowedError"||e.name==="NotFoundError")' +
+    'setSt("\u26A0\uFE0F Permiss\u00e3o negada ou captura cancelada.");' +
+    'else setSt("\u274C Erro: "+(e.message||e.name));' +
+    'document.getElementById("btnI").disabled=false;}}' +
+    'function parar(){if(rec&&rec.state!=="inactive")rec.stop();}' +
+    'function stopAll(){clearInterval(iv);' +
+    'if(stScreen)stScreen.getTracks().forEach(function(t){t.stop()});' +
+    'if(stMic)stMic.getTracks().forEach(function(t){t.stop()});' +
+    'if(actx){try{actx.close()}catch(_){}}stScreen=stMic=null;}' +
+    '<\/scr'+'ipt><\/body><\/html>';
+}
+
+function abrirGravadorOnline() {
+  if (_popupGravadorOnline && !_popupGravadorOnline.closed) {
+    _popupGravadorOnline.focus(); return;
+  }
+  var larg = 460, alt = 500;
+  var left = Math.max(0, Math.floor(screen.width / 2 - larg / 2));
+  var top  = Math.max(0, Math.floor(screen.height / 2 - alt / 2));
+  _popupGravadorOnline = window.open('', 'sm_gravador_online',
+    'width=' + larg + ',height=' + alt + ',left=' + left + ',top=' + top +
+    ',toolbar=no,menubar=no,location=no,status=no,resizable=yes');
+  if (!_popupGravadorOnline) {
+    toast('Popup bloqueado! Permita popups para este site.', 'erro', 5000);
+    return;
+  }
+  try {
+    _popupGravadorOnline.document.open();
+    _popupGravadorOnline.document.write(_htmlGravadorOnline());
+    _popupGravadorOnline.document.close();
+  } catch(e) {
+    log('ERRO', 'Erro ao abrir gravador online: ' + e.message);
+  }
+}
+
+function mostrarArquivoOnline(f) {
+  document.getElementById('arquivoPreviewOnline').style.display = 'flex';
+  document.getElementById('arquivoNomeOnline').textContent = f.name;
+  document.getElementById('arquivoTamOnline').textContent = fmtBytes(f.size);
+  document.getElementById('btnEnviarOnline').disabled = false;
+}
+
+function downloadArquivoOnline() {
+  if (!arquivoAtualOnline) return;
+  var url = URL.createObjectURL(arquivoAtualOnline);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = arquivoAtualOnline.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 10000);
+}
+
+function removerArquivoOnline() {
+  arquivoAtualOnline = null;
+  document.getElementById('arquivoPreviewOnline').style.display = 'none';
+  document.getElementById('btnEnviarOnline').disabled = true;
+  var lb = document.getElementById('statusGravLabelOnline');
+  if (lb) { lb.textContent = 'Aguardando...'; lb.className = 'status-grav'; }
+  var td = document.getElementById('timerDisplayOnline');
+  if (td) { td.textContent = '00:00:00'; td.className = 'timer-display'; }
+}
+
+function abrirModalConfigurarEnvioOnline() {
+  if (!arquivoAtualOnline) { toast('Nenhum áudio gravado ainda.', 'aviso'); return; }
+  modoConfigurarEnvio = 'online';
+  // Abre o modal genérico de configuração
+  document.querySelectorAll('input[name="estiloAta"]').forEach(function(r) { r.checked = false; });
+  document.getElementById('inputInstrucaoExtra').value = '';
+  var info = document.getElementById('promptSelecionadoInfo');
+  if (info) info.style.display = 'none';
+  document.getElementById('previewPromptArea').innerHTML =
+    '<span style="color:var(--marrom-claro);font-family:inherit;font-style:italic;">← Selecione um estilo para visualizar o prompt.</span>';
+  document.getElementById('modalConfigurarEnvio').classList.add('visivel');
+  _carregarPromptsUsuario();
+}
+
+// ═══════════════════════════════════════
+//  TRANSCRIÇÃO DIRETA
+// ═══════════════════════════════════════
+function abrirConfigTranscricaoDireta() {
+  var transcricao = (document.getElementById('inputTranscricaoDireta').value || '').trim();
+  if (!transcricao || transcricao.length < 20) {
+    toast('Cole uma transcrição com pelo menos 20 caracteres.', 'aviso'); return;
+  }
+  modoConfigurarEnvio = 'transcricao';
+  document.querySelectorAll('input[name="estiloAta"]').forEach(function(r) { r.checked = false; });
+  document.getElementById('inputInstrucaoExtra').value = '';
+  var info = document.getElementById('promptSelecionadoInfo');
+  if (info) info.style.display = 'none';
+  document.getElementById('previewPromptArea').innerHTML =
+    '<span style="color:var(--marrom-claro);font-family:inherit;font-style:italic;">← Selecione um estilo para visualizar o prompt.</span>';
+  document.getElementById('modalConfigurarEnvio').classList.add('visivel');
+  _carregarPromptsUsuario();
+}
+
+function processarTranscricaoDireta(estilo, instrucaoExtra) {
+  var titulo        = (document.getElementById('inputTituloTranscricao').value || '').trim() || 'Reunião';
+  var participantes = (document.getElementById('inputParticipantesTranscricao').value || '').trim();
+  var depSel        = document.getElementById('inputDepartamentoTranscricao');
+  var departamentoId = depSel ? depSel.value : '';
+  var transcricao   = (document.getElementById('inputTranscricaoDireta').value || '').trim();
+  var promptCustom  = _promptCustomSelecionado ? (_promptCustomSelecionado.conteudo || '') : '';
+
+  toast('Gerando ata via IA... aguarde', 'info', 60000);
+  atualizarLoading('Gerando ata a partir da transcrição...');
+  log('INFO', '📋 Processando transcrição direta: ' + titulo);
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      atualizarLoading('');
+      (r && r.logs || []).forEach(function(l) { log(l.tipo, l.mensagem); });
+      if (!r || !r.sucesso) {
+        toast('Erro: ' + (r ? r.mensagem : 'Falha desconhecida'), 'erro', 8000);
+        return;
+      }
+      toast('✅ Ata gerada com sucesso!', 'sucesso', 5000);
+      log('SUCESSO', '🎉 Ata via transcrição direta criada!');
+      exibirAtaPainel(r.reuniaoId, r.ata, titulo, false);
+      carregarCatalogo();
+      setTimeout(function() {
+        if (r.ata) abrirValidacaoAta(r.reuniaoId, r.ata, titulo, true);
+      }, 400);
+    })
+    .withFailureHandler(function(e) {
+      atualizarLoading('');
+      var msg = e && e.message ? e.message : String(e);
+      toast('Falha: ' + msg, 'erro', 8000);
+      log('ERRO', '❌ ' + msg);
+    })
+    .gerarAtaDeTranscricaoDireta(SESSAO_TOKEN, {
+      titulo:        titulo,
+      participantes: participantes,
+      departamentoId:departamentoId,
+      transcricao:   transcricao,
+      estilo:        estilo,
+      instrucaoExtra:instrucaoExtra || '',
+      promptCustom:  promptCustom
+    });
+}
+
+// ═══════════════════════════════════════
+//  SISTEMA DE PROMPTS PERSONALIZADOS
+// ═══════════════════════════════════════
+
+var _promptDraftInterval   = null;
+var _promptEditandoId      = null;
+var _sugestoesAcumuladas   = []; // textos das sugestões selecionadas
+var _promptsCache          = []; // cache local dos prompts do usuário
+var _chatHistMsg           = []; // histórico de mensagens do chat [{role, content}]
+var _promptCustomSelecionado = null; // prompt personalizado selecionado como instrução primária
+
+function _setEditorChars(n) {
+  var el = document.getElementById('editorChars');
+  if (el) el.textContent = n + ' chars';
+}
+
+function editorLimpar() {
+  if (!confirm('Limpar todo o conteúdo do editor?')) return;
+  document.getElementById('editorPromptTexto').value = '';
+  _setEditorChars(0);
+}
+
+function editorCopiar() {
+  var ta = document.getElementById('editorPromptTexto');
+  if (!ta || !ta.value) { toast('Editor está vazio.', 'aviso'); return; }
+  navigator.clipboard.writeText(ta.value).then(function() {
+    toast('Prompt copiado!', 'sucesso');
+  }).catch(function() {
+    ta.select(); document.execCommand('copy');
+    toast('Prompt copiado!', 'sucesso');
+  });
+}
+
+/* ── Abrir editor ─────────────────────────────── */
+function abrirEditorPrompt(promptId) {
+  _promptEditandoId    = promptId || null;
+  _sugestoesAcumuladas = [];
+  _chatHistMsg         = [];
+
+  // Limpa UI
+  document.getElementById('editorPromptNome').value  = '';
+  document.getElementById('editorPromptTexto').value = '';
+  _setEditorChars(0);
+  document.getElementById('chatHist').innerHTML      = '';
+  document.getElementById('chatChipsSel').innerHTML  = '';
+  document.getElementById('chatInput').value         = '';
+  document.querySelectorAll('.sug-chip').forEach(function(c) { c.classList.remove('sel'); });
+  document.getElementById('editorDraftBadge').style.display = 'none';
+
+  var draftKey = 'sm_prompt_draft_' + SESSAO_TOKEN + (promptId ? '_' + promptId : '_novo');
+
+  if (promptId) {
+    // Carrega prompt existente
+    var existing = _promptsCache.find(function(p) { return p.id === promptId; });
+    if (existing) {
+      document.getElementById('editorPromptNome').value  = existing.nome || '';
+      document.getElementById('editorPromptTexto').value = existing.conteudo || '';
+      _setEditorChars((existing.conteudo || '').length);
+    }
+    // Verifica rascunho
+    try {
+      var draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
+      if (draft && (draft.nome !== (existing && existing.nome) || draft.conteudo !== (existing && existing.conteudo))) {
+        _mostrarRascunhoDisponivel(draftKey, draft);
+      }
+    } catch(_) {}
+  } else {
+    // Novo prompt — verifica rascunho
+    try {
+      var draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
+      if (draft && (draft.nome || draft.conteudo)) {
+        document.getElementById('editorPromptNome').value  = draft.nome  || '';
+        document.getElementById('editorPromptTexto').value = draft.conteudo || '';
+        _setEditorChars((draft.conteudo || '').length);
+        document.getElementById('editorDraftBadge').style.display = 'inline-flex';
+      }
+    } catch(_) {}
+  }
+
+  // Detecta tópicos do conteúdo carregado
+  _detectarTopicos();
+
+  // Mensagem de boas-vindas no chat
+  _adicionarBubbleChat('s', '💬 Olá! Descreva como quer a ata ou peça melhorias no prompt atual. Você também pode acumular sugestões clicando nos chips à direita.');
+
+  // Inicia auto-save
+  _iniciarAutoSavePrompt(draftKey);
+
+  document.getElementById('modalEditorPrompt').classList.add('visivel');
+}
+
+function _mostrarRascunhoDisponivel(draftKey, draft) {
+  document.getElementById('editorDraftBadge').style.display = 'inline-flex';
+  // Pergunta ao usuário via chat
+  _adicionarBubbleChat('s', '📝 Encontrei um rascunho salvo. Clique no badge "Rascunho" para restaurá-lo ou continue editando.');
+  document.getElementById('editorDraftBadge').onclick = function() {
+    document.getElementById('editorPromptNome').value  = draft.nome  || '';
+    document.getElementById('editorPromptTexto').value = draft.conteudo || '';
+    _setEditorChars((draft.conteudo || '').length);
+    toast('Rascunho restaurado!', 'sucesso');
+    document.getElementById('editorDraftBadge').style.display = 'none';
+  };
+}
+
+/* ── Fechar editor ─────────────────────────────── */
+function fecharEditorPrompt() {
+  _pararAutoSavePrompt();
+  document.getElementById('modalEditorPrompt').classList.remove('visivel');
+}
+
+/* ── Auto-save rascunho ─────────────────────────── */
+function _iniciarAutoSavePrompt(draftKey) {
+  _pararAutoSavePrompt();
+  _promptDraftInterval = setInterval(function() {
+    try {
+      var nome     = document.getElementById('editorPromptNome').value;
+      var conteudo = document.getElementById('editorPromptTexto').value;
+      localStorage.setItem(draftKey, JSON.stringify({ nome: nome, conteudo: conteudo }));
+      document.getElementById('editorDraftBadge').style.display = 'inline-flex';
+    } catch(_) {}
+  }, 4000);
+}
+
+function _pararAutoSavePrompt() {
+  if (_promptDraftInterval) { clearInterval(_promptDraftInterval); _promptDraftInterval = null; }
+}
+
+/* ── Contador de caracteres + tópicos ao digitar ── */
+document.addEventListener('DOMContentLoaded', function() {
+  var ta = document.getElementById('editorPromptTexto');
+  if (ta) ta.addEventListener('input', function() {
+    _setEditorChars(ta.value.length);
+    _detectarTopicos();
+  });
+});
+
+/* ── Salvar prompt ─────────────────────────────── */
+function salvarPromptEditor() {
+  var nome     = (document.getElementById('editorPromptNome').value || '').trim();
+  var conteudo = (document.getElementById('editorPromptTexto').value || '').trim();
+  if (!nome)     { toast('Dê um nome ao prompt.', 'aviso'); return; }
+  if (!conteudo) { toast('O conteúdo do prompt está vazio.', 'aviso'); return; }
+
+  var dados = { nome: nome, conteudo: conteudo };
+  if (_promptEditandoId) dados.id = _promptEditandoId;
+
+  var btn = document.getElementById('editorBtnSalvar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Salvar Prompt'; }
+      if (!r || !r.sucesso) { toast('Erro: ' + (r ? r.mensagem : 'Falha'), 'erro'); return; }
+      toast('✅ Prompt salvo!', 'sucesso');
+      // Limpa rascunho
+      try {
+        var draftKey = 'sm_prompt_draft_' + SESSAO_TOKEN + (_promptEditandoId ? '_' + _promptEditandoId : '_novo');
+        localStorage.removeItem(draftKey);
+        document.getElementById('editorDraftBadge').style.display = 'none';
+      } catch(_) {}
+      fecharEditorPrompt();
+      _carregarPromptsUsuario();
+    })
+    .withFailureHandler(function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Salvar Prompt'; }
+      toast('Falha ao salvar: ' + (e && e.message ? e.message : e), 'erro');
+    })
+    .salvarPrompt(SESSAO_TOKEN, dados);
+}
+
+/* ── Toggle de sugestão ─────────────────────────── */
+function toggleSugestao(el, texto) {
+  var idx = _sugestoesAcumuladas.indexOf(texto);
+  if (idx === -1) {
+    _sugestoesAcumuladas.push(texto);
+    el.classList.add('sel');
+  } else {
+    _sugestoesAcumuladas.splice(idx, 1);
+    el.classList.remove('sel');
+  }
+  _atualizarChipsSelecionados();
+}
+
+function _atualizarChipsSelecionados() {
+  var cont = document.getElementById('chatChipsSel');
+  if (!cont) return;
+  if (_sugestoesAcumuladas.length === 0) {
+    cont.innerHTML = '<span style="font-size:0.72rem;color:rgba(212,169,106,0.45);font-style:italic;">Nenhuma sugestão selecionada</span>';
+    return;
+  }
+  cont.innerHTML = _sugestoesAcumuladas.map(function(t) {
+    return '<span class="chip-selecionado" title="' + t + '">' + t.substring(0, 28) + (t.length > 28 ? '…' : '') + '</span>';
+  }).join('');
+}
+
+/* ── Tópicos: detectar e navegar ────────────────── */
+function _detectarTopicos() {
+  var ta   = document.getElementById('editorPromptTexto');
+  var cont = document.getElementById('editorTopicos');
+  if (!cont || !ta) return;
+  var texto  = ta.value || '';
+  var linhas = texto.split('\n');
+  var topicos = [];
+  var charOffset = 0;
+  linhas.forEach(function(linha) {
+    var limpa = linha.trim();
+    var nome = null;
+    var m;
+    if ((m = limpa.match(/^#{1,3}\s+(.+)/)))            nome = m[1].replace(/\*\*/g,'').trim();
+    else if ((m = limpa.match(/^\*\*(.+?)\*\*\s*:?\s*$/))) nome = m[1].trim();
+    else if ((m = limpa.match(/^(\d+)\.\s+([A-ZÁÉÍÓÚ].{2,})/))) nome = m[2].trim();
+    else if ((m = limpa.match(/^([A-ZÁÉÍÓÚÃÕÂÊÔÇ][A-ZÁÉÍÓÚÃÕÂÊÔÇa-záéíóúãõâêô\s]{3,}):\s*$/))) nome = m[1].trim();
+    if (nome) topicos.push({ nome: nome, pos: charOffset });
+    charOffset += linha.length + 1;
+  });
+  var html = '<span class="topicos-bar-label">Tópicos</span>';
+  if (topicos.length === 0) {
+    html += '<span style="font-size:0.7rem;color:rgba(212,169,106,0.4);font-style:italic;">Nenhum tópico detectado</span>';
+  } else {
+    html += topicos.map(function(t) {
+      return '<button class="topico-badge" onclick="_irParaTopico(' + t.pos + ')" title="' + _escaparHtml(t.nome) + '">' +
+        _escaparHtml(t.nome.length > 22 ? t.nome.substring(0,22)+'…' : t.nome) + '</button>';
+    }).join('');
+  }
+  cont.innerHTML = html;
+}
+
+function _irParaTopico(pos) {
+  var ta = document.getElementById('editorPromptTexto');
+  if (!ta) return;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+  var lh = parseInt(window.getComputedStyle(ta).lineHeight) || 20;
+  var linhaNo = (ta.value.substring(0, pos).match(/\n/g) || []).length;
+  ta.scrollTop = Math.max(0, (linhaNo - 2) * lh);
+}
+
+/* ── Parser de resposta estruturada do Gemini ──── */
+var _geminiParsedCache = {};
+
+function _parsearRespostaGemini(resposta) {
+  // PROMPT_COMPLETO
+  var mC = resposta.match(/<<<PROMPT_COMPLETO>>>([\s\S]*?)<<<FIM>>>/);
+  if (mC) {
+    return { tipo: 'completo', conteudo: mC[1].trim(),
+      texto: resposta.replace(/<<<PROMPT_COMPLETO>>>[\s\S]*?<<<FIM>>>/, '').trim() };
+  }
+  // TOPICO
+  var mT = resposta.match(/<<<TOPICO:([^>]+)>>>([\s\S]*?)<<<FIM>>>/);
+  if (mT) {
+    return { tipo: 'topico', nome: mT[1].trim(), conteudo: mT[2].trim(),
+      texto: resposta.replace(/<<<TOPICO:[^>]+>>>[\s\S]*?<<<FIM>>>/, '').trim() };
+  }
+  // TRECHO
+  var mOrig = resposta.match(/<<<ORIGINAL>>>([\s\S]*?)<<<FIM_ORIGINAL>>>/);
+  var mNovo  = resposta.match(/<<<NOVO>>>([\s\S]*?)<<<FIM_NOVO>>>/);
+  if (mOrig && mNovo) {
+    return { tipo: 'trecho', original: mOrig[1].trim(), novo: mNovo[1].trim(),
+      texto: resposta.replace(/<<<ORIGINAL>>>[\s\S]*?<<<FIM_NOVO>>>/, '').trim() };
+  }
+  return { tipo: 'info', texto: resposta };
+}
+
+/* ── Aplicar ação do Gemini ao editor ────────────── */
+function _aplicarAcaoGemini(bubbleId) {
+  var parsed = _geminiParsedCache[bubbleId];
+  if (!parsed) return;
+  var ta = document.getElementById('editorPromptTexto');
+  if (!ta) return;
+
+  if (parsed.tipo === 'completo') {
+    ta.value = parsed.conteudo;
+    _setEditorChars(parsed.conteudo.length);
+    _detectarTopicos();
+    toast('✅ Prompt completo aplicado!', 'sucesso');
+    return;
+  }
+
+  if (parsed.tipo === 'topico') {
+    var linhas  = ta.value.split('\n');
+    var nomeLC  = parsed.nome.toLowerCase();
+    var inicio  = -1, fim = linhas.length;
+    for (var i = 0; i < linhas.length; i++) {
+      var limpa = linhas[i].replace(/^#+\s*/, '').replace(/\*\*/g,'').replace(/^\d+\.\s*/,'').replace(/:\s*$/,'').trim().toLowerCase();
+      if (limpa === nomeLC || limpa.startsWith(nomeLC.substring(0, Math.max(5, nomeLC.length - 3)))) {
+        inicio = i;
+        for (var j = i + 1; j < linhas.length; j++) {
+          if (/^#{1,3}\s|^\*\*[^*]+\*\*\s*:?\s*$|^\d+\.\s+[A-ZÁÉÍÓÚ]|^[A-ZÁÉÍÓÚÃÕ]{3}/.test(linhas[j].trim())) {
+            fim = j; break;
+          }
+        }
+        break;
+      }
+    }
+    var novasLinhas = parsed.conteudo.split('\n');
+    if (inicio >= 0) {
+      linhas.splice.apply(linhas, [inicio, fim - inicio].concat(novasLinhas));
+      ta.value = linhas.join('\n');
+      toast('✅ Tópico "' + parsed.nome + '" atualizado!', 'sucesso');
+    } else {
+      ta.value = ta.value + '\n\n' + parsed.conteudo;
+      toast('⚠️ Tópico não encontrado — conteúdo adicionado ao final.', 'aviso');
+    }
+    _setEditorChars(ta.value.length);
+    _detectarTopicos();
+    return;
+  }
+
+  if (parsed.tipo === 'trecho') {
+    if (ta.value.indexOf(parsed.original) !== -1) {
+      ta.value = ta.value.replace(parsed.original, parsed.novo);
+      toast('✅ Trecho substituído!', 'sucesso');
+    } else {
+      ta.value = ta.value + '\n\n' + parsed.novo;
+      toast('⚠️ Trecho original não localizado — conteúdo adicionado ao final.', 'aviso');
+    }
+    _setEditorChars(ta.value.length);
+    _detectarTopicos();
+    return;
+  }
+
+  // info — copia tudo para o editor
+  ta.value = parsed.texto;
+  _setEditorChars(parsed.texto.length);
+  _detectarTopicos();
+  toast('Conteúdo copiado para o editor.', 'info');
+}
+
+/* ── Chat com Gemini ─────────────────────────────── */
+function enviarChatGemini() {
+  var input = document.getElementById('chatInput');
+  var textoUsuario = (input ? input.value : '').trim();
+
+  // Requer pelo menos texto ou sugestão
+  if (!textoUsuario && _sugestoesAcumuladas.length === 0) {
+    toast('Digite uma mensagem ou selecione sugestões.', 'aviso'); return;
+  }
+
+  // ── Monta mensagem estruturada para o Gemini ──
+  var promptAtual = (document.getElementById('editorPromptTexto').value || '').trim();
+  var blocos = [];
+
+  // Bloco 1: estado do editor
+  if (promptAtual) {
+    blocos.push('[ESTADO DO EDITOR]\nO editor contém o seguinte prompt:\n"""\n' + promptAtual + '\n"""');
+  } else {
+    blocos.push('[ESTADO DO EDITOR]\nVAZIO — nenhum prompt foi criado ainda.');
+  }
+
+  // Bloco 2: pedido do usuário
+  if (textoUsuario) {
+    blocos.push('[PEDIDO]\n' + textoUsuario);
+  }
+
+  // Bloco 3: temas/requisitos (sugestões)
+  if (_sugestoesAcumuladas.length > 0) {
+    blocos.push('[TEMAS/REQUISITOS A INCLUIR]\n' + _sugestoesAcumuladas.map(function(s){ return '• ' + s; }).join('\n'));
+  }
+
+  var msgFinal = blocos.join('\n\n');
+
+  _adicionarBubbleChat('u', _escaparHtml(textoUsuario || '(' + _sugestoesAcumuladas.join(' + ') + ')'));
+  if (input) input.value = '';
+
+  _sugestoesAcumuladas = [];
+  document.querySelectorAll('.sug-chip').forEach(function(c) { c.classList.remove('sel'); });
+  _atualizarChipsSelecionados();
+
+  var typingId = 'typing_' + Date.now();
+  _adicionarBubbleChat('g', '<span class="chat-dots"><span></span><span></span><span></span></span>', typingId);
+
+  _chatHistMsg.push({ role: 'user', content: msgFinal });
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      _removerBubble(typingId);
+      if (!r || !r.sucesso) {
+        _adicionarBubbleChat('s', '❌ Erro: ' + (r ? r.mensagem : 'Falha na API'));
+        _chatHistMsg.pop();
+        return;
+      }
+      var resposta = r.resposta || '';
+      _chatHistMsg.push({ role: 'model', content: resposta });
+
+      var parsed   = _parsearRespostaGemini(resposta);
+      var bubbleId = 'gb_' + Date.now();
+      _geminiParsedCache[bubbleId] = parsed;
+
+      var explicacao = _escaparHtml(parsed.texto || '').replace(/\n/g, '<br>');
+      var acoesHtml  = '';
+
+      if (parsed.tipo === 'completo') {
+        var preview = parsed.conteudo.substring(0, 120).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        acoesHtml =
+          '<div class="chat-preview-bloco">' + preview + (parsed.conteudo.length > 120 ? '…' : '') + '</div>' +
+          '<div class="chat-acoes-bloco">' +
+            '<button class="chat-acao-btn chat-acao-completo" onclick="_aplicarAcaoGemini(\'' + bubbleId + '\')"><i class="fas fa-check-circle"></i> Usar prompt completo</button>' +
+          '</div>';
+      } else if (parsed.tipo === 'topico') {
+        var previewT = parsed.conteudo.substring(0, 100).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        acoesHtml =
+          '<div class="chat-preview-bloco">' + previewT + (parsed.conteudo.length > 100 ? '…' : '') + '</div>' +
+          '<div class="chat-acoes-bloco">' +
+            '<button class="chat-acao-btn chat-acao-topico" onclick="_aplicarAcaoGemini(\'' + bubbleId + '\')"><i class="fas fa-layer-group"></i> Substituir tópico: <em>' + _escaparHtml(parsed.nome) + '</em></button>' +
+          '</div>';
+      } else if (parsed.tipo === 'trecho') {
+        acoesHtml =
+          '<div class="chat-preview-bloco" style="border-left-color:rgba(192,125,42,0.5);">' +
+            '<span style="color:rgba(255,100,100,0.7);font-size:0.65rem;">— ANTES —</span><br>' +
+            parsed.original.substring(0,80).replace(/</g,'&lt;') + (parsed.original.length>80?'…':'') +
+            '<br><span style="color:rgba(100,200,100,0.7);font-size:0.65rem;">+ DEPOIS +</span><br>' +
+            parsed.novo.substring(0,80).replace(/</g,'&lt;') + (parsed.novo.length>80?'…':'') +
+          '</div>' +
+          '<div class="chat-acoes-bloco">' +
+            '<button class="chat-acao-btn chat-acao-trecho" onclick="_aplicarAcaoGemini(\'' + bubbleId + '\')"><i class="fas fa-exchange-alt"></i> Aplicar substituição</button>' +
+          '</div>';
+      } else {
+        acoesHtml =
+          '<div class="chat-acoes-bloco">' +
+            '<button class="chat-acao-btn chat-acao-info" onclick="_aplicarAcaoGemini(\'' + bubbleId + '\')"><i class="fas fa-clipboard"></i> Copiar para o editor</button>' +
+          '</div>';
+      }
+
+      _adicionarBubbleChat('g', explicacao + acoesHtml, bubbleId);
+    })
+    .withFailureHandler(function(e) {
+      _removerBubble(typingId);
+      _adicionarBubbleChat('s', '❌ Falha: ' + (e && e.message ? e.message : String(e)));
+      _chatHistMsg.pop();
+    })
+    .chatGeminiPrompt(SESSAO_TOKEN, _chatHistMsg.slice());
+}
+
+function _adicionarBubbleChat(tipo, htmlConteudo, id) {
+  var hist = document.getElementById('chatHist');
+  if (!hist) return;
+  var div = document.createElement('div');
+  div.className = 'chat-b ' + tipo;
+  if (id) div.id = id;
+  div.innerHTML = htmlConteudo;
+  hist.appendChild(div);
+  hist.scrollTop = hist.scrollHeight;
+}
+
+function _removerBubble(id) {
+  var el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function _escaparHtml(txt) {
+  return txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// Enter no chat input envia
+document.addEventListener('DOMContentLoaded', function() {
+  var ci = document.getElementById('chatInput');
+  if (ci) ci.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarChatGemini(); }
+  });
+});
+
+/* ── Renderizar prompts no modal de configuração ── */
+function renderPromptsCfgModal(prompts) {
+  _promptsCache = prompts || [];
+  var cont = document.getElementById('cfgPromptsList');
+  if (!cont) return;
+
+  if (!prompts || prompts.length === 0) {
+    cont.innerHTML = '<div class="prompt-empty">Você ainda não criou prompts personalizados.</div>';
+    return;
+  }
+
+  cont.innerHTML = prompts.map(function(p) {
+    var preview = (p.conteudo || '').substring(0, 90) + ((p.conteudo || '').length > 90 ? '…' : '');
+    return '<div class="prompt-card" onclick="selecionarPromptNaModal(' + JSON.stringify(p).replace(/"/g, '&quot;') + ')" title="Clique para usar">' +
+      '<div class="prompt-card-nome">' + _escaparHtml(p.nome || '') + '</div>' +
+      '<div class="prompt-card-preview">' + _escaparHtml(preview) + '</div>' +
+      '<div class="prompt-card-acoes">' +
+        '<button onclick="event.stopPropagation();abrirEditorPrompt(\'' + p.id + '\')" title="Editar">✏️ Editar</button>' +
+        '<button onclick="event.stopPropagation();excluirPromptConfirmar(\'' + p.id + '\',\'' + _escaparHtml(p.nome || '') + '\')" title="Excluir">🗑️ Excluir</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function selecionarPromptNaModal(prompt) {
+  if (typeof prompt === 'string') {
+    try { prompt = JSON.parse(prompt); } catch(_) { return; }
+  }
+  _promptCustomSelecionado = prompt;
+  var info = document.getElementById('promptSelecionadoInfo');
+  var vazio = document.getElementById('promptSelecionadoVazio');
+  if (info) {
+    info.style.display = 'flex';
+    var nomeEl = document.getElementById('promptSelecionadoNome');
+    if (nomeEl) nomeEl.textContent = prompt.nome || '';
+  }
+  if (vazio) vazio.style.display = 'none';
+  // Atualiza preview do prompt se estilo já selecionado
+  var rdo = document.querySelector('input[name="estiloAta"]:checked');
+  if (rdo) carregarPreviewPrompt(rdo.value);
+  toast('Prompt "' + (prompt.nome || '') + '" definido como instrução principal.', 'sucesso');
+}
+
+function limparPromptSelecionado() {
+  _promptCustomSelecionado = null;
+  var info = document.getElementById('promptSelecionadoInfo');
+  if (info) info.style.display = 'none';
+  var vazio = document.getElementById('promptSelecionadoVazio');
+  if (vazio) vazio.style.display = '';
+  var rdo = document.querySelector('input[name="estiloAta"]:checked');
+  if (rdo) carregarPreviewPrompt(rdo.value);
+}
+
+/* ── Excluir prompt (com confirmação) ─────────── */
+function excluirPromptConfirmar(promptId, nome) {
+  if (!confirm('Excluir o prompt "' + nome + '"?\nEsta ação não pode ser desfeita.')) return;
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r || !r.sucesso) { toast('Erro: ' + (r ? r.mensagem : 'Falha'), 'erro'); return; }
+      toast('Prompt excluído.', 'info');
+      _carregarPromptsUsuario();
+    })
+    .withFailureHandler(function(e) { toast('Falha: ' + (e && e.message ? e.message : e), 'erro'); })
+    .excluirPrompt(SESSAO_TOKEN, promptId);
+}
+
+/* ── Carregar prompts (chamado ao abrir modais) ── */
+function _carregarPromptsUsuario() {
+  var cont = document.getElementById('cfgPromptsList');
+  if (cont) cont.innerHTML = '<div class="prompt-empty" style="font-style:italic;">Carregando…</div>';
+
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (r && r.sucesso) {
+        renderPromptsCfgModal(r.prompts || []);
+        _renderizarMeusPrompts(r.prompts || []);
+      } else {
+        if (cont) cont.innerHTML = '<div class="prompt-empty">Erro ao carregar prompts.</div>';
+      }
+    })
+    .withFailureHandler(function() {
+      if (cont) cont.innerHTML = '<div class="prompt-empty">Falha ao carregar prompts.</div>';
+    })
+    .listarPromptsPorUsuario(SESSAO_TOKEN);
+}
+
+/* ── Modal "Meus Prompts" ───────────────────────── */
+function abrirMeusPrompts() {
+  document.getElementById('modalMeusPrompts').classList.add('visivel');
+  _renderizarMeusPrompts(null); // mostra loading
+  google.script.run
+    .withSuccessHandler(function(r) {
+      var prompts = (r && r.sucesso) ? (r.prompts || []) : [];
+      _promptsCache = prompts;
+      _renderizarMeusPrompts(prompts);
+      renderPromptsCfgModal(prompts); // sincroniza col. config modal também
+    })
+    .withFailureHandler(function() {
+      _renderizarMeusPrompts([]);
+    })
+    .listarPromptsPorUsuario(SESSAO_TOKEN);
+}
+
+function _renderizarMeusPrompts(prompts) {
+  var cont = document.getElementById('meusPromptsList');
+  if (!cont) return;
+
+  if (prompts === null) {
+    cont.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--marrom-claro);font-style:italic;"><i class="fas fa-circle-notch fa-spin" style="margin-right:0.4rem;"></i>Carregando seus prompts…</div>';
+    return;
+  }
+
+  if (prompts.length === 0) {
+    cont.innerHTML =
+      '<div class="prompt-empty">' +
+        '<i class="fas fa-wand-magic-sparkles"></i>' +
+        '<strong>Nenhum prompt criado ainda</strong><br>' +
+        'Clique em "Criar novo prompt" para começar.' +
+      '</div>';
+    return;
+  }
+
+  var html = '<div class="meus-prompts-grid">';
+  prompts.forEach(function(p) {
+    var idSafe = (p.id || '').replace(/'/g, "\\'");
+    var nomeSafe = _escaparHtml(p.nome || '');
+    var preview  = _escaparHtml((p.conteudo || '').substring(0, 180));
+    html +=
+      '<div class="mp-card">' +
+        '<div class="mp-card-nome" title="' + nomeSafe + '">' + nomeSafe + '</div>' +
+        '<div class="mp-card-preview">' + preview + (p.conteudo && p.conteudo.length > 180 ? '…' : '') + '</div>' +
+        '<div class="mp-card-footer">' +
+          '<button class="mp-card-btn editar" onclick="fecharModal(\'modalMeusPrompts\');abrirEditorPrompt(\'' + idSafe + '\')"><i class="fas fa-pen"></i> Editar</button>' +
+          '<button class="mp-card-btn excluir" onclick="excluirPromptMeusPrompts(\'' + idSafe + '\',\'' + nomeSafe + '\')"><i class="fas fa-trash"></i> Excluir</button>' +
+        '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
+function excluirPromptMeusPrompts(promptId, nome) {
+  if (!confirm('Excluir o prompt "' + nome + '"?\nEsta ação não pode ser desfeita.')) return;
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (!r || !r.sucesso) { toast('Erro: ' + (r ? r.mensagem : 'Falha'), 'erro'); return; }
+      toast('Prompt excluído.', 'info');
+      abrirMeusPrompts(); // recarrega
+    })
+    .withFailureHandler(function(e) { toast('Falha: ' + (e && e.message ? e.message : e), 'erro'); })
+    .excluirPrompt(SESSAO_TOKEN, promptId);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  EDITOR COMPLETO DE ATA — Word-like full-page editor
+// ═══════════════════════════════════════════════════════════
+var _ataEditorTemplateAtual = '';
+
+function abrirEditorCompleto() {
+  // Monta o conteúdo completo a partir das seções ou da ataBruta
+  var conteudo = '';
+  if (_val && _val.ataBruta && _val.ataBruta.length > 20) {
+    conteudo = _val.ataBruta;
+  } else if (_val && _val.secoes && _val.secoes.length > 0) {
+    conteudo = _val.secoes.map(function(s) {
+      return '## ' + s.titulo + '\n\n' + (s.conteudo || '');
+    }).join('\n\n---\n\n');
+  }
+  var canvas = document.getElementById('ataEditorCanvas');
+  canvas.innerHTML = (typeof md2html === 'function') ? md2html(conteudo) : conteudo;
+
+  // Título
+  var tituloEl = document.getElementById('ataEditorTitulo');
+  if (tituloEl && _val && _val.titulo) tituloEl.textContent = '— ' + _val.titulo;
+
+  // Abre overlay
+  document.getElementById('ataEditorOverlay').classList.add('visivel');
+
+  // Mantém template atual (ou reseta)
+  aplicarTemplateEditor(_ataEditorTemplateAtual || '');
+  _ataAtualizarContagem();
+  setTimeout(function() { canvas.focus(); }, 80);
+}
+
+function fecharEditorCompleto() {
+  document.getElementById('ataEditorOverlay').classList.remove('visivel');
+}
+
+function salvarEditorCompleto() {
+  var canvas = document.getElementById('ataEditorCanvas');
+  var html = canvas.innerHTML || '';
+  var md = (typeof html2md === 'function') ? html2md(html) : html;
+
+  if (!_val) return;
+  _val.ataBruta = md;
+  _val.secoes = (typeof _valParsear === 'function') ? _valParsear(md) : _val.secoes;
+  if (_val.secoes) {
+    _val.secoes.forEach(function(s) {
+      if (/feedback|privado/i.test(s.titulo)) s.incluirEmail = false;
+    });
+  }
+
+  if (typeof _valRenderSecoes === 'function') _valRenderSecoes();
+  if (typeof _valAtualizarPreview === 'function') _valAtualizarPreview();
+
+  fecharEditorCompleto();
+  if (typeof toast === 'function') toast('Ata salva com sucesso!', 'sucesso');
+}
+
+function aplicarTemplateEditor(tpl) {
+  var page = document.getElementById('ataEditorPage');
+  if (!page) return;
+  // Remove classes de template anteriores
+  var cls = Array.from(page.classList).filter(function(c) { return c.startsWith('tpl-'); });
+  cls.forEach(function(c) { page.classList.remove(c); });
+  if (tpl) page.classList.add(tpl);
+  _ataEditorTemplateAtual = tpl;
+  _ataAtivarTemplateCard(tpl);
+}
+
+function _ataAtivarTemplateCard(tpl) {
+  var map = { '': '0', 'tpl-executivo': '1', 'tpl-moderno': '2', 'tpl-classico': '3', 'tpl-minimal': '4', 'tpl-verde': '5' };
+  document.querySelectorAll('.ata-template-card').forEach(function(c) { c.classList.remove('ativo'); });
+  var idx = map.hasOwnProperty(tpl) ? map[tpl] : '0';
+  var card = document.getElementById('ataTPLCard' + idx);
+  if (card) card.classList.add('ativo');
+}
+
+function _ataExec(cmd, val) {
+  var canvas = document.getElementById('ataEditorCanvas');
+  if (canvas && document.activeElement !== canvas) canvas.focus();
+  try { document.execCommand(cmd, false, val !== undefined ? val : null); } catch(e) {}
+}
+
+function _ataEstiloBloco(tag) {
+  if (!tag) return;
+  var canvas = document.getElementById('ataEditorCanvas');
+  if (canvas && document.activeElement !== canvas) canvas.focus();
+  try { document.execCommand('formatBlock', false, '<' + tag + '>'); } catch(e) {}
+  _ataAtualizarContagem();
+}
+
+function _ataInserirLink() {
+  var url = prompt('URL do link:');
+  if (url) {
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    _ataExec('createLink', url);
+    // Abre link em nova aba
+    var links = document.getElementById('ataEditorCanvas').querySelectorAll('a:not([target])');
+    links.forEach(function(a) { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener'); });
+  }
+}
+
+function _ataInserirTabela() {
+  var linhas = parseInt(prompt('Número de linhas (sem cabeçalho):', '3'));
+  var colunas = parseInt(prompt('Número de colunas:', '3'));
+  if (!linhas || linhas < 1) linhas = 3;
+  if (!colunas || colunas < 1) colunas = 3;
+  var html = '<table><thead><tr>';
+  for (var c = 0; c < colunas; c++) html += '<th>Coluna ' + (c + 1) + '</th>';
+  html += '</tr></thead><tbody>';
+  for (var r = 0; r < linhas; r++) {
+    html += '<tr>';
+    for (var cc = 0; cc < colunas; cc++) html += '<td>&nbsp;</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table><p><br></p>';
+  _ataExec('insertHTML', html);
+}
+
+function _ataAtualizarContagem() {
+  var canvas = document.getElementById('ataEditorCanvas');
+  if (!canvas) return;
+  var texto = (canvas.innerText || '').replace(/\s+/g, ' ').trim();
+  var palavras = texto ? texto.split(' ').filter(function(w) { return w.length > 0; }).length : 0;
+  var chars = texto.length;
+  var el = document.getElementById('ataWordCount');
+  if (el) el.textContent = palavras + ' palavras · ' + chars + ' chars';
+}
+
+function _ataKeydown(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    salvarEditorCompleto();
+  }
 }
 
 // ═══════════════════════════════════════

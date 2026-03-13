@@ -713,12 +713,22 @@ function salvarProjetoCompleto(dados, token) {
     const novoId = dados.id || gerarId();
     const linhaDados = [];
     for(let k in COLUNAS_PROJETOS) linhaDados[COLUNAS_PROJETOS[k]] = '';
-    
+
     if (linha > 0) {
       const dadosAntigos = valores[linha-1];
       for(let k = 0; k < dadosAntigos.length; k++) linhaDados[k] = dadosAntigos[k];
+    } else {
+      // Novo projeto: criar pasta no Drive automaticamente
+      try {
+        const pastaPrincipal = DriveApp.getFolderById(ID_PASTA_DRIVE_REUNIOES);
+        const novaSubPasta = pastaPrincipal.createFolder(dados.nome || 'Projeto ' + novoId);
+        dados.link = 'https://drive.google.com/drive/folders/' + novaSubPasta.getId();
+      } catch(e) {
+        Logger.log('AVISO: não foi possível criar pasta no Drive: ' + e.message);
+        dados.link = dados.link || '';
+      }
     }
-    
+
     linhaDados[COLUNAS_PROJETOS.ID]              = novoId;
     linhaDados[COLUNAS_PROJETOS.NOME]            = dados.nome;
     linhaDados[COLUNAS_PROJETOS.DESCRICAO]       = dados.descricao;
@@ -766,7 +776,7 @@ function salvarProjetoCompleto(dados, token) {
       aba.appendRow(linhaDados);
     }
     
-    return { sucesso: true, id: novoId };
+    return { sucesso: true, id: novoId, link: linhaDados[COLUNAS_PROJETOS.LINK] || '' };
   } catch (e) {
     Logger.log('ERRO salvarProjetoCompleto: ' + e.toString());
     return { sucesso: false, mensagem: e.message };
@@ -999,7 +1009,9 @@ function enviarEmailParaResponsaveis(idsResponsaveis, projetoId, assuntoPersonal
         MailApp.sendEmail({
           to: responsavel.email,
           subject: assunto,
-          htmlBody: corpoEmail
+          htmlBody: corpoEmail,
+          name: 'Smart Meeting',
+          replyTo: 'setorbiunichristus@gmail.com'
         });
         emailsEnviados++;
         Logger.log('Email enviado para: ' + responsavel.email);
@@ -1510,7 +1522,7 @@ function enviarRelatorioProjetosEmail(token, opcoes) {
     });
 
     // Envia
-    const emailOpts = { subject: assunto, htmlBody: corpo };
+    const emailOpts = { subject: assunto, htmlBody: corpo, name: 'Smart Meeting', replyTo: 'setorbiunichristus@gmail.com' };
     if (emailsCC.length > 0) emailOpts.cc = emailsCC.join(',');
 
     if (emailsTo.length > 0) {
@@ -1762,7 +1774,9 @@ function enviarEmailParaResponsaveisComCopia(idsResponsaveis, projetoId, assunto
         const opcoesEmail = {
           to: responsavel.email,
           subject: assunto,
-          htmlBody: corpoEmail
+          htmlBody: corpoEmail,
+          name: 'Smart Meeting',
+          replyTo: 'setorbiunichristus@gmail.com'
         };
         
         // Adicionar CC se houver
@@ -2068,149 +2082,162 @@ function montarOpcoes(lista, pesoMaximo) {
   })).filter(o => o.valor > 0);
 }
 
+// ===================== CONFIG PRIORIDADE =====================
+
+const CONFIG_PRIORIDADE_DEFAULTS = {
+  // Gravidade
+  grav_critico:        5,
+  grav_alto:           4,
+  grav_medio:          3,
+  // Urgência
+  urg_imediata:        5,
+  urg_muito_urgente:   4,
+  urg_urgente:         3,
+  urg_pouco_urgente:   2,
+  urg_pode_esperar:    1,
+  // Tipo de Projeto
+  tipo_correcao:       5,
+  tipo_nova_impl:      4,
+  tipo_melhoria:       3,
+  // Para Quem
+  para_diretoria:      5,
+  para_outros:         3,
+  // Esforço
+  esf_turno:           5,
+  esf_dia:             4,
+  esf_semana:          3,
+  esf_mais_semana:     2,
+  // Escala de prioridade (thresholds)
+  escala_alta_min:     2102,
+  escala_media_min:    1078
+};
+
+function _lerConfigPrioridadeTab_() {
+  try {
+    const ss  = SpreadsheetApp.openById(ID_PLANILHA);
+    let aba   = ss.getSheetByName(NOME_ABA_CONFIG_PRIORIDADE);
+    if (!aba) {
+      aba = ss.insertSheet(NOME_ABA_CONFIG_PRIORIDADE);
+      inicializarCabecalhoAba(aba, NOME_ABA_CONFIG_PRIORIDADE);
+      return Object.assign({}, CONFIG_PRIORIDADE_DEFAULTS);
+    }
+    const dados = aba.getDataRange().getValues();
+    if (dados.length <= 1) return Object.assign({}, CONFIG_PRIORIDADE_DEFAULTS);
+    const cfg = Object.assign({}, CONFIG_PRIORIDADE_DEFAULTS);
+    for (let i = 1; i < dados.length; i++) {
+      const chave = dados[i][0] ? dados[i][0].toString().trim() : '';
+      const val   = dados[i][1];
+      if (chave && chave in cfg && val !== '' && val !== null) {
+        cfg[chave] = Number(val);
+      }
+    }
+    return cfg;
+  } catch (e) {
+    Logger.log('ERRO _lerConfigPrioridadeTab_: ' + e.toString());
+    return Object.assign({}, CONFIG_PRIORIDADE_DEFAULTS);
+  }
+}
+
+function obterConfigPrioridade(token) {
+  try {
+    const sess = verificarSessao(token);
+    if (!sess || !sess.valida) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    const cfg = _lerConfigPrioridadeTab_();
+    return { sucesso: true, config: cfg };
+  } catch (e) {
+    Logger.log('ERRO obterConfigPrioridade: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function salvarConfigPrioridade(token, config) {
+  try {
+    const sess = verificarSessao(token);
+    if (!sess || !sess.valida) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    if (sess.usuario.perfil !== 'admin') return { sucesso: false, mensagem: 'Apenas administradores podem alterar a configuração de prioridade.' };
+
+    const ss  = SpreadsheetApp.openById(ID_PLANILHA);
+    let aba   = ss.getSheetByName(NOME_ABA_CONFIG_PRIORIDADE);
+    if (!aba) {
+      aba = ss.insertSheet(NOME_ABA_CONFIG_PRIORIDADE);
+      inicializarCabecalhoAba(aba, NOME_ABA_CONFIG_PRIORIDADE);
+    }
+
+    // Reconstrói a aba inteiramente para evitar linhas órfãs
+    const linhas = [['Chave', 'Valor']];
+    const chavesValidas = Object.keys(CONFIG_PRIORIDADE_DEFAULTS);
+    chavesValidas.forEach(function(chave) {
+      const val = (config && config[chave] !== undefined) ? Number(config[chave]) : CONFIG_PRIORIDADE_DEFAULTS[chave];
+      linhas.push([chave, val]);
+    });
+
+    aba.clearContents();
+    aba.getRange(1, 1, linhas.length, 2).setValues(linhas);
+    aba.getRange(1, 1, 1, 2).setFontWeight('bold');
+
+    return { sucesso: true, mensagem: 'Configuração salva com sucesso!' };
+  } catch (e) {
+    Logger.log('ERRO salvarConfigPrioridade: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
 function obterConfigCalculoPrioridade() {
   try {
-    const aba = obterAba(NOME_ABA_PROJETOS);
-
-    // Pesos fixos por tipo de projeto
-    const PESOS_FIXOS_TIPO = {
-      'correção': 5, 'correcao': 5,
-      'nova implementação': 4, 'nova implementacao': 4,
-      'melhoria': 3
-    };
-
-    // ← novo: pesos fixos por esforço (conforme especificado pelo usuário)
-    const PESOS_FIXOS_ESFORCO = {
-      '1 turno ou menos (4 horas)': 5,
-      '1 dia ou menos (8 horas)':   4,
-      'uma semana (40h)':            3,
-      'mais de uma semana (40h)':    2
-    };
-
-    function obterOpcoesValidacao(colunaIndex) {
-      for (let linhaTest = 2; linhaTest <= 10; linhaTest++) {
-        try {
-          const range = aba.getRange(linhaTest, colunaIndex + 1);
-          const validacao = range.getDataValidation();
-          if (validacao) {
-            const criterio = validacao.getCriteriaType();
-            if (criterio === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) {
-              const valores = validacao.getCriteriaValues()[0];
-              if (Array.isArray(valores) && valores.length > 0) {
-                return valores.filter(v => v && v.toString().trim() !== '');
-              }
-            } else if (criterio === SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE) {
-              const rangeValidacao = validacao.getCriteriaValues()[0];
-              if (rangeValidacao) {
-                return rangeValidacao.getValues().flat().filter(v => v && v.toString().trim() !== '');
-              }
-            }
-          }
-        } catch (e) { continue; }
-      }
-      return [];
-    }
-
-    function montarOpcoesTipoFixo(lista) {
-      if (!lista || lista.length === 0) return [];
-      return lista
-        .map(label => {
-          const chave = label.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          const peso = PESOS_FIXOS_TIPO[label.toString().toLowerCase()] ||
-                       PESOS_FIXOS_TIPO[chave] || 0;
-          return { valor: peso, label: label.toString() };
-        })
-        .filter(o => o.valor > 0)
-        .sort((a, b) => b.valor - a.valor);
-    }
-
-    // ← nova função para esforço com pesos fixos
-    function montarOpcoesEsforcoFixo(lista) {
-      if (!lista || lista.length === 0) return [];
-      return lista
-        .map(label => {
-          const peso = PESOS_FIXOS_ESFORCO[label.toString().trim()] || 0;
-          return { valor: peso, label: label.toString().trim() };
-        })
-        .filter(o => o.valor > 0)
-        .sort((a, b) => b.valor - a.valor);
-    }
-
-    const opcoesGravidade = obterOpcoesValidacao(COLUNAS_PROJETOS.GRAVIDADE);
-    const opcoesUrgencia  = obterOpcoesValidacao(COLUNAS_PROJETOS.URGENCIA);
-    const opcoesTipo      = obterOpcoesValidacao(COLUNAS_PROJETOS.TIPO);
-    const opcoesParaQuem  = obterOpcoesValidacao(COLUNAS_PROJETOS.PARA_QUEM);
-    const opcoesEsforco   = obterOpcoesValidacao(COLUNAS_PROJETOS.ESFORCO); // ← novo
-
-    Logger.log('Opções encontradas - Gravidade: ' + opcoesGravidade.length +
-               ', Urgencia: ' + opcoesUrgencia.length +
-               ', Tipo: ' + opcoesTipo.length +
-               ', ParaQuem: ' + opcoesParaQuem.length +
-               ', Esforco: ' + opcoesEsforco.length);
+    const cfg = _lerConfigPrioridadeTab_();
 
     return {
       gravidade: {
         titulo: 'Gravidade',
         descricao: 'O que acontece se eu não fizer?',
-        opcoes: opcoesGravidade.length > 0
-          ? montarOpcoes(opcoesGravidade, 5)
-          : [
-              { valor: 5, label: 'Crítico - Não é possível cumprir as atividades' },
-              { valor: 4, label: 'Alto - É possível cumprir parcialmente' },
-              { valor: 3, label: 'Médio - É possível mas demora muito' }
-            ]
+        opcoes: [
+          { valor: cfg.grav_critico, label: 'Crítico - Não é possível cumprir as atividades' },
+          { valor: cfg.grav_alto,    label: 'Alto - É possível cumprir parcialmente' },
+          { valor: cfg.grav_medio,   label: 'Médio - É possível mas demora muito' }
+        ]
       },
       urgencia: {
         titulo: 'Urgência',
         descricao: 'Para quando?',
-        opcoes: opcoesUrgencia.length > 0
-          ? montarOpcoes(opcoesUrgencia, 5)
-          : [
-              { valor: 5, label: 'Imediata - Executar imediatamente' },
-              { valor: 4, label: 'Muito urgente - Prazo curto (5 dias)' },
-              { valor: 3, label: 'Urgente - Curto prazo (10 dias)' },
-              { valor: 2, label: 'Pouco urgente - Mais de 10 dias' },
-              { valor: 1, label: 'Pode esperar' }
-            ]
+        opcoes: [
+          { valor: cfg.urg_imediata,       label: 'Imediata - Executar imediatamente' },
+          { valor: cfg.urg_muito_urgente,  label: 'Muito urgente - Prazo curto (5 dias)' },
+          { valor: cfg.urg_urgente,        label: 'Urgente - Curto prazo (10 dias)' },
+          { valor: cfg.urg_pouco_urgente,  label: 'Pouco urgente - Mais de 10 dias' },
+          { valor: cfg.urg_pode_esperar,   label: 'Pode esperar' }
+        ]
       },
       tipoProjeto: {
         titulo: 'Tipo de Projeto',
         descricao: 'Natureza do projeto',
-        opcoes: opcoesTipo.length > 0
-          ? montarOpcoesTipoFixo(opcoesTipo)
-          : [
-              { valor: 5, label: 'Correção' },
-              { valor: 4, label: 'Nova Implementação' },
-              { valor: 3, label: 'Melhoria' }
-            ]
+        opcoes: [
+          { valor: cfg.tipo_correcao,  label: 'Correção' },
+          { valor: cfg.tipo_nova_impl, label: 'Nova Implementação' },
+          { valor: cfg.tipo_melhoria,  label: 'Melhoria' }
+        ]
       },
       quemSolicita: {
         titulo: 'Para Quem',
         descricao: 'Quem solicitou',
-        opcoes: opcoesParaQuem.length > 0
-          ? montarOpcoes(opcoesParaQuem, 5)
-          : [
-              { valor: 5, label: 'Diretoria / Crítico' },
-              { valor: 3, label: 'Demais áreas' }
-            ]
+        opcoes: [
+          { valor: cfg.para_diretoria, label: 'Diretoria / Crítico' },
+          { valor: cfg.para_outros,    label: 'Demais áreas' }
+        ]
       },
-      // ← novo indicador
       esforco: {
         titulo: 'Esforço',
         descricao: 'Tempo de desenvolvimento necessário',
-        opcoes: opcoesEsforco.length > 0
-          ? montarOpcoesEsforcoFixo(opcoesEsforco)
-          : [
-              { valor: 5, label: '1 turno ou menos (4 horas)' },
-              { valor: 4, label: '1 dia ou menos (8 horas)' },
-              { valor: 3, label: 'uma semana (40h)' },
-              { valor: 2, label: 'mais de uma semana (40h)' }
-            ]
+        opcoes: [
+          { valor: cfg.esf_turno,      label: '1 turno ou menos (4 horas)' },
+          { valor: cfg.esf_dia,        label: '1 dia ou menos (8 horas)' },
+          { valor: cfg.esf_semana,     label: 'uma semana (40h)' },
+          { valor: cfg.esf_mais_semana,label: 'mais de uma semana (40h)' }
+        ]
       },
       escala: {
-        alta:  { minimo: 2102, cor: '#dc2626', bgCor: 'rgba(220, 38, 38, 0.15)' },
-        media: { minimo: 1078, maximo: 2101, cor: '#ca8a04', bgCor: 'rgba(202, 138, 4, 0.15)' },
-        baixa: { maximo: 1077, cor: '#059669', bgCor: 'rgba(5, 150, 105, 0.15)' }
+        alta:  { minimo: cfg.escala_alta_min,  cor: '#dc2626', bgCor: 'rgba(220, 38, 38, 0.15)' },
+        media: { minimo: cfg.escala_media_min, maximo: cfg.escala_alta_min - 1, cor: '#ca8a04', bgCor: 'rgba(202, 138, 4, 0.15)' },
+        baixa: { maximo: cfg.escala_media_min - 1, cor: '#059669', bgCor: 'rgba(5, 150, 105, 0.15)' }
       }
     };
   } catch (e) {
@@ -2743,9 +2770,11 @@ function enviarResumoSemanalParaGestor() {
 var dataEnvio = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
 MailApp.sendEmail({
   to: CONFIG_RESUMO_SEMANAL.EMAIL_GESTOR,
-  cc:"napa13@christus.com.br,napa02@christus.com.br,michelle.furuya@gmail.com" ,
+  cc:"napa13@christus.com.br,napa02@christus.com.br,michelle.furuya@gmail.com",
   subject: CONFIG_RESUMO_SEMANAL.ASSUNTO + ' · ' + dataEnvio,
-  htmlBody: corpoHtmlEmail
+  htmlBody: corpoHtmlEmail,
+  name: 'Smart Meeting',
+  replyTo: 'setorbiunichristus@gmail.com'
 });
 
     Logger.log('✅ Resumo semanal enviado para ' + CONFIG_RESUMO_SEMANAL.EMAIL_GESTOR);
@@ -2915,4 +2944,299 @@ entry.projetos.forEach(function(proj) {
 
   h += '</div></body></html>';
   return h;
+}
+
+// ========================= MÓDULO: DOCUMENTOS DO DRIVE =========================
+
+function _extrairIdPastaDrive(link) {
+  if (!link) return null;
+  var m = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
+function _obterLinkProjeto(projetoId) {
+  var aba = obterAba(NOME_ABA_PROJETOS);
+  var valores = aba.getDataRange().getValues();
+  for (var i = 1; i < valores.length; i++) {
+    if (valores[i][COLUNAS_PROJETOS.ID] == projetoId) {
+      return { link: (valores[i][COLUNAS_PROJETOS.LINK] || '').toString().trim(), linha: i + 1 };
+    }
+  }
+  return null;
+}
+
+function criarPastaProjetoDrive(token, projetoId) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
+    const aba = obterAba(NOME_ABA_PROJETOS);
+    const valores = aba.getDataRange().getValues();
+    let linha = -1, nomeProjeto = '', linkExistente = '';
+    for (let i = 1; i < valores.length; i++) {
+      if (valores[i][COLUNAS_PROJETOS.ID] == projetoId) {
+        linha = i + 1;
+        nomeProjeto = valores[i][COLUNAS_PROJETOS.NOME] || 'Projeto ' + projetoId;
+        linkExistente = (valores[i][COLUNAS_PROJETOS.LINK] || '').toString().trim();
+        break;
+      }
+    }
+    if (linha === -1) return { sucesso: false, mensagem: 'Projeto não encontrado.' };
+    if (linkExistente) return { sucesso: true, link: linkExistente };
+
+    const pastaPrincipal = DriveApp.getFolderById(ID_PASTA_DRIVE_REUNIOES);
+    const novaSubPasta = pastaPrincipal.createFolder(nomeProjeto);
+    const linkNovo = 'https://drive.google.com/drive/folders/' + novaSubPasta.getId();
+    aba.getRange(linha, COLUNAS_PROJETOS.LINK + 1).setValue(linkNovo);
+    return { sucesso: true, link: linkNovo };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function listarDocumentosDrive(token, projetoId) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
+    const info = _obterLinkProjeto(projetoId);
+    if (!info || !info.link) return { sucesso: true, arquivos: [], temPasta: false };
+
+    const folderId = _extrairIdPastaDrive(info.link);
+    if (!folderId) return { sucesso: true, arquivos: [], temPasta: false };
+
+    let pasta;
+    try { pasta = DriveApp.getFolderById(folderId); }
+    catch(e) { return { sucesso: true, arquivos: [], temPasta: false }; }
+
+    const arquivos = [];
+    const it = pasta.getFiles();
+    while (it.hasNext()) {
+      const f = it.next();
+      arquivos.push({
+        id: f.getId(),
+        nome: f.getName(),
+        mimeType: f.getMimeType(),
+        tamanho: f.getSize(),
+        dataModificacao: Utilities.formatDate(f.getLastUpdated(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm'),
+        urlVisualizacao: f.getUrl()
+      });
+    }
+    arquivos.sort(function(a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+    return { sucesso: true, arquivos: arquivos, temPasta: true, link: info.link };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function uploadDocumentoDrive(token, projetoId, nomeArquivo, conteudoBase64, mimeType) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
+    const info = _obterLinkProjeto(projetoId);
+    if (!info || !info.link) return { sucesso: false, mensagem: 'Este projeto não tem pasta no Drive.' };
+
+    const folderId = _extrairIdPastaDrive(info.link);
+    if (!folderId) return { sucesso: false, mensagem: 'Link de pasta inválido.' };
+
+    const pasta = DriveApp.getFolderById(folderId);
+    const dados = conteudoBase64.split(',')[1] || conteudoBase64;
+    const blob = Utilities.newBlob(Utilities.base64Decode(dados), mimeType, nomeArquivo);
+    const arquivo = pasta.createFile(blob);
+    return {
+      sucesso: true,
+      arquivo: {
+        id: arquivo.getId(),
+        nome: arquivo.getName(),
+        mimeType: arquivo.getMimeType(),
+        tamanho: arquivo.getSize(),
+        dataModificacao: Utilities.formatDate(arquivo.getLastUpdated(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm'),
+        urlVisualizacao: arquivo.getUrl()
+      }
+    };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+// ── Upload em chunks (arquivos grandes) ───────────────────────────────────────
+
+function iniciarUploadChunked(token, projetoId) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
+    const info = _obterLinkProjeto(projetoId);
+    if (!info || !info.link) return { sucesso: false, mensagem: 'Este projeto não tem pasta no Drive.' };
+
+    const folderId = _extrairIdPastaDrive(info.link);
+    if (!folderId) return { sucesso: false, mensagem: 'Link de pasta inválido.' };
+
+    const pasta = DriveApp.getFolderById(folderId);
+    const tempNome = '__upload_temp_' + Utilities.getUuid();
+    const tempPasta = pasta.createFolder(tempNome);
+
+    return { sucesso: true, uploadId: tempPasta.getId(), folderId: folderId };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function enviarChunkUpload(token, uploadId, chunkIndex, dadosBase64) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
+    const tempPasta = DriveApp.getFolderById(uploadId);
+    const bytes = Utilities.base64Decode(dadosBase64);
+    const nome = 'chunk_' + ('000000' + chunkIndex).slice(-6);
+    tempPasta.createFile(Utilities.newBlob(bytes, 'application/octet-stream', nome));
+
+    return { sucesso: true };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function finalizarUploadChunked(token, uploadId, totalChunks, folderId, nomeArquivo, mimeType) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
+    const tempPasta = DriveApp.getFolderById(uploadId);
+
+    // Coleta chunks em ordem
+    var fileMap = {};
+    var iter = tempPasta.getFiles();
+    while (iter.hasNext()) {
+      var f = iter.next();
+      fileMap[f.getName()] = f.getBlob().getBytes();
+    }
+
+    // Concatena bytes
+    var totalLen = 0;
+    var arrays = [];
+    for (var i = 0; i < totalChunks; i++) {
+      var key = 'chunk_' + ('000000' + i).slice(-6);
+      if (!fileMap[key]) return { sucesso: false, mensagem: 'Parte ' + i + ' não encontrada.' };
+      var arr = fileMap[key];
+      arrays.push(arr);
+      totalLen += arr.length;
+    }
+    var combined = new Array(totalLen);
+    var offset = 0;
+    for (var a = 0; a < arrays.length; a++) {
+      for (var b = 0; b < arrays[a].length; b++) {
+        combined[offset++] = arrays[a][b];
+      }
+    }
+
+    // Salva arquivo final e apaga pasta temp
+    var pasta = DriveApp.getFolderById(folderId);
+    var blob = Utilities.newBlob(combined, mimeType, nomeArquivo);
+    var arquivo = pasta.createFile(blob);
+    tempPasta.setTrashed(true);
+
+    return {
+      sucesso: true,
+      arquivo: {
+        id: arquivo.getId(),
+        nome: arquivo.getName(),
+        mimeType: arquivo.getMimeType(),
+        tamanho: arquivo.getSize(),
+        dataModificacao: Utilities.formatDate(arquivo.getLastUpdated(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm'),
+        urlVisualizacao: arquivo.getUrl()
+      }
+    };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function renomearDocumentoDrive(token, fileId, novoNome) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    DriveApp.getFileById(fileId).setName(novoNome);
+    return { sucesso: true };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function removerDocumentoDrive(token, fileId) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    DriveApp.getFileById(fileId).setTrashed(true);
+    return { sucesso: true };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function obterConteudoDocumentoDrive(token, fileId) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
+    const arquivo = DriveApp.getFileById(fileId);
+    const mimeType = arquivo.getMimeType();
+
+    if (mimeType.startsWith('text/') || mimeType === 'application/json') {
+      return { sucesso: true, tipo: 'texto', conteudo: arquivo.getBlob().getDataAsString('utf-8') };
+    } else if (mimeType.startsWith('image/')) {
+      const base64 = Utilities.base64Encode(arquivo.getBlob().getBytes());
+      return { sucesso: true, tipo: 'imagem', conteudo: 'data:' + mimeType + ';base64,' + base64 };
+    } else {
+      return { sucesso: true, tipo: 'iframe', url: 'https://drive.google.com/file/d/' + fileId + '/preview' };
+    }
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function salvarTextoNaDrive(token, projetoId, nome, conteudo, mimeTypeParam) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+
+    const info = _obterLinkProjeto(projetoId);
+    if (!info || !info.link) return { sucesso: false, mensagem: 'Este projeto não tem pasta no Drive.' };
+
+    const folderId = _extrairIdPastaDrive(info.link);
+    if (!folderId) return { sucesso: false, mensagem: 'Link de pasta inválido.' };
+
+    const mime = mimeTypeParam || 'text/html';
+    const ext  = mime === 'text/html' ? '.html' : '.txt';
+    const nomeArquivo = nome.match(/\.(html?|txt)$/i) ? nome : nome + ext;
+    const pasta = DriveApp.getFolderById(folderId);
+    const blob = Utilities.newBlob(conteudo, mime, nomeArquivo);
+    const arquivo = pasta.createFile(blob);
+    return {
+      sucesso: true,
+      arquivo: {
+        id: arquivo.getId(),
+        nome: arquivo.getName(),
+        mimeType: arquivo.getMimeType(),
+        tamanho: arquivo.getSize(),
+        dataModificacao: Utilities.formatDate(arquivo.getLastUpdated(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm'),
+        urlVisualizacao: arquivo.getUrl()
+      }
+    };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+function atualizarTextoNaDrive(token, fileId, novoConteudo) {
+  try {
+    const auth = _obterSessaoEdicaoProjetos(token);
+    if (!auth.ok) return { sucesso: false, mensagem: auth.mensagem };
+    DriveApp.getFileById(fileId).setContent(novoConteudo);
+    return { sucesso: true };
+  } catch(e) {
+    return { sucesso: false, mensagem: e.message };
+  }
 }

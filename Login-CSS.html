@@ -32,12 +32,157 @@
   body {
     min-height: 100vh;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
     background: radial-gradient(ellipse at 25% 15%, #3D1A06 0%, #1A0A04 45%, #0E0503 100%);
     font-family: var(--fonte);
     color: var(--cafe-cream);
     overflow: hidden;
+  }
+
+  /* ── Layout dividido ────────────────────────────────────────────── */
+  .login-split {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+    position: relative;
+    z-index: 5;
+  }
+
+  /* ── Lado esquerdo — vídeo/gif ──────────────────────────────────── */
+  .login-split-left {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    min-height: 100vh;
+    padding-left: 6%;
+    padding-top: 4%;
+  }
+
+  /* GIF ancorado no topo — altura limitada para não invadir o texto */
+  .split-gif {
+    position: relative;
+    z-index: 2;
+    width: 80%;
+    max-width: 400px;
+    max-height: 52vh;
+    object-fit: contain;
+    object-position: top left;
+    pointer-events: none;
+    user-select: none;
+    animation: gifFloat 6s ease-in-out infinite;
+    filter: drop-shadow(0 12px 40px rgba(198,134,66,0.18));
+  }
+  @keyframes gifFloat {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-12px); }
+  }
+
+  /* Placeholder animado (orbs de fundo — sempre visíveis) */
+  .split-placeholder {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .placeholder-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+  }
+  .placeholder-orb-1 {
+    width: 70%; height: 70%;
+    top: -15%; left: -15%;
+    background: radial-gradient(circle, rgba(198,134,66,0.45) 0%, transparent 65%);
+    animation: orbFloat1 18s ease-in-out infinite;
+  }
+  .placeholder-orb-2 {
+    width: 60%; height: 60%;
+    bottom: -20%; right: -10%;
+    background: radial-gradient(circle, rgba(92,45,14,0.6) 0%, transparent 65%);
+    animation: orbFloat2 23s ease-in-out infinite;
+  }
+  .placeholder-orb-3 {
+    width: 40%; height: 40%;
+    top: 30%; left: 30%;
+    background: radial-gradient(circle, rgba(212,169,106,0.25) 0%, transparent 65%);
+    animation: orbFloat3 15s ease-in-out infinite;
+  }
+
+  /* Overlay — gradiente na base para o branding, sem cobrir o GIF */
+  .split-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: linear-gradient(
+      to top,
+      rgba(14,5,3,0.88) 0%,
+      rgba(14,5,3,0.35) 35%,
+      transparent 65%
+    );
+    display: flex;
+    align-items: flex-end;
+    padding: 52px 48px;
+    pointer-events: none;
+  }
+
+  .split-branding {
+    max-width: 380px;
+  }
+  .split-branding-title {
+    font-family: var(--fonte-display);
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--cafe-cream);
+    line-height: 1.15;
+    text-shadow: 0 2px 24px rgba(0,0,0,0.55);
+    margin-bottom: 12px;
+  }
+  .split-branding-sub {
+    font-size: 1rem;
+    color: var(--cafe-cream-dim);
+    line-height: 1.55;
+    text-shadow: 0 1px 12px rgba(0,0,0,0.5);
+    margin-bottom: 28px;
+  }
+  .split-branding-dots {
+    display: flex;
+    gap: 8px;
+  }
+  .split-branding-dots span {
+    display: block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--cafe-caramel);
+    opacity: 0.7;
+  }
+  .split-branding-dots span:nth-child(2) {
+    opacity: 0.45;
+    width: 6px; height: 6px;
+    margin-top: 1px;
+  }
+  .split-branding-dots span:nth-child(3) {
+    opacity: 0.25;
+    width: 5px; height: 5px;
+    margin-top: 1.5px;
+  }
+
+  /* ── Lado direito — cards ───────────────────────────────────────── */
+  .login-split-right {
+    width: 500px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 28px;
+    position: relative;
+    z-index: 10;
+    background: rgba(10, 4, 2, 0.28);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border-left: 1px solid rgba(250, 243, 224, 0.06);
   }
 
   /* ── Orbs flutuantes ────────────────────────────────────────────── */
@@ -534,8 +679,18 @@
   @keyframes fadeIn  { from{opacity:0;} to{opacity:1;} }
 
   /* ── Responsive ─────────────────────────────────────────────────── */
+  @media (max-width: 860px) {
+    .login-split-left { display: none; }
+    .login-split-right {
+      width: 100%;
+      background: transparent;
+      backdrop-filter: none;
+      border-left: none;
+    }
+  }
   @media (max-width: 480px) {
-    body { align-items: flex-start; overflow-y: auto; padding: 32px 0 48px; }
-    .login-card { margin: 0 12px; padding: 34px 24px; max-width: 100%; }
+    body { overflow-y: auto; }
+    .login-split-right { align-items: flex-start; padding: 32px 12px 48px; }
+    .login-card { padding: 34px 24px; }
   }
 </style>

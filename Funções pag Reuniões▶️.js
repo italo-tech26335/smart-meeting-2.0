@@ -2369,7 +2369,7 @@ function enviarAtaPorEmail(reuniaoId, destinatarios) {
         <div class="footer"><p>Mensagem automática gerada pelo Smart Meeting.</p></div>
       </body></html>`;
 
-    MailApp.sendEmail({ to: destinatarios.join(','), subject: assunto, htmlBody: corpoHtml });
+    MailApp.sendEmail({ to: destinatarios.join(','), subject: assunto, htmlBody: corpoHtml, name: 'Smart Meeting', replyTo: 'setorbiunichristus@gmail.com' });
 
     const emailsEnviados = destinatarios.join(', ') + ' (' + new Date().toLocaleString('pt-BR') + ')';
     aba.getRange(linhaReuniao + 1, COLUNAS_REUNIOES.EMAILS_ENVIADOS + 1).setValue(emailsEnviados);
@@ -4457,7 +4457,7 @@ function processarReuniaoSalva(token, dadosProcessamento) {
  * @param {Function} [logFn]        - function(tipo, msg) para logging
  * @returns {{ sucesso: boolean, ata: string, mensagem?: string }}
  */
-function gerarAtaEstiloSegmentada(estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao, chaveApi, logFn) {
+function gerarAtaEstiloSegmentada(estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao, chaveApi, logFn, promptCustom) {
   var log = logFn || function(t, m) { Logger.log('[gerarAtaEstiloSegmentada][' + t + '] ' + m); };
   try {
     var cfgEstilo = CONFIG_PROMPTS_REUNIAO.ESTILOS[estilo];
@@ -4470,9 +4470,9 @@ function gerarAtaEstiloSegmentada(estilo, titulo, participantes, dataFormatada, 
 
     for (var s = 0; s < segmentos.length; s++) {
       var seg = segmentos[s];
-      log('INFO', '  📝 Segmento ' + (s + 1) + '/' + segmentos.length + ': ' + seg.nome + '...');
+      log('INFO', '  📝 Segmento ' + (s + 1) + '/' + segmentos.length + ': ' + seg.nome + (promptCustom ? ' [prompt custom]' : '') + '...');
 
-      var prompt = montarPromptSegmentoAta(estilo, seg.id, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
+      var prompt = montarPromptSegmentoAta(estilo, seg.id, titulo, participantes, dataFormatada, instrucaoExtra, transcricao, promptCustom);
       if (!prompt) {
         log('ALERTA', '  ⚠️ Prompt vazio para segmento: ' + seg.id);
         continue;
@@ -4664,6 +4664,7 @@ function gerarSegmentoAtaSingle(dados) {
     var participantes  = dados.participantes  || '';
     var instrucaoExtra = dados.instrucaoExtra || '';
     var transcricao    = dados.transcricao    || '';
+    var promptCustom   = dados.promptCustom   || '';
 
     var chaveApi = obterChaveGeminiProjeto();
     if (!chaveApi) throw new Error('Chave API do Gemini não configurada.');
@@ -4678,7 +4679,7 @@ function gerarSegmentoAtaSingle(dados) {
     if (!seg) throw new Error('Segmento desconhecido: ' + segmentoId);
 
     var dataFormatada = new Date().toLocaleDateString('pt-BR');
-    var prompt = montarPromptSegmentoAta(estilo, segmentoId, titulo, participantes, dataFormatada, instrucaoExtra, transcricao);
+    var prompt = montarPromptSegmentoAta(estilo, segmentoId, titulo, participantes, dataFormatada, instrucaoExtra, transcricao, promptCustom);
     if (!prompt) throw new Error('Prompt vazio para segmento ' + segmentoId);
 
     log('INFO', 'Gerando segmento "' + seg.nome + '" [' + seg.modelo + ']...');
@@ -4807,6 +4808,260 @@ function obterAtaReuniao(token, reuniaoId, estilo) {
     }
     return { sucesso: false, mensagem: 'Reunião não encontrada.' };
   } catch (e) {
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Gera ata a partir de uma transcrição fornecida diretamente pelo usuário (sem áudio).
+ * dados: { titulo, participantes, departamentoId, transcricao, estilo, instrucaoExtra }
+ */
+function gerarAtaDeTranscricaoDireta(token, dados) {
+  var logs = [];
+  var log = function(tipo, msg) {
+    logs.push({ tipo: tipo, mensagem: msg, timestamp: new Date().toLocaleTimeString('pt-BR') });
+    Logger.log('[gerarAtaDeTranscricaoDireta][' + tipo + '] ' + msg);
+  };
+  try {
+    var sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.', logs: logs };
+
+    var titulo        = ((dados.titulo || '').trim()) || 'Reunião sem título';
+    var participantes = (dados.participantes || '').trim();
+    var transcricao   = (dados.transcricao || '').trim();
+    var estilo        = dados.estilo || 'detalhada';
+    var instrucaoExtra = dados.instrucaoExtra || '';
+    var promptCustom   = dados.promptCustom   || '';
+    var departamentoId = dados.departamentoId || '';
+
+    if (!transcricao || transcricao.length < 20) {
+      return { sucesso: false, mensagem: 'A transcrição é muito curta ou está vazia.', logs: logs };
+    }
+
+    var estilosValidos = Object.keys(CONFIG_PROMPTS_REUNIAO.ESTILOS);
+    if (!estilosValidos.includes(estilo)) {
+      return { sucesso: false, mensagem: 'Estilo inválido: ' + estilo, logs: logs };
+    }
+
+    var chaveApi = obterChaveGeminiProjeto();
+    if (!chaveApi) {
+      return { sucesso: false, mensagem: 'Chave API Gemini não configurada.', logs: logs };
+    }
+
+    log('INFO', '📋 Gerando ata estilo: ' + estilo + (promptCustom ? ' [prompt personalizado]' : '') + ' via transcrição direta...');
+    var agora = new Date();
+    var dataFormatada = agora.toLocaleDateString('pt-BR');
+
+    var resultado = gerarAtaEstiloSegmentada(
+      estilo, titulo, participantes, dataFormatada, instrucaoExtra, transcricao, chaveApi, log, promptCustom
+    );
+
+    if (!resultado.sucesso) {
+      return { sucesso: false, mensagem: resultado.mensagem, logs: logs };
+    }
+
+    log('INFO', '💾 Salvando reunião na planilha...');
+
+    var ataEstilos = {};
+    ataEstilos[estilo] = resultado.ata;
+
+    var reuniaoId = salvarReuniaoNaPlanilha({
+      titulo:            titulo,
+      dataInicio:        agora.toISOString(),
+      dataFim:           agora.toISOString(),
+      duracao:           0,
+      status:            STATUS_REUNIAO.PROCESSADA,
+      participantes:     participantes,
+      transcricao:       transcricao,
+      ata:               resultado.ata,
+      sugestoesIA:       '',
+      linkAudio:         '',
+      projetosImpactados:'',
+      etapasImpactadas:  '',
+      departamentoId:    departamentoId,
+      ataEstilos:        ataEstilos
+    });
+
+    log('SUCESSO', '✅ Reunião ' + reuniaoId + ' criada com ata via transcrição direta!');
+    return { sucesso: true, logs: logs, ata: resultado.ata, reuniaoId: reuniaoId, estilo: estilo };
+
+  } catch (erro) {
+    Logger.log('ERRO gerarAtaDeTranscricaoDireta: ' + erro.toString());
+    return { sucesso: false, mensagem: erro.message, logs: logs };
+  }
+}
+
+// =====================================================================
+//  PROMPTS PERSONALIZADOS POR USUÁRIO
+// =====================================================================
+
+function _garantirAbaPrompts() {
+  var ss  = SpreadsheetApp.openById(ID_PLANILHA);
+  var aba = ss.getSheetByName(NOME_ABA_PROMPTS);
+  if (!aba) {
+    aba = ss.insertSheet(NOME_ABA_PROMPTS);
+    aba.appendRow(['ID', 'Usuario Email', 'Nome', 'Conteudo', 'Data Criacao', 'Data Atualizacao']);
+    aba.setFrozenRows(1);
+    aba.setColumnWidth(COLUNAS_PROMPTS.CONTEUDO + 1, 600);
+  }
+  return aba;
+}
+
+/**
+ * Lista todos os prompts do usuário autenticado.
+ */
+function listarPromptsPorUsuario(token) {
+  try {
+    var sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    var email = (sessao.email || '').toLowerCase().trim();
+    var aba   = _garantirAbaPrompts();
+    var dados = aba.getDataRange().getValues();
+    var prompts = [];
+    for (var i = 1; i < dados.length; i++) {
+      var rowEmail = (dados[i][COLUNAS_PROMPTS.USUARIO_EMAIL] || '').toLowerCase().trim();
+      if (rowEmail === email) {
+        prompts.push({
+          id:              dados[i][COLUNAS_PROMPTS.ID] + '',
+          nome:            dados[i][COLUNAS_PROMPTS.NOME] + '',
+          conteudo:        dados[i][COLUNAS_PROMPTS.CONTEUDO] + '',
+          dataCriacao:     dados[i][COLUNAS_PROMPTS.DATA_CRIACAO]     ? dados[i][COLUNAS_PROMPTS.DATA_CRIACAO].toString()     : '',
+          dataAtualizacao: dados[i][COLUNAS_PROMPTS.DATA_ATUALIZACAO] ? dados[i][COLUNAS_PROMPTS.DATA_ATUALIZACAO].toString() : ''
+        });
+      }
+    }
+    return { sucesso: true, prompts: prompts };
+  } catch (e) {
+    Logger.log('ERRO listarPromptsPorUsuario: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Cria ou atualiza um prompt personalizado.
+ * dados: { id (update only), nome, conteudo }
+ */
+function salvarPrompt(token, dados) {
+  try {
+    var sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    var email = (sessao.email || '').toLowerCase().trim();
+    var aba   = _garantirAbaPrompts();
+    var agora = new Date().toISOString();
+
+    if (dados.id) {
+      // Update
+      var d = aba.getDataRange().getValues();
+      for (var i = 1; i < d.length; i++) {
+        var rowId    = d[i][COLUNAS_PROMPTS.ID] + '';
+        var rowEmail = (d[i][COLUNAS_PROMPTS.USUARIO_EMAIL] || '').toLowerCase().trim();
+        if (rowId === dados.id + '' && rowEmail === email) {
+          if (dados.nome    !== undefined) aba.getRange(i + 1, COLUNAS_PROMPTS.NOME    + 1).setValue(dados.nome);
+          if (dados.conteudo !== undefined) aba.getRange(i + 1, COLUNAS_PROMPTS.CONTEUDO + 1).setValue(dados.conteudo);
+          aba.getRange(i + 1, COLUNAS_PROMPTS.DATA_ATUALIZACAO + 1).setValue(agora);
+          return { sucesso: true, id: dados.id };
+        }
+      }
+      return { sucesso: false, mensagem: 'Prompt não encontrado.' };
+    } else {
+      // Insert
+      var id = gerarId();
+      aba.appendRow([
+        id, email,
+        dados.nome     || 'Sem nome',
+        dados.conteudo || '',
+        agora, agora
+      ]);
+      return { sucesso: true, id: id };
+    }
+  } catch (e) {
+    Logger.log('ERRO salvarPrompt: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Exclui um prompt do usuário.
+ */
+function excluirPrompt(token, promptId) {
+  try {
+    var sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+    var email = (sessao.email || '').toLowerCase().trim();
+    var aba   = _garantirAbaPrompts();
+    var d     = aba.getDataRange().getValues();
+    for (var i = 1; i < d.length; i++) {
+      var rowId    = d[i][COLUNAS_PROMPTS.ID] + '';
+      var rowEmail = (d[i][COLUNAS_PROMPTS.USUARIO_EMAIL] || '').toLowerCase().trim();
+      if (rowId === promptId + '' && rowEmail === email) {
+        aba.deleteRow(i + 1);
+        return { sucesso: true };
+      }
+    }
+    return { sucesso: false, mensagem: 'Prompt não encontrado.' };
+  } catch (e) {
+    Logger.log('ERRO excluirPrompt: ' + e.toString());
+    return { sucesso: false, mensagem: e.message };
+  }
+}
+
+/**
+ * Proxy de chat com o Gemini para o editor de prompts.
+ * mensagens: [{ role: 'user' | 'model', text: string }]
+ */
+function chatGeminiPrompt(token, mensagens) {
+  try {
+    var sessao = _obterSessao(token);
+    if (!sessao) return { sucesso: false, mensagem: 'Sessão inválida.' };
+
+    var chaveApi = obterChaveGeminiProjeto();
+    if (!chaveApi) return { sucesso: false, mensagem: 'Chave API Gemini não configurada.' };
+
+    // Instrução de sistema para o chat de criação de prompts
+    var systemInstruction =
+      'Você é um especialista em criação e refinamento de prompts para geração de atas de reunião profissionais.\n\n' +
+      'ESTRUTURA DE CADA MENSAGEM DO USUÁRIO:\n' +
+      '- [ESTADO DO EDITOR]: vazio ou mostra o prompt atual\n' +
+      '- [PEDIDO]: o que o usuário quer\n' +
+      '- [TEMAS/REQUISITOS]: tópicos temáticos para incluir (são inspiração/instrução, NUNCA são o prompt atual)\n\n' +
+      'REGRA FUNDAMENTAL:\n' +
+      '- [ESTADO DO EDITOR] = VAZIO → SEMPRE crie prompt completo com <<<PROMPT_COMPLETO>>>\n' +
+      '- [ESTADO DO EDITOR] tem prompt existente + pedido de reescrita geral → <<<PROMPT_COMPLETO>>>\n' +
+      '- [ESTADO DO EDITOR] tem prompt existente + pedido de melhorar tópico específico → <<<TOPICO:nome>>>\n' +
+      '- [ESTADO DO EDITOR] tem prompt existente + ajuste pontual de frase → <<<ORIGINAL>>>/<<<NOVO>>>\n\n' +
+      'FORMATO OBRIGATÓRIO (use EXATAMENTE um bloco por resposta, SEMPRE):\n\n' +
+      'Prompt COMPLETO:\n<<<PROMPT_COMPLETO>>>\n[prompt completo]\n<<<FIM>>>\n\n' +
+      'Tópico específico:\n<<<TOPICO:[nome do tópico]>>>\n[conteúdo completo do tópico incluindo o título]\n<<<FIM>>>\n\n' +
+      'Trecho pontual:\n<<<ORIGINAL>>>\n[texto exato a substituir]\n<<<FIM_ORIGINAL>>>\n<<<NOVO>>>\n[novo texto]\n<<<FIM_NOVO>>>\n\n' +
+      'OUTRAS REGRAS:\n' +
+      '- Comece com 1 frase de explicação, depois o bloco\n' +
+      '- Prompts em português, detalhados, focados em atas profissionais\n' +
+      '- Nunca faça perguntas — gere o resultado imediatamente';
+
+    var contents = mensagens.map(function(m) {
+      return { role: m.role === 'model' ? 'model' : 'user', parts: [{ text: m.content || m.text || '' }] };
+    });
+
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + chaveApi;
+    var resp = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents: contents,
+        generationConfig: { temperature: 0.85, maxOutputTokens: 2048 }
+      })
+    });
+
+    if (resp.getResponseCode() === 200) {
+      var texto = extrairTextoRespostaGemini(JSON.parse(resp.getContentText()));
+      return { sucesso: true, resposta: texto };
+    } else {
+      return { sucesso: false, mensagem: 'Erro API Gemini: HTTP ' + resp.getResponseCode() };
+    }
+  } catch (e) {
+    Logger.log('ERRO chatGeminiPrompt: ' + e.toString());
     return { sucesso: false, mensagem: e.message };
   }
 }

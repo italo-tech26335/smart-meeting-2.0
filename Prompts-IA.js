@@ -506,14 +506,52 @@ function montarPromptRelatorio(setoresExistentes, projetosExistentes, etapasExis
 //    instrucaoExtra – instruções adicionais opcionais
 //    transcricao    – transcrição completa da reunião
 // ─────────────────────────────────────────────────────────────────────────────
-function montarPromptSegmentoAta(estilo, segmentoId, titulo, participantes, data, instrucaoExtra, transcricao) {
+function montarPromptSegmentoAta(estilo, segmentoId, titulo, participantes, data, instrucaoExtra, transcricao, promptCustom) {
   titulo         = titulo         || 'Não informado';
   participantes  = participantes  || 'Não informados';
   data           = data           || new Date().toLocaleDateString('pt-BR');
-  instrucaoExtra = instrucaoExtra ? '\n**Instruções adicionais:** ' + instrucaoExtra + '\n' : '';
   transcricao    = transcricao    || '';
 
   var cabecalhoComum =
+    '## DADOS DA REUNIÃO:\n' +
+    '- **Título:** ' + titulo + '\n' +
+    '- **Participantes:** ' + participantes + '\n' +
+    '- **Data:** ' + data + '\n\n' +
+    '## TRANSCRIÇÃO COMPLETA:\n' +
+    transcricao + '\n\n';
+
+  // ── MODO PROMPT PERSONALIZADO ─────────────────────────────────────────────
+  // Quando um prompt customizado é fornecido, ele substitui as instruções do
+  // estilo padrão e é usado como instrução principal de geração deste segmento.
+  if (promptCustom && promptCustom.trim()) {
+    var nomeSegmento = segmentoId;
+    try {
+      var segs = CONFIG_PROMPTS_REUNIAO.ESTILOS[estilo] && CONFIG_PROMPTS_REUNIAO.ESTILOS[estilo].segmentos;
+      if (segs) {
+        for (var _i = 0; _i < segs.length; _i++) {
+          if (segs[_i].id === segmentoId) { nomeSegmento = segs[_i].nome; break; }
+        }
+      }
+    } catch(_) {}
+    var instrExtra = instrucaoExtra ? '\n**Observação adicional do usuário:** ' + instrucaoExtra + '\n' : '';
+    return (
+      'Você é um especialista em elaboração de atas de reunião profissionais.\n\n' +
+      '## INSTRUÇÃO PRINCIPAL (definida pelo usuário):\n' +
+      promptCustom.trim() + '\n\n' +
+      (instrExtra ? '## INSTRUÇÃO COMPLEMENTAR:\n' + instrExtra + '\n' : '') +
+      '## CONTEXTO DE SEGMENTAÇÃO:\n' +
+      'Esta geração faz parte do segmento **"' + nomeSegmento + '"** de uma ata segmentada.\n' +
+      'Aplique as instruções acima focando no conteúdo correspondente a este segmento.\n\n' +
+      cabecalhoComum +
+      '## SUA TAREFA:\n' +
+      'Com base nas instruções personalizadas acima e nos dados da reunião, gere o conteúdo do segmento "' + nomeSegmento + '".\n' +
+      'Responda em Markdown, em português, seguindo rigorosamente as instruções do usuário.'
+    );
+  }
+
+  // ── MODO PADRÃO (instrução extra simples) ─────────────────────────────────
+  instrucaoExtra = instrucaoExtra ? '\n**Instruções adicionais:** ' + instrucaoExtra + '\n' : '';
+  cabecalhoComum =
     '## DADOS DA REUNIÃO:\n' +
     '- **Título:** ' + titulo + '\n' +
     '- **Participantes:** ' + participantes + '\n' +

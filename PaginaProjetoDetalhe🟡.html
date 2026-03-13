@@ -69,9 +69,6 @@
           <a href="#" class="nav-link-proj" data-pagina="reunioes">
             <i class="fas fa-video"></i><span>Reuniões</span>
           </a>
-          <a href="#" class="nav-link-proj" data-pagina="relatorios">
-            <i class="fas fa-clipboard-check"></i><span>Relatórios IA</span>
-          </a>
           <a href="#" class="nav-link-proj ativo" data-pagina="projeto">
             <i class="fas fa-project-diagram"></i><span>Projetos</span>
           </a>
@@ -134,6 +131,10 @@
 
         <!-- Grupo: Conta / Config -->
         <div class="btn-header-grupo">
+          <button class="btn-header btn-config-prioridade" id="btnConfigPrioridade" onclick="abrirModalConfigPrioridade()" title="Configurar pesos e limiares de prioridade">
+            <i class="fas fa-sliders"></i>
+            <span>Prioridade</span>
+          </button>
           <button class="btn-header btn-lixeira" onclick="abrirModalLixeira()" title="Lixeira de Projetos">
             <i class="fas fa-trash-alt"></i>
           </button>
@@ -376,6 +377,10 @@
           <div class="coluna-header">
             <h3><i class="fas fa-sitemap"></i> Estrutura do Projeto</h3>
             <div class="coluna-acoes">
+              <button class="btn-acao-pequeno" onclick="abrirAtasProjetoAtual()" id="btnVerAtasEstrutura"
+                title="Ver atas e documentos das reuniões vinculadas ao projeto">
+                <i class="fas fa-book-open"></i> Ver Atas
+              </button>
               <button class="btn-acao-pequeno btn-modo-foco" onclick="abrirModoFoco()" id="btnModoFoco"
                 title="Modo Foco — visualizar projeto em tela cheia">
                 <i class="fas fa-expand-alt"></i> Foco
@@ -576,13 +581,6 @@
             </div>
           </div>
 
-          <!-- Link (Documentos do Projeto) -->
-          <div class="campo-grupo">
-            <label><i class="fas fa-folder-open" style="margin-right:4px;color:var(--cor-primaria);"></i> Documentos do Projeto</label>
-            <input type="url" id="itemLink" placeholder="https://drive.google.com/...">
-            <small class="campo-hint">Link para o diretório do projeto no Drive</small>
-          </div>
-
           <!-- Departamento -->
           <div class="campo-grupo" id="itemDepartamentoGrupo">
             <label><i class="fas fa-sitemap" style="margin-right:4px;color:var(--cor-primaria);"></i> Departamento</label>
@@ -705,11 +703,6 @@
           </div>
         </div>
 
-        <div class="campo-grupo">
-          <label><i class="fas fa-folder-open" style="margin-right:4px;color:var(--cor-primaria);"></i> Documentos do Projeto</label>
-          <input type="url" id="novoProjetoLink" placeholder="https://drive.google.com/...">
-          <small class="campo-hint">Link para o diretório do projeto no Drive</small>
-        </div>
       </div>
 
       <!-- Cálculo de Prioridade GUT -->
@@ -934,6 +927,79 @@
   <?!= include('ModalRelatorio🟡'); ?>
 
 
+  <!-- ==================== MODAL CONFIG PRIORIDADE ==================== -->
+  <div id="modalConfigPrioridade" class="modal-overlay">
+    <div class="modal-content" style="max-width:640px;">
+      <div class="modal-header">
+        <h3><i class="fas fa-sliders"></i> Configuração de Prioridade</h3>
+        <button class="btn-fechar-modal" onclick="fecharModalConfigPrioridade()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body" id="configPrioridadeCorpo" style="overflow-y:auto;max-height:68vh;">
+        <div class="empty-state"><i class="fas fa-mug-hot fa-spin"></i> Carregando configurações...</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-acao btn-secundario" onclick="fecharModalConfigPrioridade()">Cancelar</button>
+        <button class="btn-acao" id="btnSalvarConfigPrioridade" onclick="salvarConfigPrioridadeModal()">
+          <i class="fas fa-save"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== MODAL SNAKE GAME ==================== -->
+  <div id="modalSnakeGame" class="modal-overlay" style="z-index:3500;padding:16px;backdrop-filter:blur(8px);">
+    <div style="background:#020c02;border:3px solid #00cc44;border-radius:10px;
+      width:300px;max-width:95vw;overflow:hidden;
+      box-shadow:0 0 40px rgba(0,204,68,0.5),0 0 80px rgba(0,204,68,0.15),inset 0 0 40px rgba(0,80,20,0.04);
+      display:flex;flex-direction:column;align-items:stretch;">
+      <!-- Header bar -->
+      <div style="padding:9px 12px;background:#001400;border-bottom:2px solid #003800;display:flex;align-items:center;justify-content:space-between;">
+        <div style="color:#00cc44;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;font-family:'Courier New',monospace;font-weight:700;">🐍 SNAKE — PREMIUM EDITION</div>
+        <button onclick="fecharSnakeGame()"
+          style="background:rgba(255,50,50,0.12);border:1px solid rgba(255,80,80,0.4);color:#ff6666;
+            width:24px;height:24px;border-radius:4px;cursor:pointer;font-size:0.72rem;
+            display:flex;align-items:center;justify-content:center;transition:all 0.15s;"
+          onmouseover="this.style.background='rgba(255,50,50,0.35)'"
+          onmouseleave="this.style.background='rgba(255,50,50,0.12)'">✕</button>
+      </div>
+      <!-- Score bar -->
+      <div style="padding:5px 12px;background:#001000;display:flex;justify-content:space-between;
+        border-bottom:1px solid #002400;font-size:0.65rem;color:#00aa33;font-family:'Courier New',monospace;">
+        <span>PONTOS:&nbsp;<strong id="snakeScoreDisplay" style="color:#00ff44;">0</strong></span>
+        <span>RECORDE:&nbsp;<strong id="snakeHiScore" style="color:#ffcc00;">0</strong></span>
+      </div>
+      <!-- Canvas -->
+      <div style="position:relative;background:#010d01;line-height:0;width:300px;align-self:center;">
+        <canvas id="snakeCanvas" width="300" height="300"
+          style="display:block;width:300px;height:300px;image-rendering:pixelated;image-rendering:-moz-crisp-edges;cursor:pointer;"></canvas>
+        <!-- CRT scanlines -->
+        <div style="position:absolute;inset:0;pointer-events:none;
+          background:repeating-linear-gradient(0deg,transparent 0,transparent 2px,rgba(0,0,0,0.1) 2px,rgba(0,0,0,0.1) 3px);"></div>
+        <!-- Vignette -->
+        <div style="position:absolute;inset:0;pointer-events:none;
+          background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,0.55) 100%);"></div>
+      </div>
+      <!-- On-screen d-pad (shown only during game) -->
+      <div id="snakeControls" style="display:none;padding:8px 12px 10px;background:#001000;border-top:1px solid #002400;">
+        <div style="display:grid;grid-template-columns:repeat(3,34px);gap:4px;margin:0 auto;width:fit-content;">
+          <div></div>
+          <button class="sn-btn" onclick="_snakeDirBtn(0,-1)">▲</button>
+          <div></div>
+          <button class="sn-btn" onclick="_snakeDirBtn(-1,0)">◀</button>
+          <button class="sn-btn" id="snakePauseBtn" onclick="_snakePauseToggle()">⏸</button>
+          <button class="sn-btn" onclick="_snakeDirBtn(1,0)">▶</button>
+          <div></div>
+          <button class="sn-btn" onclick="_snakeDirBtn(0,1)">▼</button>
+          <div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- ==================== MODAL LIXEIRA ==================== -->
   <div id="modalLixeira" class="modal-overlay">
     <div class="modal-content" style="max-width:680px;">
@@ -1066,7 +1132,7 @@
   </div>
   <!-- ==================== MODAL SELETOR DE TEMA ==================== -->
 <div id="modalSeletorTema" class="modal-overlay">
-  <div class="modal-content" style="max-width:545px;">
+  <div class="modal-content" style="max-width:660px;">
     <div class="modal-header">
       <h3>
         <i class="fas fa-palette" style="color:var(--cor-destaque);"></i>
@@ -1093,7 +1159,7 @@
       </div>
 
       <!-- Grade de temas -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">
 
         <!-- ☕ Tema Café — A ESCOLHA CERTA -->
         <button onclick="aplicarTema('cafe')" id="temaBtnCafe"
@@ -1140,6 +1206,42 @@
           <div style="font-size:0.67rem;color:#7a7a7a;line-height:1.45;padding:0 2px;font-style:italic;">Para quem acha que dark mode é personalidade. Coitado.</div>
           <div id="temaBadgePreto" style="display:none;font-size:0.67rem;background:#e0b84a;color:#111;padding:2px 9px;border-radius:20px;font-weight:700;">✓ Ativo</div>
         </button>
+
+        <!-- 🔒 Tema Premium — BLOQUEADO -->
+        <div class="tema-premium-card"
+          style="border:2px solid #9a7c08;border-radius:var(--raio-lg);padding:15px 10px 14px;
+            background:linear-gradient(160deg,#0e0c00,#1c1700);text-align:center;
+            display:flex;flex-direction:column;align-items:center;gap:7px;position:relative;overflow:visible;">
+          <!-- Correntes nos cantos -->
+          <span style="position:absolute;top:-9px;left:-7px;font-size:15px;line-height:1;filter:drop-shadow(0 0 3px #b8970a);">⛓️</span>
+          <span style="position:absolute;top:-9px;right:-7px;font-size:15px;line-height:1;transform:scaleX(-1);filter:drop-shadow(0 0 3px #b8970a);">⛓️</span>
+          <span style="position:absolute;bottom:-9px;left:-7px;font-size:15px;line-height:1;transform:rotate(90deg);filter:drop-shadow(0 0 3px #b8970a);">⛓️</span>
+          <span style="position:absolute;bottom:-9px;right:-7px;font-size:15px;line-height:1;transform:rotate(-90deg);filter:drop-shadow(0 0 3px #b8970a);">⛓️</span>
+          <!-- Ícone cadeado -->
+          <div class="premium-lock-icon"
+            style="width:48px;height:48px;border-radius:13px;
+              background:linear-gradient(150deg,#201a00,#3a2e00);
+              display:flex;align-items:center;justify-content:center;
+              box-shadow:0 4px 14px rgba(0,0,0,0.8),0 0 18px rgba(184,151,10,0.3);
+              border:1px solid rgba(184,151,10,0.5);">
+            <i class="fas fa-lock" style="font-size:20px;color:#d4a90a;"></i>
+          </div>
+          <div>
+            <div style="font-weight:800;font-size:0.84rem;color:#d4a90a;font-family:'Playfair Display',serif;">Premium</div>
+            <div style="font-size:0.63rem;color:#6a5208;margin-top:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">🔒 Bloqueado</div>
+          </div>
+          <div style="font-size:0.62rem;color:#4a3c08;line-height:1.5;padding:0 2px;font-style:italic;">Conteúdo exclusivo. Prove que merece.</div>
+          <button onclick="abrirSnakeGame()"
+            style="margin-top:2px;padding:6px 0;width:100%;
+              background:linear-gradient(135deg,#b8970a,#7a6208);
+              border:none;border-radius:20px;color:#fffce0;font-size:0.65rem;font-weight:800;
+              cursor:pointer;letter-spacing:0.05em;text-transform:uppercase;
+              box-shadow:0 3px 10px rgba(184,151,10,0.5);transition:all 0.2s ease;"
+            onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 5px 16px rgba(184,151,10,0.7)'"
+            onmouseleave="this.style.transform='';this.style.boxShadow='0 3px 10px rgba(184,151,10,0.5)'">
+            🔓 Desbloquear
+          </button>
+        </div>
 
       </div>
 
@@ -1319,6 +1421,246 @@
       </div>
       <div class="modal-footer">
         <button class="btn-secundario" onclick="fecharModal('modalGerenciarResponsaveis')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL DOCUMENTOS DO DRIVE ==================== -->
+  <div id="modalDocumentosDrive" class="modal-overlay">
+    <div class="modal-content modal-docs-drive-content">
+
+      <div class="modal-header">
+        <h3>
+          <i class="fas fa-folder-open" style="color:var(--cor-destaque);"></i>
+          Documentos — <span id="docsDriveProjNome">Projeto</span>
+        </h3>
+        <button class="btn-fechar-modal" onclick="fecharModalDocsDrive()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Spinner de carregamento inicial (cobre todo o body) -->
+      <div id="docsDriveSpinner" class="docs-drive-spinner-overlay">
+        <i class="fas fa-spinner fa-spin"></i>
+        <span id="docsSpinnerTexto">Carregando documentos...</span>
+        <div id="docsUploadProgressBar" style="display:none; width:260px; margin-top:10px;">
+          <div style="background:var(--cor-borda);border-radius:4px;height:6px;overflow:hidden;">
+            <div id="docsUploadProgressFill" style="height:100%;width:0%;background:var(--cor-destaque);border-radius:4px;transition:width 0.3s;"></div>
+          </div>
+          <div id="docsUploadProgressTexto" style="font-size:0.75rem;color:var(--cor-texto-secundario);text-align:center;margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <div class="modal-docs-drive-body">
+
+        <!-- Painel esquerdo: lista de arquivos -->
+        <div class="docs-drive-painel-lista">
+
+          <!-- Estado: sem pasta -->
+          <div id="docsDriveSemPasta" style="display:none;">
+            <div class="drive-docs-sem-pasta">
+              <i class="fas fa-folder-plus drive-docs-sem-pasta-icone"></i>
+              <p>Este projeto não tem pasta no Drive para salvar documentos</p>
+              <button class="btn-acao" onclick="criarPastaProjetoUI(_docsDriveProjetoId)" style="margin-top:12px;">
+                <i class="fas fa-plus"></i> Criar Pasta
+              </button>
+            </div>
+          </div>
+
+          <!-- Estado: com pasta -->
+          <div id="docsDriveComPasta" style="display:none;">
+            <div class="docs-drive-toolbar">
+              <button class="btn-acao-pequeno" onclick="abrirNovoTextoEditor()">
+                <i class="fas fa-file-edit"></i> Novo Texto
+              </button>
+              <label class="btn-acao-pequeno docs-upload-label" title="Enviar arquivo">
+                <i class="fas fa-upload"></i> Upload
+                <input type="file" id="docsDriveFileInput" style="display:none;"
+                       onchange="processarUploadDrive(_docsDriveProjetoId, this)">
+              </label>
+              <a id="docsDriveLinkPasta" href="#" target="_blank" class="btn-drive-ver-pasta" title="Abrir pasta no Drive">
+                <i class="fas fa-external-link-alt"></i>
+              </a>
+            </div>
+            <div id="docsDriveCarregando" class="drive-docs-carregando">
+              <i class="fas fa-spinner fa-spin"></i> Carregando documentos...
+            </div>
+            <div id="docsDriveListaArquivos" class="docs-drive-lista-arquivos"></div>
+          </div>
+
+        </div>
+
+        <!-- Painel direito: viewer / editor -->
+        <div class="docs-drive-painel-viewer" id="docsDriveViewer">
+
+          <!-- Placeholder -->
+          <div id="docsDriveViewerPlaceholder" class="docs-viewer-placeholder">
+            <i class="fas fa-file-alt"></i>
+            <p>Selecione um documento para visualizar</p>
+          </div>
+
+          <!-- Editor de texto rico (novo ou editar) -->
+          <div id="docsDriveEditorContainer" style="display:none;" class="docs-editor-container">
+
+            <!-- Barra de nome + ações -->
+            <div class="docs-editor-nome-bar">
+              <input type="text" id="docsDriveEditorNome" placeholder="Nome do documento..." class="docs-editor-nome-input">
+              <button class="btn-acao docs-btn-salvar" onclick="salvarDocumentoTexto()">
+                <i class="fas fa-save"></i> Salvar
+              </button>
+              <button class="btn-secundario" onclick="fecharEditorTexto()" title="Fechar">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+
+            <!-- Toolbar rica -->
+            <div class="docs-editor-toolbar" id="docsEditorToolbar">
+
+              <!-- Histórico -->
+              <div class="docs-tb-grupo">
+                <button class="docs-tb-btn" onclick="docCmd('undo')" title="Desfazer (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+                <button class="docs-tb-btn" onclick="docCmd('redo')" title="Refazer (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+              </div>
+              <span class="docs-tb-sep"></span>
+
+              <!-- Fonte + Tamanho -->
+              <div class="docs-tb-grupo">
+                <select id="docsFontFamily" class="docs-tb-select docs-tb-font" onchange="docCmdVal('fontName',this.value)" title="Família da fonte">
+                  <option value="Arial">Arial</option>
+                  <option value="'Times New Roman',serif">Times New Roman</option>
+                  <option value="Georgia,serif">Georgia</option>
+                  <option value="Verdana,sans-serif">Verdana</option>
+                  <option value="Tahoma,sans-serif">Tahoma</option>
+                  <option value="'Courier New',monospace">Courier New</option>
+                  <option value="'Trebuchet MS',sans-serif">Trebuchet MS</option>
+                </select>
+                <select id="docsFontSize" class="docs-tb-select docs-tb-size" onchange="docAplicarTamanho(this.value)" title="Tamanho">
+                  <option value="10">10</option>
+                  <option value="12" selected>12</option>
+                  <option value="14">14</option>
+                  <option value="16">16</option>
+                  <option value="18">18</option>
+                  <option value="20">20</option>
+                  <option value="24">24</option>
+                  <option value="28">28</option>
+                  <option value="32">32</option>
+                  <option value="36">36</option>
+                  <option value="48">48</option>
+                  <option value="60">60</option>
+                </select>
+              </div>
+              <span class="docs-tb-sep"></span>
+
+              <!-- Formatação básica -->
+              <div class="docs-tb-grupo">
+                <button class="docs-tb-btn" data-cmd="bold"          onclick="docCmd('bold')"          title="Negrito (Ctrl+B)"><i class="fas fa-bold"></i></button>
+                <button class="docs-tb-btn" data-cmd="italic"        onclick="docCmd('italic')"        title="Itálico (Ctrl+I)"><i class="fas fa-italic"></i></button>
+                <button class="docs-tb-btn" data-cmd="underline"     onclick="docCmd('underline')"     title="Sublinhado (Ctrl+U)"><i class="fas fa-underline"></i></button>
+                <button class="docs-tb-btn" data-cmd="strikeThrough" onclick="docCmd('strikeThrough')" title="Tachado"><i class="fas fa-strikethrough"></i></button>
+              </div>
+              <span class="docs-tb-sep"></span>
+
+              <!-- Cores -->
+              <div class="docs-tb-grupo">
+                <label class="docs-tb-btn docs-color-btn" title="Cor do texto">
+                  <i class="fas fa-font"></i>
+                  <span class="docs-color-bar" id="docsCorTextoBar" style="background:#1a1a1a;"></span>
+                  <input type="color" id="docsCorTexto" value="#1a1a1a"
+                         oninput="docCmdVal('foreColor',this.value);document.getElementById('docsCorTextoBar').style.background=this.value">
+                </label>
+                <label class="docs-tb-btn docs-color-btn" title="Cor de realce">
+                  <i class="fas fa-highlighter"></i>
+                  <span class="docs-color-bar" id="docsCorFundoBar" style="background:#fff176;"></span>
+                  <input type="color" id="docsCorFundo" value="#fff176"
+                         oninput="docCmdVal('hiliteColor',this.value);document.getElementById('docsCorFundoBar').style.background=this.value">
+                </label>
+              </div>
+              <span class="docs-tb-sep"></span>
+
+              <!-- Estilo de parágrafo -->
+              <div class="docs-tb-grupo">
+                <select id="docsBlockFormat" class="docs-tb-select docs-tb-block" onchange="docCmdVal('formatBlock',this.value)" title="Estilo do parágrafo">
+                  <option value="p">Normal</option>
+                  <option value="h1">Título 1</option>
+                  <option value="h2">Título 2</option>
+                  <option value="h3">Título 3</option>
+                  <option value="h4">Título 4</option>
+                  <option value="blockquote">Citação</option>
+                  <option value="pre">Código</option>
+                </select>
+              </div>
+              <span class="docs-tb-sep"></span>
+
+              <!-- Alinhamento -->
+              <div class="docs-tb-grupo">
+                <button class="docs-tb-btn" data-cmd="justifyLeft"   onclick="docCmd('justifyLeft')"   title="Esquerda"><i class="fas fa-align-left"></i></button>
+                <button class="docs-tb-btn" data-cmd="justifyCenter" onclick="docCmd('justifyCenter')" title="Centro"><i class="fas fa-align-center"></i></button>
+                <button class="docs-tb-btn" data-cmd="justifyRight"  onclick="docCmd('justifyRight')"  title="Direita"><i class="fas fa-align-right"></i></button>
+                <button class="docs-tb-btn" data-cmd="justifyFull"   onclick="docCmd('justifyFull')"   title="Justificar"><i class="fas fa-align-justify"></i></button>
+              </div>
+              <span class="docs-tb-sep"></span>
+
+              <!-- Listas e recuo -->
+              <div class="docs-tb-grupo">
+                <button class="docs-tb-btn" data-cmd="insertUnorderedList" onclick="docCmd('insertUnorderedList')" title="Lista com marcadores"><i class="fas fa-list-ul"></i></button>
+                <button class="docs-tb-btn" data-cmd="insertOrderedList"   onclick="docCmd('insertOrderedList')"   title="Lista numerada"><i class="fas fa-list-ol"></i></button>
+                <button class="docs-tb-btn" onclick="docCmd('indent')"   title="Aumentar recuo"><i class="fas fa-indent"></i></button>
+                <button class="docs-tb-btn" onclick="docCmd('outdent')"  title="Diminuir recuo"><i class="fas fa-outdent"></i></button>
+              </div>
+              <span class="docs-tb-sep"></span>
+
+              <!-- Inserir -->
+              <div class="docs-tb-grupo">
+                <button class="docs-tb-btn" onclick="docInserirLinha()"   title="Linha horizontal"><i class="fas fa-minus"></i></button>
+                <button class="docs-tb-btn" onclick="docInserirLink()"    title="Inserir link"><i class="fas fa-link"></i></button>
+                <button class="docs-tb-btn" onclick="docInserirTabela()"  title="Inserir tabela"><i class="fas fa-table"></i></button>
+              </div>
+              <span class="docs-tb-sep"></span>
+
+              <!-- Limpar -->
+              <div class="docs-tb-grupo">
+                <button class="docs-tb-btn" onclick="docCmd('removeFormat')" title="Limpar formatação"><i class="fas fa-remove-format"></i></button>
+              </div>
+
+            </div><!-- /toolbar -->
+
+            <!-- Régua de página (decorativa) -->
+            <div class="docs-editor-regua"></div>
+
+            <!-- Área de edição -->
+            <div class="docs-editor-scroll">
+              <div id="docsDriveEditorArea"
+                   class="docs-editor-area"
+                   contenteditable="true"
+                   data-placeholder="Comece a escrever seu documento aqui..."
+                   onmouseup="docsAtualizarToolbar()"
+                   onkeyup="docsAtualizarToolbar()"
+                   onkeydown="docsEditorKeydown(event)"></div>
+            </div>
+
+          </div>
+
+          <!-- Viewer de imagem -->
+          <div id="docsDriveImagemContainer" style="display:none;" class="docs-viewer-imagem-container">
+            <div class="docs-viewer-header">
+              <i class="fas fa-image"></i>
+              <span id="docsDriveImagemNome"></span>
+            </div>
+            <div class="docs-viewer-imagem-body">
+              <img id="docsDriveImagemEl" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;">
+            </div>
+          </div>
+
+          <!-- Viewer iframe (PDF / outros) -->
+          <div id="docsDriveIframeContainer" style="display:none;" class="docs-viewer-iframe-container">
+            <div class="docs-viewer-header">
+              <i class="fas fa-file-pdf"></i>
+              <span id="docsDriveIframeNome"></span>
+            </div>
+            <iframe id="docsDriveIframeEl" src="" class="docs-viewer-iframe" allowfullscreen></iframe>
+          </div>
+
+        </div>
       </div>
     </div>
   </div>
